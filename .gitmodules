@@ -1,0 +1,9 @@
+[submodule "ext/imgui"]
+	path = ext/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "ext/sdl3"]
+	path = ext/sdl3
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "ext/spdlog"]
+	path = ext/spdlog
+	url = https://github.com/gabime/spdlog.git
