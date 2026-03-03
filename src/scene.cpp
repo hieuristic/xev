@@ -1,6 +1,6 @@
 #include <limits>
-#include <xev/scene.h>
 #include <xev/logger.h>
+#include <xev/scene.h>
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -42,113 +42,51 @@ void Scene::load_gltf(std::string_view filepath) {
 
   uint32_t vertex_offset = 0;
 
-  // Parse vertices and indices
-  for (const auto& mesh : model.meshes) {
-    for (const auto& primitive : mesh.primitives) {
-      uint32_t primitive_vertex_count = 0;
-
-      // Extract positions
-      auto it = primitive.attributes.find("POSITION");
-      if (it != primitive.attributes.end()) {
-        const tinygltf::Accessor& accessor = model.accessors[it->second];
-        const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-        const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-        const float* positions = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-
-        size_t byteStride = accessor.ByteStride(bufferView);
-        if (byteStride == 0) byteStride = sizeof(float) * 3;
-
-        for (size_t i = 0; i < accessor.count; ++i) {
-          const float* p = reinterpret_cast<const float*>(reinterpret_cast<const uint8_t*>(positions) + i * byteStride);
-          // RDF Conversion: +X Right, +Y Down, +Z Front
-          // mapping from standard glTF (+X Right, +Y Up, +Z Back)
-          // to RDF (+X Right, +Y Down, +Z Front) via 180deg rotation around X:
-          // x_rdf = x_gltf, y_rdf = -y_gltf, z_rdf = -z_gltf
-          // m_vert_buffer.push_back(glm::vec3(p[0], -p[1], -p[2]));
-          m_vert_buffer.push_back(glm::vec3(p[0], p[2], p[1]));
-        }
-        primitive_vertex_count = static_cast<uint32_t>(accessor.count);
-      }
-
-      // Extract indices
-      if (primitive.indices >= 0) {
-        const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
-        const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-        const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-        size_t byteStride = accessor.ByteStride(bufferView);
-        const uint8_t* data = &buffer.data[bufferView.byteOffset + accessor.byteOffset];
-
-        for (size_t i = 0; i < accessor.count; i += 3) {
-          uint32_t indices[3] = {0, 0, 0};
-          for (int j = 0; j < 3; ++j) {
-            if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-              const uint16_t* p = reinterpret_cast<const uint16_t*>(data + (i + j) * (byteStride == 0 ? 2 : byteStride));
-              indices[j] = *p;
-            } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-              const uint32_t* p = reinterpret_cast<const uint32_t*>(data + (i + j) * (byteStride == 0 ? 4 : byteStride));
-              indices[j] = *p;
-            } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
-               const uint8_t* p = reinterpret_cast<const uint8_t*>(data + (i + j) * (byteStride == 0 ? 1 : byteStride));
-               indices[j] = *p;
-            }
-            indices[j] += vertex_offset;
-          }
-          m_face_buffer.push_back(glm::uvec3(indices[0], indices[1], indices[2]));
-        }
-      }
-      vertex_offset += primitive_vertex_count;
-    }
+  // parsing camera
+  XEV_INFO("NUMBER OF CAMERAS: {}", model.cameras.size());
+  for (const tinygltf::Camera &cam : model.cameras) {
+    XEV_INFO("CAMERA NAME: {}", cam.name);
   }
 
-  // Parse active camera
-  if (!model.cameras.empty()) {
-    const tinygltf::Camera& gltf_cam = model.cameras[0];
-    if (gltf_cam.type == "perspective") {
-      m_active_cam = Camera(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.0f),
-                            glm::degrees(gltf_cam.perspective.yfov));
-      m_active_cam.near = gltf_cam.perspective.znear;
-      m_active_cam.far = gltf_cam.perspective.zfar > 0.0f ? gltf_cam.perspective.zfar : 1000.0f;
-    } else {
-       m_active_cam = Camera();
-    }
+  // parsing geometry
+  tinygltf::Scene raw_scene = model.scenes[model.defaultScene];
 
-    // Look for node transform if camera is attached
-    for (const auto& node : model.nodes) {
-        if (node.camera == 0) {
-            if (node.translation.size() == 3) {
-                m_active_cam.pos = glm::vec3(node.translation[0], -node.translation[1], -node.translation[2]);
-            }
-            if (node.rotation.size() == 4) {
-                // Quaternion transformation for 180deg around X: (w, x, -y, -z)
-                // m_active_cam.rot = glm::quat(node.rotation[3], node.rotation[0], -node.rotation[1], -node.rotation[2]);
-                m_active_cam.rot = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-            }
-            break;
-        }
-    }
-  } else {
-    m_active_cam = Camera();
+  std::queue<int> to_visit;
+  for (const int &nidx : raw_scene.nodes) {
+    to_visit.push(nidx);
   }
 
-  XEV_INFO("Loaded camera at pos {},{},{}", m_active_cam.pos.x, m_active_cam.pos.y, m_active_cam.pos.z);
-  XEV_INFO("Loaded glTF: {} ({} vertices, {} faces)", path, m_vert_buffer.size(), m_face_buffer.size());
+  XEV_INFO("NUMBER OF NODES: {}", to_visit.size());
+  bool cam_found = false;
+  while (!to_visit.empty()) {
+    int node_idx = to_visit.front();
+    tinygltf::Node node = model.nodes[node_idx];
+
+    if (node.camera != -1 && node.name.compare("cam.active")) {
+      tinygltf::Camera camera = model.cameras[node.camera];
+      assert (camera.type.compare("perspective"));
+      assert (node.rotation.size() == 4);
+      assert (node.translation.size() == 3);
+      Scene.m_active_cam = Camera(node.rotation, node.translation, camera.perspective.yfov);
+      cam_found = true;
+    }
+
+    if (node.mesh != -1) {
+      std::unique<Mesh> mesh = std::make_unique<Mesh>();
+      mesh->load_from_gltf();
+      Scene.m_meshes.push_back(std::move(mesh));
+    }
+
+    for (const int& child : children) {
+      to_visit.push(child);
+    }
+    to_visit.pop();
+  }
+  XEV_ERROR_IF_FAILED(cam_found, "No active camera found!");
 }
 
 void Scene::create_test_triangle() {
-  m_vert_buffer.clear();
-  m_face_buffer.clear();
-
-  // Simple triangle in RDF (+X right, +Y down, +Z front)
-  // These are in clip space if identity MVP is used
-  m_vert_buffer.push_back(glm::vec3(0.0f, -0.5f, 0.5f));  // Top
-  m_vert_buffer.push_back(glm::vec3(0.5f, 0.5f, 0.5f));   // Bottom Right
-  m_vert_buffer.push_back(glm::vec3(-0.5f, 0.5f, 0.5f));  // Bottom Left
-
-  m_face_buffer.push_back(glm::uvec3(0, 1, 2));
-
-  m_active_cam = Camera(); // Identity camera
+  // TODO rewrite this
   XEV_INFO("Created test triangle.");
 }
 

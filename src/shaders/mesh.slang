@@ -19,6 +19,7 @@ struct VertIn {
 struct VertOut {
   float4 sv_position : SV_POSITION;
   uint primitiveID : PRIMITIVE_ID;
+  float world_pos_h;
 };
 
 [shader("vertex")]
@@ -26,6 +27,7 @@ VertOut vert_main(VertIn vertex_input, uint vid: SV_VertexID) {
   VertOut output;
   output.sv_position = mul(pushConstants.mvp, float4(vertex_input.position, 1.0));
   output.primitiveID = vid / 3;
+  output.world_pos_h = vertex_input.position.z;
   return output;
 }
 
@@ -35,7 +37,7 @@ float4 frag_main(VertOut vertex_output): SV_TARGET {
   // float r = hash11(pid);
   // float g = hash11(pid + 100);
   // float b = hash11(pid + 200);
-  float h = vertex_output.sv_position.y / 10.0;
+  float h = vertex_output.world_pos_h * 1.5 + 0.1;
   float r, g, b;
   r = g = b = h;
   return float4(r, g, b, 1.0);

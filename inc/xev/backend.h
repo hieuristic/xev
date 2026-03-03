@@ -27,20 +27,21 @@ struct QueueFamily {
   bool isComplete() { return gfx.has_value() && pre.has_value(); }
 };
 
-typedef uint32_t BufferHandle;
-constexpr BufferHandle BUFFER_NULL_HANDLE = 0;
-
 class Buffer {
 public:
-  Buffer(std::string_view name, VkDeviceSize size, VkBufferUsageFlags usage,
-         VkMemoryPropertyFlags properties);
-  bool is_valid() { return m_valid; }
+  Buffer(VkDevice device, std::string_view name, VkDeviceSize size,
+         VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+         uint32_t memoryTypeIndex);
+  ~Buffer();
+  bool is_valid() const { return m_valid; }
+  VkBuffer handle() const { return m_buffer; }
   std::string name = "";
 
 private:
-  bool m_valid = false;
+  VkDevice m_device = VK_NULL_HANDLE;
   VkBuffer m_buffer = VK_NULL_HANDLE;
-  VkBufferMemory m_memory = VK_NULL_HANDLE;
+  VkDeviceMemory m_memory = VK_NULL_HANDLE;
+  bool m_valid = false;
 };
 
 class Backend {
@@ -67,10 +68,15 @@ public:
   const char *engine_name = "xev_engine";
   uint32_t engine_version = VK_MAKE_VERSION(0, 0, 0);
 
-  void create_buffer(VkDevice size, VkBufferUsageFlags usage,
+  void create_buffer(std::string_view name, VkDeviceSize size,
+                     VkBufferUsageFlags usage,
                      VkMemoryPropertyFlags properties);
+  void remove_buffer(std::string_view name);
+  Buffer *get_buffer(std::string_view name);
 
 private:
+  uint32_t find_memory_type(uint32_t typeFilter,
+                            VkMemoryPropertyFlags properties);
   QueueFamily getQueueFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
   VkSwapchainKHR create_swapchain(VkDevice device, VkSurfaceKHR surface);
   VkSwapchainKHR recreate_swapchain(VkDevice device, VkSurfaceKHR surface);
@@ -124,7 +130,7 @@ private:
   VkQueue m_gfx_queue = VK_NULL_HANDLE;
   VkQueue m_pre_queue = VK_NULL_HANDLE;
 
-  std::unordered_map<BufferHandle, std::unique_ptr<Buffer>> m_buffers;
+  std::unordered_map<std::string, std::unique_ptr<Buffer>> m_buffers;
 };
 
 } // namespace xev

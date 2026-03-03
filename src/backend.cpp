@@ -227,7 +227,7 @@ VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
 
 VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                                          VkSurfaceKHR surface) {
-  VkSuccess res_;
+  VkResult res_;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
   if (!m_qfam.isComplete()) {
@@ -379,15 +379,64 @@ VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
 void Backend::create_buffer(std::string_view name, VkDeviceSize size,
                             VkBufferUsageFlags usage,
                             VkMemoryPropertyFlags properties) {
-  std::unique_ptr<Buffer> buffer =
-      std::make_unique<Buffer>(name, size, usage, properties);
-  if (buffer.is_valid()) {
-    m_buffers.push_back(std::move(buffer));
+  VkBufferCreateInfo buffer_info = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .size = size,
+      .usage = usage,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+  };
+
+  VkBuffer buffer;
+  VkResult res = vkCreateBuffer(m_dev, &buffer_info, nullptr, &buffer);
+  XEV_ERROR_IF_FAILED(res, "Failed to create buffer: {}", name);
+  if (res != VK_SUCCESS)
+    return;
+
+  VkMemoryRequirements mem_req;
+  vkGetBufferMemoryRequirements(m_dev, buffer, &mem_req);
+
+  uint32_t mem_type = find_memory_type(mem_req.memoryTypeBits, properties);
+  vkDestroyBuffer(m_dev, buffer, nullptr); // Destroy temp buffer used for requirements
+
+  auto buf_ptr = std::make_unique<Buffer>(m_dev, name, size, usage, properties, mem_type);
+  if (buf_ptr->is_valid()) {
+    m_buffers[std::string(name)] = std::move(buf_ptr);
   }
 }
 
-Buffer::Buffer(std::string_view name, VkDeviceSize size,
-               VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) {
+void Backend::remove_buffer(std::string_view name) {
+  m_buffers.erase(std::string(name));
+}
+
+Buffer *Backend::get_buffer(std::string_view name) {
+  auto it = m_buffers.find(std::string(name));
+  if (it != m_buffers.end()) {
+    return it->second.get();
+  }
+  return nullptr;
+}
+
+uint32_t Backend::find_memory_type(uint32_t typeFilter,
+                                  VkMemoryPropertyFlags properties) {
+  VkPhysicalDeviceMemoryProperties memProperties;
+  vkGetPhysicalDeviceMemoryProperties(m_physical_dev, &memProperties);
+
+  for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+    if ((typeFilter & (1 << i)) &&
+        (memProperties.memoryTypes[i].propertyFlags & properties) ==
+            properties) {
+      return i;
+    }
+  }
+
+  XEV_ERROR("Failed to find suitable memory type!");
+  return 0;
+}
+
+Buffer::Buffer(VkDevice device, std::string_view name, VkDeviceSize size,
+               VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+               uint32_t memoryTypeIndex)
+    : m_device(device), name(name) {
   VkResult res_;
 
   VkBufferCreateInfo buffer_info = {
@@ -397,27 +446,50 @@ Buffer::Buffer(std::string_view name, VkDeviceSize size,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
 
-  res_ = vkCreateBuffer(m_device, &buffer_info, nullptr, &buffer.buffer);
+  res_ = vkCreateBuffer(m_device, &buffer_info, nullptr, &m_buffer);
   XEV_ERROR_IF_FAILED(res_, "Failed to create buffer: {}", name);
+  if (res_ != VK_SUCCESS)
+    return;
 
   VkMemoryRequirements mem_req;
-  vkGetBufferMemoryRequirements(m_device, buffer.buffer, &mem_req);
+  vkGetBufferMemoryRequirements(m_device, m_buffer, &mem_req);
 
   VkMemoryAllocateInfo alloc_info = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
       .allocationSize = mem_req.size,
-      .memoryTypeIndex = find_memory_type(mem_req.memoryTypeBits, properties),
+      .memoryTypeIndex = memoryTypeIndex,
   };
 
-  res_ = vkAllocateMemory(device, &alloc_info, nullptr, &buffer.memory);
+  res_ = vkAllocateMemory(m_device, &alloc_info, nullptr, &m_memory);
   XEV_ERROR_IF_FAILED(res_, "Failed to allocate buffer memory: {}", name);
+  if (res_ != VK_SUCCESS) {
+    vkDestroyBuffer(m_device, m_buffer, nullptr);
+    m_buffer = VK_NULL_HANDLE;
+    return;
+  }
 
-  res_ = vkBindBufferMemory(device, buffer.buffer, buffer.memory, 0);
-  if m_buffers
-    .push_back(buffer);
+  res_ = vkBindBufferMemory(m_device, m_buffer, m_memory, 0);
+  XEV_ERROR_IF_FAILED(res_, "Failed to bind buffer memory: {}", name);
+  if (res_ != VK_SUCCESS) {
+    vkFreeMemory(m_device, m_memory, nullptr);
+    vkDestroyBuffer(m_device, m_buffer, nullptr);
+    m_buffer = VK_NULL_HANDLE;
+    m_memory = VK_NULL_HANDLE;
+    return;
+  }
+
+  m_valid = true;
 }
 
 Buffer::~Buffer() {
+  if (m_device != VK_NULL_HANDLE) {
+    if (m_memory != VK_NULL_HANDLE) {
+      vkFreeMemory(m_device, m_memory, nullptr);
+    }
+    if (m_buffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(m_device, m_buffer, nullptr);
+    }
+  }
 }
 
 } // namespace xev

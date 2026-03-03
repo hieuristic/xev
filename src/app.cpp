@@ -37,14 +37,7 @@ App::App() : m_running(true) {
   }
 
   m_scene = std::make_unique<Scene>();
-  m_scene->load_gltf(base_path + "../../assets/bunny.glb");
-
-  // If no camera was loaded, setup a default one that can see the bunny
-  // if (m_scene->m_active_cam.near == 0.0f) {
-  //     m_scene->m_active_cam.pos = glm::vec3(0.0f, 0.0f, -5.0f); // Look from -Z in RDF (Forward)
-  //     m_scene->m_active_cam.near = 0.1f;
-  //     m_scene->m_active_cam.far = 100.0f;
-  // }
+  m_scene->load_gltf(base_path + "../../assets/player.glb");
 
   XEV_INFO("Scene vertices: {}, faces: {}", m_scene->m_vert_buffer.size(),
            m_scene->m_face_buffer.size());
