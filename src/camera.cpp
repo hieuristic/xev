@@ -32,15 +32,21 @@ Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fovx_deg, float fovy_deg,
 }
 
 glm::mat4 Camera::create_view_mat() const {
-  glm::mat4 rot4 = glm::mat4_cast(rot);
-  return rot4 * glm::translate(glm::mat4(1.0f), -pos);
+  glm::mat4 rot_inv = glm::mat4_cast(glm::conjugate(rot));
+  glm::mat4 trans_inv = glm::translate(glm::mat4(1.0f), -pos);
+  return rot_inv * trans_inv;
 }
 
 glm::mat4 Camera::create_proj_mat() const {
   float aspect = std::tan(fovx_rad * 0.5f) / std::tan(fovy_rad * 0.5f);
-  glm::mat4 proj = glm::perspective(fovy_rad, aspect, near, far);
-  proj[2][0] = shift_x;
-  proj[2][1] = shift_y;
+  // For RDF (Right-Handed, +Z is Forward, +Y is Down, +X is Right)
+  // Vulkan clip space: +X Right, +Y Down, +Z Forward (0 to 1)
+  glm::mat4 proj = glm::mat4(0.0f);
+  proj[0][0] = 1.0f / aspect / std::tan(fovy_rad * 0.5f);
+  proj[1][1] = 1.0f / std::tan(fovy_rad * 0.5f);
+  proj[2][2] = far / (far - near);
+  proj[2][3] = 1.0f;
+  proj[3][2] = -(far * near) / (far - near);
   return proj;
 }
 

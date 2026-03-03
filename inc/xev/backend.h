@@ -27,6 +27,22 @@ struct QueueFamily {
   bool isComplete() { return gfx.has_value() && pre.has_value(); }
 };
 
+typedef uint32_t BufferHandle;
+constexpr BufferHandle BUFFER_NULL_HANDLE = 0;
+
+class Buffer {
+public:
+  Buffer(std::string_view name, VkDeviceSize size, VkBufferUsageFlags usage,
+         VkMemoryPropertyFlags properties);
+  bool is_valid() { return m_valid; }
+  std::string name = "";
+
+private:
+  bool m_valid = false;
+  VkBuffer m_buffer = VK_NULL_HANDLE;
+  VkBufferMemory m_memory = VK_NULL_HANDLE;
+};
+
 class Backend {
 public:
   Backend(SDL_Window *window);
@@ -38,16 +54,21 @@ public:
   VkQueue retrieve_queue(QFAM qfam, uint32_t qidx);
   std::optional<QueueFamilyEntry> get_queue_family_index(QFAM qfam);
   VkSurfaceFormatKHR get_format() { return m_ideal_format; }
-  
+
   VkSwapchainKHR get_swapchain() { return m_swapchain; }
   VkExtent2D get_extent() { return m_extent; }
   std::vector<VkImage> get_swapchain_images() { return m_swapchain_images; }
-  std::vector<VkImageView> get_swapchain_image_views() { return m_swapchain_image_views; }
+  std::vector<VkImageView> get_swapchain_image_views() {
+    return m_swapchain_image_views;
+  }
 
   const char *app_name = "xev_app";
   uint32_t app_version = VK_MAKE_VERSION(0, 0, 0);
   const char *engine_name = "xev_engine";
   uint32_t engine_version = VK_MAKE_VERSION(0, 0, 0);
+
+  void create_buffer(VkDevice size, VkBufferUsageFlags usage,
+                     VkMemoryPropertyFlags properties);
 
 private:
   QueueFamily getQueueFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
@@ -102,6 +123,8 @@ private:
 
   VkQueue m_gfx_queue = VK_NULL_HANDLE;
   VkQueue m_pre_queue = VK_NULL_HANDLE;
+
+  std::unordered_map<BufferHandle, std::unique_ptr<Buffer>> m_buffers;
 };
 
 } // namespace xev

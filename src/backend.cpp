@@ -227,9 +227,12 @@ VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
 
 VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                                          VkSurfaceKHR surface) {
+  VkSuccess res_;
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+
   if (!m_qfam.isComplete()) {
     XEV_ERROR("Queue families incomplete for swapchain");
-    return VK_NULL_HANDLE;
+    return swapchain;
   }
 
   VkSurfaceCapabilitiesKHR capabilities;
@@ -241,7 +244,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                                        nullptr);
   if (format_count == 0) {
     XEV_ERROR("No surface formats supported");
-    return VK_NULL_HANDLE;
+    return swapchain;
   }
   std::vector<VkSurfaceFormatKHR> formats(format_count);
   vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_dev, surface, &format_count,
@@ -252,7 +255,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                                             &present_mode_count, nullptr);
   if (present_mode_count == 0) {
     XEV_ERROR("No surface present modes supported");
-    return VK_NULL_HANDLE;
+    return swapchain;
   }
   std::vector<VkPresentModeKHR> present_modes(present_mode_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -270,6 +273,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   if (surface_format.format != m_ideal_format.format ||
       surface_format.colorSpace != m_ideal_format.colorSpace) {
     XEV_ERROR("Ideal format not supported by swapchain");
+    return swapchain;
   }
 
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -317,8 +321,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
     swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   }
 
-  VkResult res_ =
-      vkCreateSwapchainKHR(device, &swapchain_info, nullptr, &m_swapchain);
+  res_ = vkCreateSwapchainKHR(device, &swapchain_info, nullptr, &m_swapchain);
   if (res_ != VK_SUCCESS) {
     XEV_ERROR("Swapchain creation failed: {}", (int)res_);
     return VK_NULL_HANDLE;
@@ -329,7 +332,8 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   uint32_t real_image_count;
   vkGetSwapchainImagesKHR(device, m_swapchain, &real_image_count, nullptr);
   m_swapchain_images.resize(real_image_count);
-  vkGetSwapchainImagesKHR(device, m_swapchain, &real_image_count, m_swapchain_images.data());
+  vkGetSwapchainImagesKHR(device, m_swapchain, &real_image_count,
+                          m_swapchain_images.data());
 
   m_swapchain_image_views.resize(real_image_count);
   for (uint32_t i = 0; i < real_image_count; i++) {
@@ -338,21 +342,22 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
         .image = m_swapchain_images[i],
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = surface_format.format,
-        .components = {
-            VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY
-        },
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        },
+        .components = {VK_COMPONENT_SWIZZLE_IDENTITY,
+                       VK_COMPONENT_SWIZZLE_IDENTITY,
+                       VK_COMPONENT_SWIZZLE_IDENTITY,
+                       VK_COMPONENT_SWIZZLE_IDENTITY},
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
     };
-    if (vkCreateImageView(device, &view_info, nullptr, &m_swapchain_image_views[i]) != VK_SUCCESS) {
-      XEV_ERROR("Failed to create swapchain image view!");
-    }
+    res_ = vkCreateImageView(device, &view_info, nullptr,
+                             &m_swapchain_image_views[i]);
+    XEV_ERROR_IF_FAILED(res_, "Failed to create swapchain image view!");
   }
 
   return m_swapchain;
@@ -369,6 +374,50 @@ VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
     vkDestroySwapchainKHR(device, m_swapchain, nullptr);
   }
   return create_swapchain(device, surface);
+}
+
+void Backend::create_buffer(std::string_view name, VkDeviceSize size,
+                            VkBufferUsageFlags usage,
+                            VkMemoryPropertyFlags properties) {
+  std::unique_ptr<Buffer> buffer =
+      std::make_unique<Buffer>(name, size, usage, properties);
+  if (buffer.is_valid()) {
+    m_buffers.push_back(std::move(buffer));
+  }
+}
+
+Buffer::Buffer(std::string_view name, VkDeviceSize size,
+               VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) {
+  VkResult res_;
+
+  VkBufferCreateInfo buffer_info = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .size = size,
+      .usage = usage,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+  };
+
+  res_ = vkCreateBuffer(m_device, &buffer_info, nullptr, &buffer.buffer);
+  XEV_ERROR_IF_FAILED(res_, "Failed to create buffer: {}", name);
+
+  VkMemoryRequirements mem_req;
+  vkGetBufferMemoryRequirements(m_device, buffer.buffer, &mem_req);
+
+  VkMemoryAllocateInfo alloc_info = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .allocationSize = mem_req.size,
+      .memoryTypeIndex = find_memory_type(mem_req.memoryTypeBits, properties),
+  };
+
+  res_ = vkAllocateMemory(device, &alloc_info, nullptr, &buffer.memory);
+  XEV_ERROR_IF_FAILED(res_, "Failed to allocate buffer memory: {}", name);
+
+  res_ = vkBindBufferMemory(device, buffer.buffer, buffer.memory, 0);
+  if m_buffers
+    .push_back(buffer);
+}
+
+Buffer::~Buffer() {
 }
 
 } // namespace xev

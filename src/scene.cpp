@@ -1,3 +1,4 @@
+#include <limits>
 #include <xev/scene.h>
 #include <xev/logger.h>
 
@@ -39,9 +40,12 @@ void Scene::load_gltf(std::string_view filepath) {
   m_vert_buffer.clear();
   m_face_buffer.clear();
 
+  uint32_t vertex_offset = 0;
+
   // Parse vertices and indices
   for (const auto& mesh : model.meshes) {
     for (const auto& primitive : mesh.primitives) {
+      uint32_t primitive_vertex_count = 0;
 
       // Extract positions
       auto it = primitive.attributes.find("POSITION");
@@ -57,8 +61,14 @@ void Scene::load_gltf(std::string_view filepath) {
 
         for (size_t i = 0; i < accessor.count; ++i) {
           const float* p = reinterpret_cast<const float*>(reinterpret_cast<const uint8_t*>(positions) + i * byteStride);
-          m_vert_buffer.push_back(glm::vec3(p[0], p[1], p[2]));
+          // RDF Conversion: +X Right, +Y Down, +Z Front
+          // mapping from standard glTF (+X Right, +Y Up, +Z Back)
+          // to RDF (+X Right, +Y Down, +Z Front) via 180deg rotation around X:
+          // x_rdf = x_gltf, y_rdf = -y_gltf, z_rdf = -z_gltf
+          // m_vert_buffer.push_back(glm::vec3(p[0], -p[1], -p[2]));
+          m_vert_buffer.push_back(glm::vec3(p[0], p[2], p[1]));
         }
+        primitive_vertex_count = static_cast<uint32_t>(accessor.count);
       }
 
       // Extract indices
@@ -83,10 +93,12 @@ void Scene::load_gltf(std::string_view filepath) {
                const uint8_t* p = reinterpret_cast<const uint8_t*>(data + (i + j) * (byteStride == 0 ? 1 : byteStride));
                indices[j] = *p;
             }
+            indices[j] += vertex_offset;
           }
           m_face_buffer.push_back(glm::uvec3(indices[0], indices[1], indices[2]));
         }
       }
+      vertex_offset += primitive_vertex_count;
     }
   }
 
@@ -106,9 +118,11 @@ void Scene::load_gltf(std::string_view filepath) {
     for (const auto& node : model.nodes) {
         if (node.camera == 0) {
             if (node.translation.size() == 3) {
-                m_active_cam.pos = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+                m_active_cam.pos = glm::vec3(node.translation[0], -node.translation[1], -node.translation[2]);
             }
             if (node.rotation.size() == 4) {
+                // Quaternion transformation for 180deg around X: (w, x, -y, -z)
+                // m_active_cam.rot = glm::quat(node.rotation[3], node.rotation[0], -node.rotation[1], -node.rotation[2]);
                 m_active_cam.rot = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
             }
             break;
@@ -118,7 +132,24 @@ void Scene::load_gltf(std::string_view filepath) {
     m_active_cam = Camera();
   }
 
+  XEV_INFO("Loaded camera at pos {},{},{}", m_active_cam.pos.x, m_active_cam.pos.y, m_active_cam.pos.z);
   XEV_INFO("Loaded glTF: {} ({} vertices, {} faces)", path, m_vert_buffer.size(), m_face_buffer.size());
+}
+
+void Scene::create_test_triangle() {
+  m_vert_buffer.clear();
+  m_face_buffer.clear();
+
+  // Simple triangle in RDF (+X right, +Y down, +Z front)
+  // These are in clip space if identity MVP is used
+  m_vert_buffer.push_back(glm::vec3(0.0f, -0.5f, 0.5f));  // Top
+  m_vert_buffer.push_back(glm::vec3(0.5f, 0.5f, 0.5f));   // Bottom Right
+  m_vert_buffer.push_back(glm::vec3(-0.5f, 0.5f, 0.5f));  // Bottom Left
+
+  m_face_buffer.push_back(glm::uvec3(0, 1, 2));
+
+  m_active_cam = Camera(); // Identity camera
+  XEV_INFO("Created test triangle.");
 }
 
 } // namespace xev
