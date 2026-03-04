@@ -1,4 +1,5 @@
 #include <xev/renderer.h>
+#include <xev/mesh.h>
 
 namespace xev {
 
@@ -555,9 +556,6 @@ void Renderer::draw() {
 
   glm::mat4 vp_mat = m_scene->m_active_cam.create_vp_mat();
 
-  vkCmdPushConstants(m_cmd_buffer, m_pipeline_layout,
-                     VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp_mat);
-
   VkViewport viewport = {
       .x = 0.0f,
       .y = 0.0f,
@@ -574,17 +572,22 @@ void Renderer::draw() {
   };
   vkCmdSetScissor(m_cmd_buffer, 0, 1, &scissor);
 
-  if (m_vertex_buffer != VK_NULL_HANDLE) {
+  if (m_vertex_buffer != VK_NULL_HANDLE && m_index_buffer != VK_NULL_HANDLE) {
     VkBuffer vertexBuffers[] = {m_vertex_buffer};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(m_cmd_buffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(m_cmd_buffer, m_index_buffer, 0,
+                         VK_INDEX_TYPE_UINT32);
 
-    if (m_index_buffer != VK_NULL_HANDLE) {
-      vkCmdBindIndexBuffer(m_cmd_buffer, m_index_buffer, 0,
-                           VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(m_cmd_buffer, m_index_count, 1, 0, 0, 0);
-    } else {
-      vkCmdDraw(m_cmd_buffer, static_cast<uint32_t>(m_scene->m_vert_buffer.size()), 1, 0, 0);
+    for (const Mesh& mesh : m_scene->m_meshes) {
+      glm::mat4 mvp = vp_mat * mesh.get_model_mat();
+      vkCmdPushConstants(m_cmd_buffer, m_pipeline_layout,
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &mvp);
+
+      for (const MeshPrimitive& mp : mesh.get_primitives()) {
+        vkCmdDrawIndexed(m_cmd_buffer, mp.flength * 3, 1,
+                         mp.foffset * 3, mp.voffset, 0);
+      }
     }
   }
 

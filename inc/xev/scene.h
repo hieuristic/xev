@@ -5,6 +5,7 @@
 #include <string_view>
 #include <glm/glm.hpp>
 #include <xev/camera.h>
+#include <xev/mesh.h>
 
 namespace xev {
 
@@ -16,6 +17,7 @@ public:
 
   std::vector<glm::vec3> m_vert_buffer;
   std::vector<glm::uvec3> m_face_buffer;
+  std::vector<Mesh> m_meshes;
   Camera m_active_cam;
 };
 

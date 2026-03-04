@@ -29,7 +29,7 @@ public:
   float fovy_rad = glm::radians(70.0);
   float shift_x = 0.0;
   float shift_y = 0.0;
-  float near = 0.0;
+  float near = 0.01f;
   float far = 1000.0;
 };
 

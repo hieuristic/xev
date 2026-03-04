@@ -37,7 +37,7 @@ App::App() : m_running(true) {
   }
 
   m_scene = std::make_unique<Scene>();
-  m_scene->load_gltf(base_path + "../../assets/player.glb");
+  m_scene->load_gltf(base_path + "../../assets/bunny.glb");
 
   XEV_INFO("Scene vertices: {}, faces: {}", m_scene->m_vert_buffer.size(),
            m_scene->m_face_buffer.size());

@@ -34,11 +34,11 @@ VertOut vert_main(VertIn vertex_input, uint vid: SV_VertexID) {
 [shader("fragment")]
 float4 frag_main(VertOut vertex_output): SV_TARGET {
   uint pid = vertex_output.primitiveID;
-  // float r = hash11(pid);
-  // float g = hash11(pid + 100);
-  // float b = hash11(pid + 200);
-  float h = vertex_output.world_pos_h * 1.5 + 0.1;
-  float r, g, b;
-  r = g = b = h;
+  float r = hash11(pid);
+  float g = hash11(pid + 100);
+  float b = hash11(pid + 200);
+  // float h = vertex_output.world_pos_h * 1.5 + 0.1;
+  // float r, g, b;
+  // r = g = b = h;
   return float4(r, g, b, 1.0);
 }

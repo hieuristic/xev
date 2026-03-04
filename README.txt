@@ -10,3 +10,8 @@ Copyright © Nguyen Minh Hieu, 2026
 
 You can install the example app with:
 cmake -B build && cmake --build build -j8 && ./build/bin/xev
+
+
+2. Coordinate System
+
+Local object frame uses right-handed RDF system (+x - Right, +y - Down, +z - Front).
