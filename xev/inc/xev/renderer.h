@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include <volk.h>
+#include <xev/volk.h>
 #include <xev/shader.h>
 #include <xev/scene.h>
 #include <xev/backend.h>
@@ -14,6 +14,7 @@ public:
 
   void draw();
   void draw_triangle();
+  void drawMesh();
 
 private:
   void create_pipeline(VkDevice device, VkFormat swapchain_format);
@@ -38,6 +39,12 @@ private:
 
   VkBuffer m_vertex_buffer = VK_NULL_HANDLE;
   VkDeviceMemory m_vertex_buffer_memory = VK_NULL_HANDLE;
+
+  VkBuffer m_normal_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_normal_buffer_memory = VK_NULL_HANDLE;
+
+  VkBuffer m_uv_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_uv_buffer_memory = VK_NULL_HANDLE;
 
   VkBuffer m_index_buffer = VK_NULL_HANDLE;
   VkDeviceMemory m_index_buffer_memory = VK_NULL_HANDLE;

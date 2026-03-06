@@ -1,4 +1,4 @@
-#define VOLK_IMPLEMENTATION
+
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <set>
@@ -62,45 +62,45 @@ Backend::Backend(SDL_Window *window) {
       .enabledExtensionCount = (uint32_t)extensions.size(),
       .ppEnabledExtensionNames = extensions.data(),
   };
-  res_ = vkCreateInstance(&vkcreate_info, nullptr, &m_inst);
+  res_ = vkCreateInstance(&vkcreate_info, nullptr, &m_instance);
   if (res_ != VK_SUCCESS) {
     XEV_ERROR("Vulkan instance creation failed: {}", (int)res_);
     return;
   }
 
-  volkLoadInstance(m_inst);
+  volkLoadInstance(m_instance);
 
-  if (!SDL_Vulkan_CreateSurface(window, m_inst, nullptr, &m_surf)) {
+  if (!SDL_Vulkan_CreateSurface(window, m_instance, nullptr, &m_surface)) {
     XEV_ERROR("Failed to create surface: {}", SDL_GetError());
     return;
   }
 
   uint32_t num_physdev;
-  vkEnumeratePhysicalDevices(m_inst, &num_physdev, nullptr);
+  vkEnumeratePhysicalDevices(m_instance, &num_physdev, nullptr);
   if (num_physdev < 1) {
     XEV_ERROR("No physical device found");
     return;
   }
 
   std::vector<VkPhysicalDevice> physdevs(num_physdev);
-  res_ = vkEnumeratePhysicalDevices(m_inst, &num_physdev, physdevs.data());
+  res_ = vkEnumeratePhysicalDevices(m_instance, &num_physdev, physdevs.data());
   if (res_ != VK_SUCCESS) {
     XEV_ERROR("Failed to get physical device: {}", (int)res_);
     return;
   }
-  m_physical_dev = physdevs[0];
+  m_physical_device = physdevs[0];
 
   VkPhysicalDeviceProperties dev_prop;
-  vkGetPhysicalDeviceProperties(m_physical_dev, &dev_prop);
+  vkGetPhysicalDeviceProperties(m_physical_device, &dev_prop);
   XEV_INFO("Using physical device {}", dev_prop.deviceName);
 
-  m_qfam = getQueueFamily(m_physical_dev, m_surf);
+  m_qfam = get_queue_family(m_physical_device, m_surface);
 
   uint32_t device_ext_count;
-  vkEnumerateDeviceExtensionProperties(m_physical_dev, nullptr,
+  vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr,
                                        &device_ext_count, nullptr);
   std::vector<VkExtensionProperties> device_exts(device_ext_count);
-  vkEnumerateDeviceExtensionProperties(m_physical_dev, nullptr,
+  vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr,
                                        &device_ext_count, device_exts.data());
 
   for (const auto &ext : device_exts) {
@@ -133,36 +133,40 @@ Backend::Backend(SDL_Window *window) {
       .ppEnabledExtensionNames = m_ext.data(),
   };
 
-  res_ = vkCreateDevice(m_physical_dev, &dev_info, nullptr, &m_dev);
+  res_ = vkCreateDevice(m_physical_device, &dev_info, nullptr, &m_device);
   if (res_ != VK_SUCCESS) {
     XEV_ERROR("Failed to create logical device: {}", (int)res_);
     return;
   }
 
-  volkLoadDevice(m_dev);
+  volkLoadDevice(m_device);
+  m_allocator =
+      create_memory_allocator(m_instance, m_physical_device, m_device);
 
   m_gfx_queue = retrieve_queue(Q_GRAPHICS);
   m_pre_queue = retrieve_queue(Q_PRESENT);
 
-  create_swapchain(m_dev, m_surf);
+  m_swapchain = create_swapchain(m_device, m_surface);
 }
 
 Backend::~Backend() {
+  if (m_allocator != nullptr)
+    vmaDestroyAllocator(m_allocator);
   for (auto imageView : m_swapchain_image_views) {
-    vkDestroyImageView(m_dev, imageView, nullptr);
+    vkDestroyImageView(m_device, imageView, nullptr);
   }
   if (m_swapchain != VK_NULL_HANDLE)
-    vkDestroySwapchainKHR(m_dev, m_swapchain, nullptr);
-  if (m_dev != VK_NULL_HANDLE)
-    vkDestroyDevice(m_dev, nullptr);
-  if (m_surf != VK_NULL_HANDLE)
-    vkDestroySurfaceKHR(m_inst, m_surf, nullptr);
-  if (m_inst != VK_NULL_HANDLE)
-    vkDestroyInstance(m_inst, nullptr);
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+  if (m_device != VK_NULL_HANDLE)
+    vkDestroyDevice(m_device, nullptr);
+  if (m_surface != VK_NULL_HANDLE)
+    vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+  if (m_instance != VK_NULL_HANDLE)
+    vkDestroyInstance(m_instance, nullptr);
 }
 
-QueueFamily Backend::getQueueFamily(VkPhysicalDevice device,
-                                    VkSurfaceKHR surface) {
+QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
+                                      VkSurfaceKHR surface) {
   QueueFamily qfam;
   uint32_t qfam_cnt;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &qfam_cnt, nullptr);
@@ -200,7 +204,7 @@ VkQueue Backend::retrieve_queue(QFAM qfam) { return retrieve_queue(qfam, 0); }
 
 VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
   VkQueue queue = VK_NULL_HANDLE;
-  if (m_dev == VK_NULL_HANDLE) {
+  if (m_device == VK_NULL_HANDLE) {
     XEV_ERROR("Device not initialized");
     return queue;
   }
@@ -221,7 +225,7 @@ VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
       .queueIndex = qidx,
   };
 
-  vkGetDeviceQueue2(m_dev, &q_info, &queue);
+  vkGetDeviceQueue2(m_device, &q_info, &queue);
   return queue;
 }
 
@@ -236,22 +240,22 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   }
 
   VkSurfaceCapabilitiesKHR capabilities;
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_dev, surface,
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_device, surface,
                                             &capabilities);
 
   uint32_t format_count;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_dev, surface, &format_count,
-                                       nullptr);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_device, surface,
+                                       &format_count, nullptr);
   if (format_count == 0) {
     XEV_ERROR("No surface formats supported");
     return swapchain;
   }
   std::vector<VkSurfaceFormatKHR> formats(format_count);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_dev, surface, &format_count,
-                                       formats.data());
+  vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_device, surface,
+                                       &format_count, formats.data());
 
   uint32_t present_mode_count;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(m_physical_dev, surface,
+  vkGetPhysicalDeviceSurfacePresentModesKHR(m_physical_device, surface,
                                             &present_mode_count, nullptr);
   if (present_mode_count == 0) {
     XEV_ERROR("No surface present modes supported");
@@ -259,7 +263,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   }
   std::vector<VkPresentModeKHR> present_modes(present_mode_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(
-      m_physical_dev, surface, &present_mode_count, present_modes.data());
+      m_physical_device, surface, &present_mode_count, present_modes.data());
 
   VkSurfaceFormatKHR surface_format = formats[0];
   for (const auto &format : formats) {
@@ -376,120 +380,61 @@ VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
   return create_swapchain(device, surface);
 }
 
-void Backend::create_buffer(std::string_view name, VkDeviceSize size,
-                            VkBufferUsageFlags usage,
-                            VkMemoryPropertyFlags properties) {
+Buffer Backend::create_buffer(std::string_view name, VkDeviceSize size,
+                              VkBufferUsageFlags usage,
+                              VmaMemoryUsage mem_usage) const {
+  Buffer buffer{};
+
   VkBufferCreateInfo buffer_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
       .usage = usage,
-      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
 
-  VkBuffer buffer;
-  VkResult res = vkCreateBuffer(m_dev, &buffer_info, nullptr, &buffer);
-  XEV_ERROR_IF_FAILED(res, "Failed to create buffer: {}", name);
-  if (res != VK_SUCCESS)
-    return;
+  VmaAllocationCreateInfo alloc_info = {
+      .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
+               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+      .usage = mem_usage,
+  };
 
-  VkMemoryRequirements mem_req;
-  vkGetBufferMemoryRequirements(m_dev, buffer, &mem_req);
+  VkResult res_ = vmaCreateBuffer(m_allocator, &buffer_info, &alloc_info,
+                                   &buffer.buffer, &buffer.alloc,
+                                   &buffer.alloc_info);
+  XEV_ASSERT(res_ == VK_SUCCESS);
 
-  uint32_t mem_type = find_memory_type(mem_req.memoryTypeBits, properties);
-  vkDestroyBuffer(m_dev, buffer, nullptr); // Destroy temp buffer used for requirements
-
-  auto buf_ptr = std::make_unique<Buffer>(m_dev, name, size, usage, properties, mem_type);
-  if (buf_ptr->is_valid()) {
-    m_buffers[std::string(name)] = std::move(buf_ptr);
-  }
+  XEV_INFO("Created buffer '{}' ({} bytes)", name, size);
+  return buffer;
 }
 
-void Backend::remove_buffer(std::string_view name) {
-  m_buffers.erase(std::string(name));
+void Backend::destroy_buffer(Buffer buffer) {
+  vmaDestroyBuffer(m_allocator, buffer.buffer, buffer.alloc);
 }
 
-Buffer *Backend::get_buffer(std::string_view name) {
-  auto it = m_buffers.find(std::string(name));
-  if (it != m_buffers.end()) {
-    return it->second.get();
-  }
-  return nullptr;
-}
-
-uint32_t Backend::find_memory_type(uint32_t typeFilter,
-                                  VkMemoryPropertyFlags properties) {
-  VkPhysicalDeviceMemoryProperties memProperties;
-  vkGetPhysicalDeviceMemoryProperties(m_physical_dev, &memProperties);
-
-  for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-    if ((typeFilter & (1 << i)) &&
-        (memProperties.memoryTypes[i].propertyFlags & properties) ==
-            properties) {
-      return i;
-    }
-  }
-
-  XEV_ERROR("Failed to find suitable memory type!");
-  return 0;
-}
-
-Buffer::Buffer(VkDevice device, std::string_view name, VkDeviceSize size,
-               VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-               uint32_t memoryTypeIndex)
-    : m_device(device), name(name) {
+VmaAllocator Backend::create_memory_allocator(VkInstance instance,
+                                              VkPhysicalDevice physical_device,
+                                              VkDevice device) {
   VkResult res_;
+  VmaAllocator allocator;
 
-  VkBufferCreateInfo buffer_info = {
-      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-      .size = size,
-      .usage = usage,
-      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+  VmaAllocatorCreateInfo info = {
+      .flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT |
+               VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT |
+               VMA_ALLOCATOR_CREATE_KHR_BIND_MEMORY2_BIT,
+      .physicalDevice = physical_device,
+      .device = device,
+      .instance = instance,
+      .vulkanApiVersion = VK_API_VERSION_1_3,
   };
 
-  res_ = vkCreateBuffer(m_device, &buffer_info, nullptr, &m_buffer);
-  XEV_ERROR_IF_FAILED(res_, "Failed to create buffer: {}", name);
-  if (res_ != VK_SUCCESS)
-    return;
+  VmaVulkanFunctions vma_func{};
+  vma_func.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+  vma_func.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+  info.pVulkanFunctions = &vma_func;
 
-  VkMemoryRequirements mem_req;
-  vkGetBufferMemoryRequirements(m_device, m_buffer, &mem_req);
+  res_ = vmaCreateAllocator(&info, &allocator);
+  XEV_ASSERT(res_ == VK_SUCCESS);
 
-  VkMemoryAllocateInfo alloc_info = {
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .allocationSize = mem_req.size,
-      .memoryTypeIndex = memoryTypeIndex,
-  };
-
-  res_ = vkAllocateMemory(m_device, &alloc_info, nullptr, &m_memory);
-  XEV_ERROR_IF_FAILED(res_, "Failed to allocate buffer memory: {}", name);
-  if (res_ != VK_SUCCESS) {
-    vkDestroyBuffer(m_device, m_buffer, nullptr);
-    m_buffer = VK_NULL_HANDLE;
-    return;
-  }
-
-  res_ = vkBindBufferMemory(m_device, m_buffer, m_memory, 0);
-  XEV_ERROR_IF_FAILED(res_, "Failed to bind buffer memory: {}", name);
-  if (res_ != VK_SUCCESS) {
-    vkFreeMemory(m_device, m_memory, nullptr);
-    vkDestroyBuffer(m_device, m_buffer, nullptr);
-    m_buffer = VK_NULL_HANDLE;
-    m_memory = VK_NULL_HANDLE;
-    return;
-  }
-
-  m_valid = true;
-}
-
-Buffer::~Buffer() {
-  if (m_device != VK_NULL_HANDLE) {
-    if (m_memory != VK_NULL_HANDLE) {
-      vkFreeMemory(m_device, m_memory, nullptr);
-    }
-    if (m_buffer != VK_NULL_HANDLE) {
-      vkDestroyBuffer(m_device, m_buffer, nullptr);
-    }
-  }
+  return allocator;
 }
 
 } // namespace xev

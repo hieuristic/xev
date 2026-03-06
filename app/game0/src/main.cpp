@@ -1,4 +1,4 @@
-#include <xev/app.h>
+#include "app.h"
 
 int main(int argc, char *argv[]) {
   xev::App app;

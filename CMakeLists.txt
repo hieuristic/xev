@@ -40,24 +40,11 @@ include(cmake/shader.cmake)
 
 # volk
 add_subdirectory(ext/volk EXCLUDE_FROM_ALL)
-
-# glm
 add_subdirectory(ext/glm EXCLUDE_FROM_ALL)
+add_subdirectory(ext/vma EXCLUDE_FROM_ALL)
 
-# Main Executable
-file(GLOB SOURCE_FILES src/*.cpp)
-list(REMOVE_ITEM SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
-
-add_library(xev_core STATIC ${SOURCE_FILES})
-target_include_directories(xev_core PUBLIC inc ext/tinygltf)
-target_link_libraries(xev_core PUBLIC imgui SDL3::SDL3-shared Vulkan::Vulkan spdlog::spdlog volk::volk glm::glm)
-
-add_executable(xev src/main.cpp)
-target_link_libraries(xev PRIVATE xev_core)
-
-# Compile shaders
-file(GLOB SHADER_FILES src/shaders/*.slang)
-target_compile_slang_shaders(xev ${SHADER_FILES})
+add_subdirectory(xev)
+add_subdirectory(app/game0)
 
 # Testing
 enable_testing()

@@ -1,5 +1,5 @@
 #include <SDL3/SDL.h>
-#include <xev/app.h>
+#include "app.h"
 #include <xev/backend.h>
 #include <xev/camera.h>
 #include <xev/logger.h>

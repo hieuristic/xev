@@ -1,10 +1,10 @@
+#include <xev/scene.h>
 #include <xev/renderer.h>
-#include <xev/mesh.h>
 
 namespace xev {
 
-Renderer::Renderer(std::shared_ptr<Backend> backend, std::unique_ptr<Shader> shader,
-                   const Scene &scene)
+Renderer::Renderer(std::shared_ptr<Backend> backend,
+                   std::unique_ptr<Shader> shader, const Scene &scene)
     : m_backend(backend), m_shader(std::move(shader)), m_scene(&scene) {
 
   VkDevice device = m_backend->get_device();
@@ -25,6 +25,34 @@ Renderer::Renderer(std::shared_ptr<Backend> backend, std::unique_ptr<Shader> sha
     vkMapMemory(device, m_vertex_buffer_memory, 0, bufferSize, 0, &data);
     memcpy(data, scene.m_vert_buffer.data(), (size_t)bufferSize);
     vkUnmapMemory(device, m_vertex_buffer_memory);
+  }
+
+  // normal buffer
+  VkDeviceSize norm_size = sizeof(glm::vec3) * scene.m_norm_buffer.size();
+  if (norm_size > 0) {
+    create_buffer(norm_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                  m_normal_buffer, m_normal_buffer_memory);
+
+    void *data;
+    vkMapMemory(device, m_normal_buffer_memory, 0, norm_size, 0, &data);
+    memcpy(data, scene.m_norm_buffer.data(), (size_t)norm_size);
+    vkUnmapMemory(device, m_normal_buffer_memory);
+  }
+
+  // uv buffer
+  VkDeviceSize uv_size = sizeof(glm::vec2) * scene.m_uv_buffer.size();
+  if (uv_size > 0) {
+    create_buffer(uv_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                  m_uv_buffer, m_uv_buffer_memory);
+
+    void *data;
+    vkMapMemory(device, m_uv_buffer_memory, 0, uv_size, 0, &data);
+    memcpy(data, scene.m_uv_buffer.data(), (size_t)uv_size);
+    vkUnmapMemory(device, m_uv_buffer_memory);
   }
 
   m_index_count = scene.m_face_buffer.size() * 3;
@@ -102,6 +130,14 @@ Renderer::~Renderer() {
   if (m_vertex_buffer != VK_NULL_HANDLE) {
     vkDestroyBuffer(device, m_vertex_buffer, nullptr);
     vkFreeMemory(device, m_vertex_buffer_memory, nullptr);
+  }
+  if (m_normal_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device, m_normal_buffer, nullptr);
+    vkFreeMemory(device, m_normal_buffer_memory, nullptr);
+  }
+  if (m_uv_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device, m_uv_buffer, nullptr);
+    vkFreeMemory(device, m_uv_buffer_memory, nullptr);
   }
   if (m_index_buffer != VK_NULL_HANDLE) {
     vkDestroyBuffer(device, m_index_buffer, nullptr);
@@ -220,25 +256,39 @@ void Renderer::create_pipeline(VkDevice device, VkFormat swapchain_format) {
   }
 
   // 3. pipeline setup
-  VkVertexInputBindingDescription bind_desc = {
-      .binding = 0,
-      .stride = sizeof(glm::vec3),
-      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+  VkVertexInputBindingDescription bind_descs[] = {
+      {.binding = 0,
+       .stride = sizeof(glm::vec3),
+       .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+      {.binding = 1,
+       .stride = sizeof(glm::vec3),
+       .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+      {.binding = 2,
+       .stride = sizeof(glm::vec2),
+       .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
   };
 
-  VkVertexInputAttributeDescription attr_desc = {
-      .binding = 0,
-      .location = 0,
-      .format = VK_FORMAT_R32G32B32_SFLOAT,
-      .offset = 0,
+  VkVertexInputAttributeDescription attr_descs[] = {
+      {.location = 0,
+       .binding = 0,
+       .format = VK_FORMAT_R32G32B32_SFLOAT,
+       .offset = 0},
+      {.location = 1,
+       .binding = 1,
+       .format = VK_FORMAT_R32G32B32_SFLOAT,
+       .offset = 0},
+      {.location = 2,
+       .binding = 2,
+       .format = VK_FORMAT_R32G32_SFLOAT,
+       .offset = 0},
   };
 
   VkPipelineVertexInputStateCreateInfo input_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-      .vertexBindingDescriptionCount = 1,
-      .pVertexBindingDescriptions = &bind_desc,
-      .vertexAttributeDescriptionCount = 1,
-      .pVertexAttributeDescriptions = &attr_desc,
+      .vertexBindingDescriptionCount = 3,
+      .pVertexBindingDescriptions = bind_descs,
+      .vertexAttributeDescriptionCount = 3,
+      .pVertexAttributeDescriptions = attr_descs,
   };
 
   VkPipelineRenderingCreateInfo render_info = {
@@ -264,8 +314,8 @@ void Renderer::create_pipeline(VkDevice device, VkFormat swapchain_format) {
       .depthClampEnable = VK_FALSE,
       .rasterizerDiscardEnable = VK_FALSE,
       .polygonMode = VK_POLYGON_MODE_FILL,
-      .cullMode = VK_CULL_MODE_NONE,
-      .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .cullMode = VK_CULL_MODE_BACK_BIT,
+      .frontFace = VK_FRONT_FACE_CLOCKWISE,
       .depthBiasEnable = VK_FALSE,
       .lineWidth = 1.0f,
   };
@@ -330,18 +380,20 @@ void Renderer::draw_triangle() {
   VkDevice device = m_backend->get_device();
   VkSwapchainKHR swapchain = m_backend->get_swapchain();
 
-  if (vkWaitForFences(device, 1, &m_in_flight_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+  if (vkWaitForFences(device, 1, &m_in_flight_fence, VK_TRUE, UINT64_MAX) !=
+      VK_SUCCESS) {
     return;
   }
   vkResetFences(device, 1, &m_in_flight_fence);
 
   uint32_t image_index;
-  VkResult result =
-      vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
-                            m_image_available_sem, VK_NULL_HANDLE, &image_index);
+  VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+                                          m_image_available_sem, VK_NULL_HANDLE,
+                                          &image_index);
 
   if (result != VK_SUCCESS) {
-    XEV_ERROR("draw_triangle: vkAcquireNextImageKHR failed with {}", (int)result);
+    XEV_ERROR("draw_triangle: vkAcquireNextImageKHR failed with {}",
+              (int)result);
     return;
   }
 
@@ -410,9 +462,11 @@ void Renderer::draw_triangle() {
 
   glm::mat4 identity = glm::mat4(1.0f);
   vkCmdPushConstants(m_cmd_buffer, m_pipeline_layout,
-                     VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &identity);
+                     VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4),
+                     &identity);
 
-  VkViewport viewport = {0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f};
+  VkViewport viewport = {0.0f, 0.0f, (float)extent.width, (float)extent.height,
+                         0.0f, 1.0f};
   vkCmdSetViewport(m_cmd_buffer, 0, 1, &viewport);
   VkRect2D scissor = {{0, 0}, extent};
   vkCmdSetScissor(m_cmd_buffer, 0, 1, &scissor);
@@ -435,11 +489,12 @@ void Renderer::draw_triangle() {
   vkCmdPipelineBarrier2(m_cmd_buffer, &depInfo);
 
   if (vkEndCommandBuffer(m_cmd_buffer) != VK_SUCCESS) {
-      return;
+    return;
   }
 
   VkSemaphore waitSemaphores[] = {m_image_available_sem};
-  VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkPipelineStageFlags waitStages[] = {
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   VkSemaphore signalSemaphores[] = {m_render_finished_sem};
 
   VkSubmitInfo submitInfo = {
@@ -453,8 +508,9 @@ void Renderer::draw_triangle() {
       .pSignalSemaphores = signalSemaphores,
   };
 
-  if (vkQueueSubmit(m_backend->retrieve_queue(Q_GRAPHICS), 1, &submitInfo, m_in_flight_fence) != VK_SUCCESS) {
-      return;
+  if (vkQueueSubmit(m_backend->retrieve_queue(Q_GRAPHICS), 1, &submitInfo,
+                    m_in_flight_fence) != VK_SUCCESS) {
+    return;
   }
 
   VkPresentInfoKHR presentInfo = {
@@ -472,15 +528,16 @@ void Renderer::draw() {
   VkDevice device = m_backend->get_device();
   VkSwapchainKHR swapchain = m_backend->get_swapchain();
 
-  if (vkWaitForFences(device, 1, &m_in_flight_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+  if (vkWaitForFences(device, 1, &m_in_flight_fence, VK_TRUE, UINT64_MAX) !=
+      VK_SUCCESS) {
     return;
   }
   vkResetFences(device, 1, &m_in_flight_fence);
 
   uint32_t image_index;
-  VkResult result =
-      vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
-                            m_image_available_sem, VK_NULL_HANDLE, &image_index);
+  VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+                                          m_image_available_sem, VK_NULL_HANDLE,
+                                          &image_index);
 
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     XEV_ERROR("Failed to acquire swapchain image!");
@@ -573,20 +630,20 @@ void Renderer::draw() {
   vkCmdSetScissor(m_cmd_buffer, 0, 1, &scissor);
 
   if (m_vertex_buffer != VK_NULL_HANDLE && m_index_buffer != VK_NULL_HANDLE) {
-    VkBuffer vertexBuffers[] = {m_vertex_buffer};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(m_cmd_buffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(m_cmd_buffer, m_index_buffer, 0,
-                         VK_INDEX_TYPE_UINT32);
+    VkBuffer vertexBuffers[] = {m_vertex_buffer, m_normal_buffer, m_uv_buffer};
+    VkDeviceSize offsets[] = {0, 0, 0};
+    vkCmdBindVertexBuffers(m_cmd_buffer, 0, 3, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(m_cmd_buffer, m_index_buffer, 0, VK_INDEX_TYPE_UINT32);
 
-    for (const Mesh& mesh : m_scene->m_meshes) {
+    for (const Mesh &mesh : m_scene->m_meshes) {
       glm::mat4 mvp = vp_mat * mesh.get_model_mat();
       vkCmdPushConstants(m_cmd_buffer, m_pipeline_layout,
-                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &mvp);
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4),
+                         &mvp);
 
-      for (const MeshPrimitive& mp : mesh.get_primitives()) {
-        vkCmdDrawIndexed(m_cmd_buffer, mp.flength * 3, 1,
-                         mp.foffset * 3, mp.voffset, 0);
+      for (const MeshPrimitive &mp : mesh.get_primitives()) {
+        vkCmdDrawIndexed(m_cmd_buffer, mp.flength * 3, 1, mp.foffset * 3,
+                         mp.voffset, 0);
       }
     }
   }

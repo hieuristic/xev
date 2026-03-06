@@ -1,10 +1,14 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
-#include <volk.h>
 #include <xev/logger.h>
+#include <xev/vma.h>
+#include <xev/volk.h>
+#include <xev/buffer.h>
 
 namespace xev {
 
@@ -27,34 +31,15 @@ struct QueueFamily {
   bool isComplete() { return gfx.has_value() && pre.has_value(); }
 };
 
-class Buffer {
-public:
-  Buffer(VkDevice device, std::string_view name, VkDeviceSize size,
-         VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-         uint32_t memoryTypeIndex);
-  ~Buffer();
-  bool is_valid() const { return m_valid; }
-  VkBuffer handle() const { return m_buffer; }
-  std::string name = "";
-
-private:
-  VkDevice m_device = VK_NULL_HANDLE;
-  VkBuffer m_buffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_memory = VK_NULL_HANDLE;
-  bool m_valid = false;
-};
-
 class Backend {
 public:
   Backend(SDL_Window *window);
   ~Backend();
 
-  VkDevice get_device() { return m_dev; }
-  VkPhysicalDevice get_physical_device() { return m_physical_dev; }
-  VkQueue retrieve_queue(QFAM qfam);
-  VkQueue retrieve_queue(QFAM qfam, uint32_t qidx);
-  std::optional<QueueFamilyEntry> get_queue_family_index(QFAM qfam);
+  VkDevice get_device() { return m_device; }
+  VkPhysicalDevice get_physical_device() { return m_physical_device; }
   VkSurfaceFormatKHR get_format() { return m_ideal_format; }
+  VmaAllocator get_allocator() { return m_allocator; }
 
   VkSwapchainKHR get_swapchain() { return m_swapchain; }
   VkExtent2D get_extent() { return m_extent; }
@@ -68,16 +53,20 @@ public:
   const char *engine_name = "xev_engine";
   uint32_t engine_version = VK_MAKE_VERSION(0, 0, 0);
 
-  void create_buffer(std::string_view name, VkDeviceSize size,
-                     VkBufferUsageFlags usage,
-                     VkMemoryPropertyFlags properties);
-  void remove_buffer(std::string_view name);
-  Buffer *get_buffer(std::string_view name);
+  Buffer create_buffer(std::string_view name, VkDeviceSize size,
+                       VkBufferUsageFlags usage,
+                       VmaMemoryUsage mem_usage = VMA_MEMORY_USAGE_AUTO) const;
+  void destroy_buffer(Buffer);
+
+  VkQueue retrieve_queue(QFAM qfam);
+  VkQueue retrieve_queue(QFAM qfam, uint32_t qidx);
+  std::optional<QueueFamilyEntry> get_queue_family_index(QFAM qfam);
 
 private:
-  uint32_t find_memory_type(uint32_t typeFilter,
-                            VkMemoryPropertyFlags properties);
-  QueueFamily getQueueFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
+  VmaAllocator create_memory_allocator(VkInstance instance,
+                                       VkPhysicalDevice physical_device,
+                                       VkDevice device);
+  QueueFamily get_queue_family(VkPhysicalDevice device, VkSurfaceKHR surface);
   VkSwapchainKHR create_swapchain(VkDevice device, VkSurfaceKHR surface);
   VkSwapchainKHR recreate_swapchain(VkDevice device, VkSurfaceKHR surface);
 
@@ -85,10 +74,12 @@ private:
                                        .colorSpace =
                                            VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
 
-  VkInstance m_inst = VK_NULL_HANDLE;
-  VkSurfaceKHR m_surf = VK_NULL_HANDLE;
-  VkPhysicalDevice m_physical_dev = VK_NULL_HANDLE;
-  VkDevice m_dev = VK_NULL_HANDLE;
+  VkInstance m_instance = VK_NULL_HANDLE;
+  VkSurfaceKHR m_surface = VK_NULL_HANDLE;
+  VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;
+  VkDevice m_device = VK_NULL_HANDLE;
+  VmaAllocator m_allocator = nullptr;
+
   VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
   VkExtent2D m_extent = {0, 0};
   std::vector<VkImage> m_swapchain_images;
@@ -129,8 +120,6 @@ private:
 
   VkQueue m_gfx_queue = VK_NULL_HANDLE;
   VkQueue m_pre_queue = VK_NULL_HANDLE;
-
-  std::unordered_map<std::string, std::unique_ptr<Buffer>> m_buffers;
 };
 
 } // namespace xev
