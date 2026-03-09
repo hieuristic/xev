@@ -1,13 +1,4 @@
-#include <SDL3/SDL.h>
-#include "app.h"
-#include <xev/backend.h>
-#include <xev/camera.h>
-#include <xev/logger.h>
-#include <xev/renderer.h>
-#include <xev/scene.h>
-#include <xev/shader.h>
-
-namespace xev {
+#include "game.h"
 
 App::App() : m_running(true) {
   xev::InitLogger();
@@ -29,7 +20,7 @@ App::App() : m_running(true) {
   m_shader = std::make_unique<Shader>();
   std::string base_path(SDL_GetBasePath());
   m_shader->load(m_backend->get_device(), base_path + "shaders/mesh.spv",
-                   S_GRAPHICS);
+                 S_GRAPHICS);
   if (m_shader->get_shader_type() == S_NULL) {
     XEV_ERROR("FAILED TEST SHADER LOADING!");
   } else {
@@ -42,7 +33,8 @@ App::App() : m_running(true) {
   XEV_INFO("Scene vertices: {}, faces: {}", m_scene->m_vert_buffer.size(),
            m_scene->m_face_buffer.size());
 
-  m_renderer = std::make_unique<Renderer>(m_backend, std::move(m_shader), *m_scene);
+  m_renderer =
+      std::make_unique<Renderer>(m_backend, std::move(m_shader), *m_scene);
 }
 
 App::~App() {
@@ -55,28 +47,28 @@ App::~App() {
 }
 
 void App::run() {
-    if (!m_running)
-      return;
+  if (!m_running)
+    return;
 
-    XEV_INFO("TestApp loop started.");
+  XEV_INFO("TestApp loop started.");
 
-    while (m_running) {
-      SDL_Event event;
-      while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_EVENT_QUIT) {
-          m_running = false;
-        }
-        if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-            m_window && event.window.windowID ==
-                SDL_GetWindowID(m_window->getNativeWindow())) {
-          m_running = false;
-        }
+  while (m_running) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_EVENT_QUIT) {
+        m_running = false;
       }
-
-      if (m_renderer) {
-          m_renderer->draw();
+      if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && m_window &&
+          event.window.windowID ==
+              SDL_GetWindowID(m_window->getNativeWindow())) {
+        m_running = false;
       }
     }
+
+    if (m_renderer) {
+      m_renderer->draw();
+    }
+  }
 }
 
 } // namespace xev

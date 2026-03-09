@@ -1,4 +1,4 @@
-#include "app.h"
+#include "game.h"
 
 int main(int argc, char *argv[]) {
   xev::App app;

@@ -13,3 +13,7 @@ target_link_libraries(xev_core PUBLIC imgui
   VulkanMemoryAllocator
 )
 target_compile_definitions(xev_core PUBLIC VK_NO_PROTOTYPES)
+
+# Compile shaders
+file(GLOB SHADER_FILES src/shaders/*.slang)
+target_compile_slang_shaders(xev_core ${SHADER_FILES})

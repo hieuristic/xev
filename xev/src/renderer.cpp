@@ -3,7 +3,7 @@
 
 namespace xev {
 
-Renderer::Renderer(std::shared_ptr<Backend> backend,
+Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
                    std::unique_ptr<Shader> shader, const Scene &scene)
     : m_backend(backend), m_shader(std::move(shader)), m_scene(&scene) {
 
@@ -117,7 +117,7 @@ Renderer::Renderer(std::shared_ptr<Backend> backend,
   }
 }
 
-Renderer::~Renderer() {
+Renderer3D::~Renderer3D() {
   VkDevice device = m_backend->get_device();
   vkDeviceWaitIdle(device);
 
@@ -149,7 +149,7 @@ Renderer::~Renderer() {
   vkDestroyDescriptorSetLayout(device, m_cam_ds_layout, nullptr);
 }
 
-uint32_t Renderer::find_memory_type(uint32_t typeFilter,
+uint32_t Renderer3D::find_memory_type(uint32_t typeFilter,
                                     VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceProperties prop;
   VkPhysicalDeviceMemoryProperties memProperties;
@@ -167,7 +167,7 @@ uint32_t Renderer::find_memory_type(uint32_t typeFilter,
   return 0;
 }
 
-void Renderer::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+void Renderer3D::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
                              VkMemoryPropertyFlags properties, VkBuffer &buffer,
                              VkDeviceMemory &bufferMemory) {
   VkDevice device = m_backend->get_device();
@@ -201,7 +201,7 @@ void Renderer::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
   vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
-void Renderer::create_pipeline(VkDevice device, VkFormat swapchain_format) {
+void Renderer3D::create_pipeline(VkDevice device, VkFormat swapchain_format) {
   VkResult res_;
 
   if (device == VK_NULL_HANDLE) {
@@ -374,330 +374,7 @@ void Renderer::create_pipeline(VkDevice device, VkFormat swapchain_format) {
   }
 }
 
-void Renderer::recreate_pipeline(VkDevice device) {}
+void Renderer3D::recreate_pipeline(VkDevice device) {}
 
-void Renderer::draw_triangle() {
-  VkDevice device = m_backend->get_device();
-  VkSwapchainKHR swapchain = m_backend->get_swapchain();
-
-  if (vkWaitForFences(device, 1, &m_in_flight_fence, VK_TRUE, UINT64_MAX) !=
-      VK_SUCCESS) {
-    return;
-  }
-  vkResetFences(device, 1, &m_in_flight_fence);
-
-  uint32_t image_index;
-  VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
-                                          m_image_available_sem, VK_NULL_HANDLE,
-                                          &image_index);
-
-  if (result != VK_SUCCESS) {
-    XEV_ERROR("draw_triangle: vkAcquireNextImageKHR failed with {}",
-              (int)result);
-    return;
-  }
-
-  XEV_INFO("Acquired image index: {}", image_index);
-
-  vkResetCommandBuffer(m_cmd_buffer, 0);
-
-  VkCommandBufferBeginInfo beginInfo = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-
-  if (vkBeginCommandBuffer(m_cmd_buffer, &beginInfo) != VK_SUCCESS) {
-    return;
-  }
-
-  VkExtent2D extent = m_backend->get_extent();
-  auto image_views = m_backend->get_swapchain_image_views();
-
-  // Clear to a very obvious color (Magenta) to see if clear works
-  VkRenderingAttachmentInfo colorAttachment = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = image_views[image_index],
-      .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .clearValue = {.color = {.float32 = {1.0f, 0.0f, 1.0f, 1.0f}}},
-  };
-
-  VkRenderingInfo renderInfo = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      .renderArea = {.offset = {0, 0}, .extent = extent},
-      .layerCount = 1,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &colorAttachment,
-  };
-
-  VkImageMemoryBarrier2 imageBarrier = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-      .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-      .srcAccessMask = 0,
-      .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-      .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .image = m_backend->get_swapchain_images()[image_index],
-      .subresourceRange =
-          {
-              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-              .baseMipLevel = 0,
-              .levelCount = 1,
-              .baseArrayLayer = 0,
-              .layerCount = 1,
-          },
-  };
-
-  VkDependencyInfo depInfo = {
-      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-      .imageMemoryBarrierCount = 1,
-      .pImageMemoryBarriers = &imageBarrier,
-  };
-
-  vkCmdPipelineBarrier2(m_cmd_buffer, &depInfo);
-  vkCmdBeginRendering(m_cmd_buffer, &renderInfo);
-  vkCmdBindPipeline(m_cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-  glm::mat4 identity = glm::mat4(1.0f);
-  vkCmdPushConstants(m_cmd_buffer, m_pipeline_layout,
-                     VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4),
-                     &identity);
-
-  VkViewport viewport = {0.0f, 0.0f, (float)extent.width, (float)extent.height,
-                         0.0f, 1.0f};
-  vkCmdSetViewport(m_cmd_buffer, 0, 1, &viewport);
-  VkRect2D scissor = {{0, 0}, extent};
-  vkCmdSetScissor(m_cmd_buffer, 0, 1, &scissor);
-
-  if (m_vertex_buffer != VK_NULL_HANDLE) {
-    VkBuffer vertexBuffers[] = {m_vertex_buffer};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(m_cmd_buffer, 0, 1, vertexBuffers, offsets);
-    vkCmdDraw(m_cmd_buffer, 3, 1, 0, 0);
-  }
-
-  vkCmdEndRendering(m_cmd_buffer);
-
-  imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-  imageBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-  imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-  imageBarrier.dstAccessMask = 0;
-  imageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  imageBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  vkCmdPipelineBarrier2(m_cmd_buffer, &depInfo);
-
-  if (vkEndCommandBuffer(m_cmd_buffer) != VK_SUCCESS) {
-    return;
-  }
-
-  VkSemaphore waitSemaphores[] = {m_image_available_sem};
-  VkPipelineStageFlags waitStages[] = {
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  VkSemaphore signalSemaphores[] = {m_render_finished_sem};
-
-  VkSubmitInfo submitInfo = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = waitSemaphores,
-      .pWaitDstStageMask = waitStages,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &m_cmd_buffer,
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = signalSemaphores,
-  };
-
-  if (vkQueueSubmit(m_backend->retrieve_queue(Q_GRAPHICS), 1, &submitInfo,
-                    m_in_flight_fence) != VK_SUCCESS) {
-    return;
-  }
-
-  VkPresentInfoKHR presentInfo = {
-      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = signalSemaphores,
-      .swapchainCount = 1,
-      .pSwapchains = &swapchain,
-      .pImageIndices = &image_index,
-  };
-  vkQueuePresentKHR(m_backend->retrieve_queue(Q_PRESENT), &presentInfo);
-}
-
-void Renderer::draw() {
-  VkDevice device = m_backend->get_device();
-  VkSwapchainKHR swapchain = m_backend->get_swapchain();
-
-  if (vkWaitForFences(device, 1, &m_in_flight_fence, VK_TRUE, UINT64_MAX) !=
-      VK_SUCCESS) {
-    return;
-  }
-  vkResetFences(device, 1, &m_in_flight_fence);
-
-  uint32_t image_index;
-  VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
-                                          m_image_available_sem, VK_NULL_HANDLE,
-                                          &image_index);
-
-  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    XEV_ERROR("Failed to acquire swapchain image!");
-    return;
-  }
-
-  vkResetCommandBuffer(m_cmd_buffer, 0);
-
-  VkCommandBufferBeginInfo beginInfo = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-
-  if (vkBeginCommandBuffer(m_cmd_buffer, &beginInfo) != VK_SUCCESS) {
-    XEV_ERROR("Failed to begin recording command buffer!");
-    return;
-  }
-
-  VkExtent2D extent = m_backend->get_extent();
-  auto image_views = m_backend->get_swapchain_image_views();
-
-  VkRenderingAttachmentInfo colorAttachment = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = image_views[image_index],
-      .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .clearValue = {.color = {.float32 = {0.1f, 0.1f, 0.1f, 1.0f}}},
-  };
-
-  VkRenderingInfo renderInfo = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      .renderArea =
-          {
-              .offset = {0, 0},
-              .extent = extent,
-          },
-      .layerCount = 1,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &colorAttachment,
-  };
-
-  VkImageMemoryBarrier2 imageBarrier = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-      .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-      .srcAccessMask = 0,
-      .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-      .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .image = m_backend->get_swapchain_images()[image_index],
-      .subresourceRange =
-          {
-              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-              .baseMipLevel = 0,
-              .levelCount = 1,
-              .baseArrayLayer = 0,
-              .layerCount = 1,
-          },
-  };
-
-  VkDependencyInfo depInfo = {
-      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-      .imageMemoryBarrierCount = 1,
-      .pImageMemoryBarriers = &imageBarrier,
-  };
-
-  vkCmdPipelineBarrier2(m_cmd_buffer, &depInfo);
-
-  vkCmdBeginRendering(m_cmd_buffer, &renderInfo);
-
-  vkCmdBindPipeline(m_cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-  glm::mat4 vp_mat = m_scene->m_active_cam.create_vp_mat();
-
-  VkViewport viewport = {
-      .x = 0.0f,
-      .y = 0.0f,
-      .width = (float)extent.width,
-      .height = (float)extent.height,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-  };
-  vkCmdSetViewport(m_cmd_buffer, 0, 1, &viewport);
-
-  VkRect2D scissor = {
-      .offset = {0, 0},
-      .extent = extent,
-  };
-  vkCmdSetScissor(m_cmd_buffer, 0, 1, &scissor);
-
-  if (m_vertex_buffer != VK_NULL_HANDLE && m_index_buffer != VK_NULL_HANDLE) {
-    VkBuffer vertexBuffers[] = {m_vertex_buffer, m_normal_buffer, m_uv_buffer};
-    VkDeviceSize offsets[] = {0, 0, 0};
-    vkCmdBindVertexBuffers(m_cmd_buffer, 0, 3, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(m_cmd_buffer, m_index_buffer, 0, VK_INDEX_TYPE_UINT32);
-
-    for (const Mesh &mesh : m_scene->m_meshes) {
-      glm::mat4 mvp = vp_mat * mesh.get_model_mat();
-      vkCmdPushConstants(m_cmd_buffer, m_pipeline_layout,
-                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4),
-                         &mvp);
-
-      for (const MeshPrimitive &mp : mesh.get_primitives()) {
-        vkCmdDrawIndexed(m_cmd_buffer, mp.flength * 3, 1, mp.foffset * 3,
-                         mp.voffset, 0);
-      }
-    }
-  }
-
-  vkCmdEndRendering(m_cmd_buffer);
-
-  imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-  imageBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-  imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-  imageBarrier.dstAccessMask = 0;
-  imageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  imageBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  vkCmdPipelineBarrier2(m_cmd_buffer, &depInfo);
-
-  if (vkEndCommandBuffer(m_cmd_buffer) != VK_SUCCESS) {
-    XEV_ERROR("Failed to record command buffer!");
-    return;
-  }
-
-  VkSemaphore waitSemaphores[] = {m_image_available_sem};
-  VkPipelineStageFlags waitStages[] = {
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  VkSemaphore signalSemaphores[] = {m_render_finished_sem};
-
-  VkSubmitInfo submitInfo = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = waitSemaphores,
-      .pWaitDstStageMask = waitStages,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &m_cmd_buffer,
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = signalSemaphores,
-  };
-
-  if (vkQueueSubmit(m_backend->retrieve_queue(Q_GRAPHICS), 1, &submitInfo,
-                    m_in_flight_fence) != VK_SUCCESS) {
-    XEV_ERROR("Failed to submit draw command buffer!");
-    return;
-  }
-
-  VkSwapchainKHR swapchains[] = {swapchain};
-
-  VkPresentInfoKHR presentInfo = {
-      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = signalSemaphores,
-      .swapchainCount = 1,
-      .pSwapchains = swapchains,
-      .pImageIndices = &image_index,
-  };
-
-  vkQueuePresentKHR(m_backend->retrieve_queue(Q_PRESENT), &presentInfo);
-}
 
 } // namespace xev
