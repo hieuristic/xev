@@ -1,14 +1,53 @@
-
-#include <SDL3/SDL_vulkan.h>
-#include <algorithm>
-#include <set>
-#include <string>
-#include <vector>
 #include <xev/backend.h>
 
 namespace xev {
 
-Backend::Backend(SDL_Window *window) {
+namespace common {
+constexpr VkImageSubresourceRange image_subresource_range(
+    VkImageAspectFlagBits aspect_mask) {
+  return VkImageSubresourceRange{
+      .aspectMask = aspect_mask,
+      .baseMipLevel = 0,
+      .levelCount = VK_REMAINING_MIP_LEVELS,
+      .baseArrayLayer = 0,
+      .layerCount = VK_REMAINING_ARRAY_LAYERS,
+  };
+}
+
+void transition_image(VkCommandBuffer cmd_buffer,
+                     VkImage image,
+                     VkImageLayout old_layout,
+                     VkImageLayout new_layout) {
+  VkImageAspectFlags aspect_mask =
+      (old_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL ||
+       new_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL ||
+       new_layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL)
+          ? VK_IMAGE_ASPECT_DEPTH_BIT
+          : VK_IMAGE_ASPECT_COLOR_BIT;
+  VkImageMemoryBarrier2 image_barrier{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+      .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+      .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+      .dstAccessMask =
+          VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+      .oldLayout = old_layout,
+      .newLayout = new_layout,
+      .image = image,
+      .subresourceRange = image_subresource_range(aspect_mask),
+  };
+
+  VkDependencyInfo dep_info{
+      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+      .imageMemoryBarrierCount = 1,
+      .pImageMemoryBarriers = &image_barrier,
+  };
+
+  vkCmdPipelineBarrier2(cmd, &dep_info);
+}
+}  // namespace common
+
+Backend::Backend(SDL_Window* window) {
   VkResult res_;
 
   res_ = volkInitialize();
@@ -32,10 +71,10 @@ Backend::Backend(SDL_Window *window) {
   };
 
   uint32_t extension_count = 0;
-  char const *const *sdl_extensions =
+  char const* const* sdl_extensions =
       SDL_Vulkan_GetInstanceExtensions(&extension_count);
-  std::vector<const char *> extensions(sdl_extensions,
-                                       sdl_extensions + extension_count);
+  std::vector<const char*> extensions(sdl_extensions,
+                                      sdl_extensions + extension_count);
 
   uint32_t instance_ext_count = 0;
   vkEnumerateInstanceExtensionProperties(nullptr, &instance_ext_count, nullptr);
@@ -44,7 +83,7 @@ Backend::Backend(SDL_Window *window) {
                                          instance_exts.data());
 
   bool has_portability = false;
-  for (const auto &ext : instance_exts) {
+  for (const auto& ext : instance_exts) {
     if (std::string(ext.extensionName) == "VK_KHR_portability_enumeration") {
       has_portability = true;
       extensions.push_back("VK_KHR_portability_enumeration");
@@ -103,7 +142,7 @@ Backend::Backend(SDL_Window *window) {
   vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr,
                                        &device_ext_count, device_exts.data());
 
-  for (const auto &ext : device_exts) {
+  for (const auto& ext : device_exts) {
     if (std::string(ext.extensionName) == "VK_KHR_portability_subset") {
       m_ext.push_back("VK_KHR_portability_subset");
     }
@@ -190,17 +229,19 @@ QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
 
 std::optional<QueueFamilyEntry> Backend::get_queue_family_index(QFAM qfam) {
   switch (qfam) {
-  case Q_GRAPHICS:
-    return m_qfam.gfx;
-  case Q_PRESENT:
-    return m_qfam.pre;
-  case Q_COMPUTE:
-    return m_qfam.com;
+    case Q_GRAPHICS:
+      return m_qfam.gfx;
+    case Q_PRESENT:
+      return m_qfam.pre;
+    case Q_COMPUTE:
+      return m_qfam.com;
   }
   return std::nullopt;
 }
 
-VkQueue Backend::retrieve_queue(QFAM qfam) { return retrieve_queue(qfam, 0); }
+VkQueue Backend::retrieve_queue(QFAM qfam) {
+  return retrieve_queue(qfam, 0);
+}
 
 VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
   VkQueue queue = VK_NULL_HANDLE;
@@ -266,7 +307,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
       m_physical_device, surface, &present_mode_count, present_modes.data());
 
   VkSurfaceFormatKHR surface_format = formats[0];
-  for (const auto &format : formats) {
+  for (const auto& format : formats) {
     if (format.format == m_ideal_format.format &&
         format.colorSpace == m_ideal_format.colorSpace) {
       surface_format = format;
@@ -281,7 +322,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   }
 
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-  for (const auto &mode : present_modes) {
+  for (const auto& mode : present_modes) {
     if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
       present_mode = mode;
       break;
@@ -352,7 +393,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                        VK_COMPONENT_SWIZZLE_IDENTITY},
         .subresourceRange =
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -380,7 +421,8 @@ VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
   return create_swapchain(device, surface);
 }
 
-Buffer Backend::create_buffer(std::string_view name, VkDeviceSize size,
+Buffer Backend::create_buffer(std::string_view name,
+                              VkDeviceSize size,
                               VkBufferUsageFlags usage,
                               VmaMemoryUsage mem_usage) const {
   Buffer buffer{};
@@ -397,9 +439,9 @@ Buffer Backend::create_buffer(std::string_view name, VkDeviceSize size,
       .usage = mem_usage,
   };
 
-  VkResult res_ = vmaCreateBuffer(m_allocator, &buffer_info, &alloc_info,
-                                   &buffer.buffer, &buffer.alloc,
-                                   &buffer.alloc_info);
+  VkResult res_ =
+      vmaCreateBuffer(m_allocator, &buffer_info, &alloc_info, &buffer.buffer,
+                      &buffer.alloc, &buffer.alloc_info);
   XEV_ASSERT(res_ == VK_SUCCESS);
 
   XEV_INFO("Created buffer '{}' ({} bytes)", name, size);
@@ -437,4 +479,57 @@ VmaAllocator Backend::create_memory_allocator(VkInstance instance,
   return allocator;
 }
 
-} // namespace xev
+VkCommandBuffer enter_frame() {
+  const Frame& frame = m_frames[m_current_frame_idx];
+  XEV_ASSERT_VK(
+      vkWaitForFences(m_device, 1, &frame.fence_render, VK_TRUE, NO_TIMEOUT));
+
+  const VkCommandBuffer& cmd_buffer = frame.cmd_buffer;
+  VkCommandBufferBeginInfo begin_info = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+  };
+  XEV_ASSERT_VK(vkBeginCommandBuffer(cmd_buffer, &begin_info));
+
+  return cmd_buffer;
+}
+
+void leave_frame(VkCommandBuffer cmd_buffer, const Image& images) {
+  VkResult res_;
+
+  // acquire swapchain image
+  uint32_t img_idx;
+  const VkImage& image;
+  res_ = vkAcquireNextImageKHR(m_device, m_swapchain, NO_TIMEOUT,
+                               m_frames[m_current_frame_idx].sem_swapchain,
+                               VK_NULL_HANDLE, &img_idx);
+  if (res_ == VK_ERROR_OUT_OF_DATE_KHR || res_ == VK_SUBOPTIMAL_KHR) {
+    m_is_swapchain_dirty = true;
+    images = m_images[img_idx];
+  } else {
+    XEV_ASSERT_VK(res_, "Failed to acquaire swapchain image");
+    return;
+  }
+
+  // reset fence
+  XEV_ASSERT_VK(vkResetFences(device, 1, &m_frames[m_current_frame_idx]));
+
+  VkImageLayout img_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  {  // clearing
+    VkImageSubresourceRange clear_range =
+        common::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    vkutil::transition_image(cmd, swapchainImage, swapchainLayout,
+                            VK_IMAGE_LAYOUT_GENERAL);
+    swapchainLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    const auto clear_value =
+        VkClearColorValue{{props.clearColor.r, props.clearColor.g,
+                           props.clearColor.b, props.clearColor.a}};
+    vkCmdClearColorImage(cmd_buffer, image, VK_IMAGE_LAYOUT_GENERAL,
+                         &clear_value, 1, &clear_range);
+  }
+
+  m_current_frame_idx = (m_current_frame_idx + 1) % NUM_FRAME_OVERLAP;
+}
+
+}  // namespace xev

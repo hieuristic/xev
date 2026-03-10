@@ -23,7 +23,7 @@ void InitLogger();
         }                                                                 \
     } while (0)
 
-#define XEV_ERROR_IF_FAILED(res_, ...) \
+#define XEV_ASSERT_VK(res_, ...) \
     do {                               \
         if ((res_) != VK_SUCCESS) {    \
             XEV_ERROR(__VA_ARGS__);    \

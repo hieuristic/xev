@@ -23,12 +23,12 @@ public:
 
 public:
   // game state
-  initInitMenu();
-  initMainMenu();
-  initGamePlay();
-  exitGamePlay();
-  initCutscene();
-  exitCutscene();
+  init_initmenu();
+  init_mainmenu();
+  init_gameplay();
+  exit_gamePlay();
+  init_cutscene();
+  exit_cutscene();
 
 private:
   bool m_running;

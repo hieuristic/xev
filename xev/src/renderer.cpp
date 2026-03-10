@@ -1,12 +1,12 @@
-#include <xev/scene.h>
 #include <xev/renderer.h>
+#include <xev/scene.h>
 
 namespace xev {
 
 Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
-                   std::unique_ptr<Shader> shader, const Scene &scene)
+                       std::unique_ptr<Shader> shader,
+                       const Scene& scene)
     : m_backend(backend), m_shader(std::move(shader)), m_scene(&scene) {
-
   VkDevice device = m_backend->get_device();
   VkFormat format = m_backend->get_format().format;
 
@@ -21,7 +21,7 @@ Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                   m_vertex_buffer, m_vertex_buffer_memory);
 
-    void *data;
+    void* data;
     vkMapMemory(device, m_vertex_buffer_memory, 0, bufferSize, 0, &data);
     memcpy(data, scene.m_vert_buffer.data(), (size_t)bufferSize);
     vkUnmapMemory(device, m_vertex_buffer_memory);
@@ -35,7 +35,7 @@ Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                   m_normal_buffer, m_normal_buffer_memory);
 
-    void *data;
+    void* data;
     vkMapMemory(device, m_normal_buffer_memory, 0, norm_size, 0, &data);
     memcpy(data, scene.m_norm_buffer.data(), (size_t)norm_size);
     vkUnmapMemory(device, m_normal_buffer_memory);
@@ -49,7 +49,7 @@ Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                   m_uv_buffer, m_uv_buffer_memory);
 
-    void *data;
+    void* data;
     vkMapMemory(device, m_uv_buffer_memory, 0, uv_size, 0, &data);
     memcpy(data, scene.m_uv_buffer.data(), (size_t)uv_size);
     vkUnmapMemory(device, m_uv_buffer_memory);
@@ -65,7 +65,7 @@ Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                   m_index_buffer, m_index_buffer_memory);
 
-    void *data;
+    void* data;
     vkMapMemory(device, m_index_buffer_memory, 0, idx_buffer_size, 0, &data);
     memcpy(data, scene.m_face_buffer.data(), (size_t)idx_buffer_size);
     vkUnmapMemory(device, m_index_buffer_memory);
@@ -150,7 +150,7 @@ Renderer3D::~Renderer3D() {
 }
 
 uint32_t Renderer3D::find_memory_type(uint32_t typeFilter,
-                                    VkMemoryPropertyFlags properties) {
+                                      VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceProperties prop;
   VkPhysicalDeviceMemoryProperties memProperties;
   vkGetPhysicalDeviceMemoryProperties(m_backend->get_physical_device(),
@@ -167,9 +167,11 @@ uint32_t Renderer3D::find_memory_type(uint32_t typeFilter,
   return 0;
 }
 
-void Renderer3D::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                             VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                             VkDeviceMemory &bufferMemory) {
+void Renderer3D::create_buffer(VkDeviceSize size,
+                               VkBufferUsageFlags usage,
+                               VkMemoryPropertyFlags properties,
+                               VkBuffer& buffer,
+                               VkDeviceMemory& bufferMemory) {
   VkDevice device = m_backend->get_device();
 
   VkBufferCreateInfo bufferInfo = {
@@ -376,5 +378,4 @@ void Renderer3D::create_pipeline(VkDevice device, VkFormat swapchain_format) {
 
 void Renderer3D::recreate_pipeline(VkDevice device) {}
 
-
-} // namespace xev
+}  // namespace xev

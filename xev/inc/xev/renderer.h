@@ -1,12 +1,13 @@
 #pragma once
 #include <memory>
-#include <xev/backend.h>
 #include <xev/pipelines/pipeline.h>
 #include <xev/scene.h>
 #include <xev/shader.h>
 #include <xev/volk.h>
 
 namespace xev {
+
+class Backend;
 
 class Renderer {
 public:
@@ -25,22 +26,8 @@ private: // synchronization primitives
   VkFence m_fence_inflight;
 
 private:
-  static const MAX_LIGHTS = 100;
+  static const MAX_LIGHTS = 1000;
+  static const MAX_SHADOW_LIGHTS = 3;
 };
 
-class Renderer2D : Renderer {
-public:
-  Renderer2D(const Backend &backend);
-  void draw();
-};
-
-class Renderer3D : Renderer {
-public:
-  Renderer3D(std::shared_ptr<Backend> backend, std::unique_ptr<Shader> shader,
-             const Scene &scene);
-  ~Renderer3D();
-
-  void draw();
-  void drawMesh();
-  void drawFog();
 } // namespace xev

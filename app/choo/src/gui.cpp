@@ -1,13 +1,13 @@
-#include <xev/backend.h>
-
 #include <choo/gui.h>
 
-class GUI {
-  GUI(const xev::Backend &backend, );
-  ~GUI();
+GUI::GUI() {
+}
 
-public:
-  createInitMenu();
-  createMainMenu();
-  createGamePlay();
+GUI::create_initmenu() {
+}
+
+GUI::create_mainmenu() {
+}
+
+GUI::create_gameplay() {
 }
