@@ -3,10 +3,12 @@
 
 namespace xev {
 
-Window::Window(std::string name) { createWindow(name, 800, 600); }
+Window::Window(std::string name) {
+  create_window(name, 800, 600);
+}
 
 Window::Window(std::string name, uint32_t width, uint32_t height) {
-  createWindow(name, width, height);
+  create_window(name, width, height);
 }
 
 Window::~Window() {
@@ -16,7 +18,7 @@ Window::~Window() {
   }
 }
 
-void Window::createWindow(std::string name, uint32_t width, uint32_t height) {
+void Window::create_window(std::string name, uint32_t width, uint32_t height) {
   m_width = width;
   m_height = height;
   m_window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN);
@@ -27,4 +29,4 @@ void Window::createWindow(std::string name, uint32_t width, uint32_t height) {
   }
 }
 
-} // namespace xev
+}  // namespace xev

@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL3/SDL.h>
 #include <xev/buffer.h>
+#include <xev/frame_arg.h>
 #include <xev/logger.h>
 #include <xev/vma.h>
 #include <xev/volk.h>
@@ -16,33 +17,6 @@ inline constexpr uint32_t NUM_FRAME_OVERLAP = 2;
 inline constexpr uint64_t NO_TIMEOUT =
     std::numeric_limits<std::uint64_t>::max();
 
-enum QFAM {
-  Q_GRAPHICS,
-  Q_PRESENT,
-  Q_COMPUTE,
-};
-
-struct QueueFamilyEntry {
-  uint32_t idx;
-  uint32_t cnt;  // number of queues within the family
-};
-
-struct QueueFamily {
-  std::optional<QueueFamilyEntry> gfx;
-  std::optional<QueueFamilyEntry> pre;
-  std::optional<QueueFamilyEntry> com;
-
-  bool isComplete() { return gfx.has_value() && pre.has_value(); }
-};
-
-struct Frame {
-  VkCommandPool cmd_pool;
-  VkCommandBuffer cmd_buffer;
-  VkSemaphore sem_swapchain;
-  VkSemaphore sem_render;
-  VkFence fence_render;
-};
-
 /*
 This class handle most of the VulkanAPI calls. It is responsible for
 creating/destroying buffers, images, command buffers, as well as managing
@@ -53,18 +27,6 @@ class Backend {
  public:
   Backend(SDL_Window* window);
   ~Backend();
-
-  VkDevice get_device() { return m_device; }
-  VkPhysicalDevice get_physical_device() { return m_physical_device; }
-  VkSurfaceFormatKHR get_format() { return m_ideal_format; }
-  VmaAllocator get_allocator() { return m_allocator; }
-
-  VkSwapchainKHR get_swapchain() { return m_swapchain; }
-  VkExtent2D get_extent() { return m_extent; }
-  std::vector<VkImage> get_swapchain_images() { return m_swapchain_images; }
-  std::vector<VkImageView> get_swapchain_image_views() {
-    return m_swapchain_image_views;
-  }
 
   const char* app_name = "xev_app";
   uint32_t app_version = VK_MAKE_VERSION(0, 0, 0);
@@ -77,8 +39,81 @@ class Backend {
                        VmaMemoryUsage mem_usage = VMA_MEMORY_USAGE_AUTO) const;
   void destroy_buffer(Buffer);
 
+  // this define the rendering scope
   VkCommandBuffer enter_frame();
-  void leave_frame();
+  void leave_frame(VkCommandBuffer cmd,
+                   const Image& image,
+                   const FrameArg& args);
+
+ public:
+  enum QFAM {
+    Q_GRAPHICS,
+    Q_PRESENT,
+    Q_COMPUTE,
+  };
+
+  struct QueueFamilyEntry {
+    uint32_t idx;
+    uint32_t cnt;  // number of queues within the family
+  };
+
+  struct QueueFamily {
+    std::optional<QueueFamilyEntry> gfx;
+    std::optional<QueueFamilyEntry> pre;
+    std::optional<QueueFamilyEntry> com;
+
+    bool isComplete() { return gfx.has_value() && pre.has_value(); }
+  };
+
+  struct Frame {
+    VkCommandPool cmd_pool;
+    VkCommandBuffer cmd_buffer;
+    VkSemaphore sem_swapchain;
+    VkSemaphore sem_render;
+    VkFence fence_render;
+  };
+
+ public:  // pipeline resources
+  VkDescriptorSetLayout create_bindless_descriptor_set_layout();
+  VkShaderStage create_shader_stage(const char* path);
+  VkPipelineLayout create_pipeline_layout(
+      std::span<const VkDescriptorSetLayout> layouts,
+      std::span<const VkPushConstantRange> ranges);
+
+ private:  // pipeline resources
+  static const uint32_t MAX_BINDLESS_TEXTURE = 2 << 14;
+  static const uint32_t MAX_BINDLESS_SAMPLER = 2 << 5;
+  static const uint32_t TEXTURE_BINDING = 0;
+  static const uint32_t SAMPLER_BINDING = 0;
+  VkDescriptorPool m_desc_pool;
+  VkDescriptorSetLayout m_desc_set_layout;
+  VkDescriptorSet m_desc_set;
+
+  static const uint32_t LINEAR_SAMPLER_ID = 0;
+  static const float MAX_SAMPLER_ANISOTROPY{1.0f};
+  VkSampler m_linear_sampler;
+  void create_sampler(uint32_t id, VkSampler sampler);  // for valid m_desc_set
+
+ public:  // pipeline creation
+  struct PipelineInfo {
+    VkShaderModule& vert_shader;
+    VkShaderModule& frag_shader;
+    VkPrimitiveTopology topology;
+    VkPolygonMode polygon;
+    VkSampleCountFlagBits samples;
+    VkFormat color_format;
+    VkFormat depth_format;
+    bool enable_culling;
+    bool enable_depth_test;
+    VkCompareOp depth_op;
+    bool enable_blend;
+    VkBlendOp blend_op;
+    VkBlendFactor blend_src_factor;
+    VkBlendFactor blend_dst_factor;
+    VkBlendFactor blend_src_alpha_factor;
+    VkBlendFactor blend_dst_alpha_factor;
+  };
+  VkPipeline create_pipeline(const PipelineInfo& info);
 
  private:  // device and memmory allocator
   VkInstance m_instance = VK_NULL_HANDLE;
