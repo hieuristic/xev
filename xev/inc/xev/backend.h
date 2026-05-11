@@ -1,12 +1,14 @@
 #pragma once
 #include <SDL3/SDL.h>
-#include <xev/buffer.h>
 #include <xev/frame_arg.h>
 #include <xev/logger.h>
+#include <xev/resource/image.h>
+#include <xev/resource/resource.h>
 #include <xev/vma.h>
 #include <xev/volk.h>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,18 +35,38 @@ class Backend {
   const char* engine_name = "xev_engine";
   uint32_t engine_version = VK_MAKE_VERSION(0, 0, 0);
 
-  Buffer create_buffer(std::string_view name,
-                       VkDeviceSize size,
-                       VkBufferUsageFlags usage,
-                       VmaMemoryUsage mem_usage = VMA_MEMORY_USAGE_AUTO) const;
-  void destroy_buffer(Buffer);
-
   // this define the rendering scope
   VkCommandBuffer enter_frame();
   void leave_frame(VkCommandBuffer cmd,
                    const Image& image,
                    const FrameArg& args);
 
+  // Primitive resources
+ public:
+  void load_buffer(VkBuffer& buffer,
+                   VmaAllocation& alloc,
+                   VmaAllocationInfo& alloc_info,
+                   VkDeviceSize size,
+                   VkBufferUsageFlags flags,
+                   VmaMemoryUsage mem_usage) const;
+  void unload_buffer(VkBuffer buffer, VmaAllocation alloc) const;
+  void copy_buffer(const void* src,
+                   const VmaAllocation& dst_alloc,
+                   uint64_t offset,
+                   uint64_t size) const;
+  void load_image(VkImage& image,
+                  VkImageView& view,
+                  VmaAllocation& alloc,
+                  VmaAllocationInfo& alloc_info,
+                  uint32_t width,
+                  uint32_t height,
+                  VkFormat format,
+                  VkImageUsageFlags flags) const;
+  void unload_image(VkImage& image,
+                    VmaAllocation& alloc,
+                    VkImageView& view) const;
+
+  // Backend resources
  public:
   enum QFAM {
     Q_GRAPHICS,
@@ -67,18 +89,20 @@ class Backend {
 
   struct Frame {
     VkCommandPool cmd_pool;
-    VkCommandBuffer cmd_buffer;
+    VkCommandBuffer cmdbuf;
     VkSemaphore sem_swapchain;
     VkSemaphore sem_render;
     VkFence fence_render;
   };
 
  public:  // pipeline resources
-  VkDescriptorSetLayout create_bindless_descriptor_set_layout();
-  VkShaderStage create_shader_stage(const char* path);
+  VkDescriptorSetLayout create_bindless_descriptor_set_layout() const;
+  VkShaderModule create_shader_module(const char* path) const;
+  void destroy_shader_module(VkShaderModule module) const;
   VkPipelineLayout create_pipeline_layout(
       std::span<const VkDescriptorSetLayout> layouts,
-      std::span<const VkPushConstantRange> ranges);
+      std::span<const VkPushConstantRange> ranges) const;
+  void destroy_pipeline_layout(VkPipelineLayout) const;
 
  private:  // pipeline resources
   static const uint32_t MAX_BINDLESS_TEXTURE = 2 << 14;
@@ -90,7 +114,7 @@ class Backend {
   VkDescriptorSet m_desc_set;
 
   static const uint32_t LINEAR_SAMPLER_ID = 0;
-  static const float MAX_SAMPLER_ANISOTROPY{1.0f};
+  static constexpr float MAX_SAMPLER_ANISOTROPY{1.0f};
   VkSampler m_linear_sampler;
   void create_sampler(uint32_t id, VkSampler sampler);  // for valid m_desc_set
 
@@ -112,8 +136,12 @@ class Backend {
     VkBlendFactor blend_dst_factor;
     VkBlendFactor blend_src_alpha_factor;
     VkBlendFactor blend_dst_alpha_factor;
+    VkPipelineLayout layout;
+    std::vector<VkVertexInputBindingDescription> vertex_bindings;
+    std::vector<VkVertexInputAttributeDescription> vertex_attributes;
   };
-  VkPipeline create_pipeline(const PipelineInfo& info);
+  VkPipeline create_pipeline(const PipelineInfo& info) const;
+  void destroy_pipeline(VkPipeline pipeline) const;
 
  private:  // device and memmory allocator
   VkInstance m_instance = VK_NULL_HANDLE;

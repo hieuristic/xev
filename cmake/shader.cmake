@@ -4,17 +4,16 @@ if(NOT SLANGC_EXECUTABLE)
     message(WARNING "slangc compiler not found. Shader compilation will be disabled.")
 endif()
 
-function(target_compile_slang_shaders TARGET)
+function(target_compile_slang_shaders TARGET SHADER_OUT_DIR)
     if(NOT SLANGC_EXECUTABLE)
         return()
     endif()
 
-    set(SHADER_OUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders")
     file(MAKE_DIRECTORY "${SHADER_OUT_DIR}")
 
     set(COMPILED_SHADERS "")
 
-    # Iterate over all arguments passed after the TARGET name
+    # Iterate over all arguments passed after TARGET and SHADER_OUT_DIR
     foreach(SHADER ${ARGN})
         get_filename_component(SHADER_ABS "${SHADER}" ABSOLUTE)
         get_filename_component(SHADER_NAME "${SHADER_ABS}" NAME)

@@ -30,21 +30,32 @@ target_link_libraries(imgui PUBLIC SDL3::SDL3-shared Vulkan::Vulkan)
 # spdlog
 add_subdirectory(ext/spdlog EXCLUDE_FROM_ALL)
 
-# Set output directories for binaries and libraries
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# Set output directories for libraries
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Include custom shader compilation
+# Include custom cmake modules
 include(cmake/shader.cmake)
+include(cmake/xev_app.cmake)
 
 # volk
 add_subdirectory(ext/volk EXCLUDE_FROM_ALL)
 add_subdirectory(ext/glm EXCLUDE_FROM_ALL)
 add_subdirectory(ext/vma EXCLUDE_FROM_ALL)
 
+# Engine
 add_subdirectory(xev)
-add_subdirectory(app/game0)
+
+# Apps (enabled via -DMAKE_<NAME>=ON)
+option(MAKE_DEMO "Build the demo app" OFF)
+option(MAKE_CHOO "Build the choo app" OFF)
+
+if(MAKE_DEMO)
+    add_subdirectory(app/demo)
+endif()
+if(MAKE_CHOO)
+    add_subdirectory(app/choo)
+endif()
 
 # Testing
 enable_testing()

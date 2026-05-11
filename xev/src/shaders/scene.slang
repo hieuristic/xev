@@ -1,7 +1,7 @@
 module scene;
 
 import light;
-import material;
+
 
 export struct Scene {
   float4x4 view;
@@ -17,8 +17,8 @@ export struct Scene {
   float fog_density;
 
   // light
-  uint32_t light_ids[];
+  uint64_t light_buffer_address;
 
   // material
-  uint32_t material_ids[];
+  uint64_t material_buffer_address;
 };

@@ -15,6 +15,6 @@ export struct Light {
 
   float range;
   float intensity;
-  vec2 offset;
+  float2 offset;
   uint shadowmap_id;
 };

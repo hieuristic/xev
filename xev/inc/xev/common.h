@@ -1,9 +1,11 @@
 #include <xev/volk.h>
+#include <cstdint>
+#include <limits>
 
 namespace xev {
 namespace common {
 constexpr VkImageSubresourceRange image_subresource_range(
-    VkImageAspectFlagBits aspect_mask) {
+    VkImageAspectFlags aspect_mask) {
   return VkImageSubresourceRange{
       .aspectMask = aspect_mask,
       .baseMipLevel = 0,
@@ -13,7 +15,7 @@ constexpr VkImageSubresourceRange image_subresource_range(
   };
 }
 
-VkImageLayout update_layout(VkCommandBuffer cmd,
+inline VkImageLayout update_layout(VkCommandBuffer cmd,
                             VkImage image,
                             VkImageLayout old_layout,
                             VkImageLayout new_layout) {
@@ -46,12 +48,42 @@ VkImageLayout update_layout(VkCommandBuffer cmd,
   return new_layout;
 }
 
-void copy_image(VkCommandBuffer cmd,
+inline void copy_image(VkCommandBuffer cmd,
                 VkImage src,
                 VkImage dst,
-                VkExtend2D src_ext,
-                VkExtend2D dst_ext,
-                VkFilter) {
+                VkExtent2D src_ext,
+                VkExtent2D dst_ext,
+                VkFilter filter) {
+  VkImageBlit2 region = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+      .srcSubresource =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = 0,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+      .srcOffsets =
+          {
+              {},
+              {(std::int32_t)src_ext.width,
+               (std::int32_t)src_ext.height, 1},
+          },
+      .dstSubresource =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = 0,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+      .dstOffsets =
+          {
+              {},
+              {(std::int32_t)dst_ext.width,
+               (std::int32_t)dst_ext.height, 1},
+          },
+  };
+
   VkBlitImageInfo2 blit_info = {
       .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
       .srcImage = src,
@@ -59,36 +91,7 @@ void copy_image(VkCommandBuffer cmd,
       .dstImage = dst,
       .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       .regionCount = 1,
-      .pRegions =
-          &{
-              .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
-              .srcSubresource =
-                  {
-                      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                      .mipLevel = 0,
-                      .baseArrayLayer = 0,
-                      .layerCount = 1,
-                  },
-              .srcOffsets =
-                  {
-                      {},
-                      {(std::int32_t)src_ext.width,
-                       (std::int32_t)src_ext.height, 1},
-                  },
-              .dstSubresource =
-                  {
-                      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                      .mipLevel = 0,
-                      .baseArrayLayer = 0,
-                      .layerCount = 1,
-                  },
-              .dstOffsets =
-                  {
-                      {},
-                      {(std::int32_t)dst_ext.width,
-                       (std::int32_t)dst_ext.height, 1},
-                  },
-          },
+      .pRegions = &region,
       .filter = filter,
   };
 

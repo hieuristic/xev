@@ -1,6 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
-#include <glm/glm.h>
+#include <glm/glm.hpp>
 #include <cstdint>
 #include <string>
 

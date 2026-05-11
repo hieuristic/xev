@@ -2,11 +2,12 @@
 #include <xev/backend.h>
 
 class GUI {
-  GUI(const xev::Backend &backend, );
+ public:
+  GUI(const xev::Backend &backend);
   ~GUI();
 
-public:
-  create_initmenu();
-  create_mainmenu();
-  create_gameplay();
-}
+ public:
+  void create_initmenu();
+  void create_mainmenu();
+  void create_gameplay();
+};

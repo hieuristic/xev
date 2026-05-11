@@ -1,5 +1,8 @@
+#include <SDL3/SDL_vulkan.h>
 #include <xev/backend.h>
-#include <xev/commmon.h>
+#include <xev/common.h>
+#include <fstream>
+#include <set>
 
 namespace xev {
 
@@ -145,10 +148,10 @@ Backend::Backend(SDL_Window* window) {
 
   // setup bindless descripter set
   {  // descriptor pool
-    std::array<VkDescriptorPoolSize, 2> sizes = {
+    std::array<VkDescriptorPoolSize, 2> sizes = {{
         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_BINDLESS_TEXTURE},
         {VK_DESCRIPTOR_TYPE_SAMPLER, MAX_BINDLESS_SAMPLER},
-    };
+    }};
     VkDescriptorPoolCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT,
@@ -163,24 +166,24 @@ Backend::Backend(SDL_Window* window) {
 
   {  // creating descriptor set layout
     std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
-        {
-            .binding = TEXTURE_BINDING,
-            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .descriptorCount = MAX_BINDLESS_TEXTURE,
-            .stageFlags = VK_SHADER_STAGE_ALL,
-        },
-        {
-            .binding = SAMPLER_BINDING,
-            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .descriptorCount = MAX_BINDLESS_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_ALL,
-        }};
-    std::array<VkDescriptorBindingFlags, 2> flags = {
+        {{
+             .binding = TEXTURE_BINDING,
+             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+             .descriptorCount = MAX_BINDLESS_TEXTURE,
+             .stageFlags = VK_SHADER_STAGE_ALL,
+         },
+         {
+             .binding = SAMPLER_BINDING,
+             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+             .descriptorCount = MAX_BINDLESS_SAMPLER,
+             .stageFlags = VK_SHADER_STAGE_ALL,
+         }}};
+    std::array<VkDescriptorBindingFlags, 2> flags = {{
         VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
             VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
         VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
             VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-    };
+    }};
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo flag_info = {
         .sType =
@@ -189,15 +192,13 @@ Backend::Backend(SDL_Window* window) {
         .pBindingFlags = flags.data(),
     };
 
-    VkDescriptorSetLayoutCreateInfo info =
-        {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .pNext = &flag_info,
-            .flags =
-                VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
-            .bindingCount = 2,
-            .pBindings = bindings.data(),
-        }
+    VkDescriptorSetLayoutCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = &flag_info,
+        .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
+        .bindingCount = 2,
+        .pBindings = bindings.data(),
+    };
 
     res_ = vkCreateDescriptorSetLayout(m_device, &info, nullptr,
                                        &m_desc_set_layout);
@@ -229,11 +230,59 @@ Backend::Backend(SDL_Window* window) {
     res_ = vkCreateSampler(m_device, &info, nullptr, &m_linear_sampler);
     create_sampler(LINEAR_SAMPLER_ID, m_linear_sampler);
   }
+
+  {  // render frames
+    for (int i = 0; i < NUM_FRAME_OVERLAP; i++) {
+      VkCommandPoolCreateInfo pool_info = {
+          .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+          .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+          .queueFamilyIndex = m_qfam.gfx.value().idx,
+      };
+      res_ = vkCreateCommandPool(m_device, &pool_info, nullptr,
+                                 &m_frames[i].cmd_pool);
+      XEV_ASSERT_VK(res_, "Failed to create frame command pool");
+
+      VkCommandBufferAllocateInfo alloc_info = {
+          .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+          .commandPool = m_frames[i].cmd_pool,
+          .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+          .commandBufferCount = 1,
+      };
+      res_ =
+          vkAllocateCommandBuffers(m_device, &alloc_info, &m_frames[i].cmdbuf);
+      XEV_ASSERT_VK(res_, "Failed to allocate frame command buffer");
+
+      VkFenceCreateInfo fence_info = {
+          .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+          .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+      };
+      res_ = vkCreateFence(m_device, &fence_info, nullptr,
+                           &m_frames[i].fence_render);
+      XEV_ASSERT_VK(res_, "Failed to create frame render fence");
+
+      VkSemaphoreCreateInfo sem_info = {
+          .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+      };
+      res_ = vkCreateSemaphore(m_device, &sem_info, nullptr,
+                               &m_frames[i].sem_swapchain);
+      XEV_ASSERT_VK(res_, "Failed to create frame image semaphore");
+      res_ = vkCreateSemaphore(m_device, &sem_info, nullptr,
+                               &m_frames[i].sem_render);
+      XEV_ASSERT_VK(res_, "Failed to create frame drawn semaphore");
+    }
+  }
 }
 
 Backend::~Backend() {
   if (m_allocator != nullptr)
     vmaDestroyAllocator(m_allocator);
+
+  for (int i = 0; i < NUM_FRAME_OVERLAP; i++) {
+    vkDestroyFence(m_device, m_frames[i].fence_render, nullptr);
+    vkDestroySemaphore(m_device, m_frames[i].sem_swapchain, nullptr);
+    vkDestroySemaphore(m_device, m_frames[i].sem_render, nullptr);
+    vkDestroyCommandPool(m_device, m_frames[i].cmd_pool, nullptr);
+  }
 
   vkDestroySampler(m_device, m_linear_sampler, nullptr);
   vkDestroyDescriptorSetLayout(m_device, m_desc_set_layout, nullptr);
@@ -252,9 +301,9 @@ Backend::~Backend() {
     vkDestroyInstance(m_instance, nullptr);
 }
 
-QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
-                                      VkSurfaceKHR surface) {
-  QueueFamily qfam;
+Backend::QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
+                                               VkSurfaceKHR surface) {
+  Backend::QueueFamily qfam;
   uint32_t qfam_cnt;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &qfam_cnt, nullptr);
 
@@ -275,7 +324,8 @@ QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
   return qfam;
 }
 
-std::optional<QueueFamilyEntry> Backend::get_queue_family_index(QFAM qfam) {
+std::optional<Backend::QueueFamilyEntry> Backend::get_queue_family_index(
+    QFAM qfam) {
   switch (qfam) {
     case Q_GRAPHICS:
       return m_qfam.gfx;
@@ -298,7 +348,8 @@ VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
     return queue;
   }
 
-  std::optional<QueueFamilyEntry> qfam_entry = get_queue_family_index(qfam);
+  std::optional<Backend::QueueFamilyEntry> qfam_entry =
+      get_queue_family_index(qfam);
   if (!qfam_entry.has_value()) {
     XEV_ERROR("No queue within the given queue family");
     return queue;
@@ -441,7 +492,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                        VK_COMPONENT_SWIZZLE_IDENTITY},
         .subresourceRange =
             {
-                .aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -450,7 +501,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
     };
     res_ = vkCreateImageView(device, &view_info, nullptr,
                              &m_swapchain_image_views[i]);
-    XEV_ERROR_IF_FAILED(res_, "Failed to create swapchain image view!");
+    XEV_ASSERT_VK(res_, "Failed to create swapchain image view!");
   }
 
   return m_swapchain;
@@ -469,35 +520,106 @@ VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
   return create_swapchain(device, surface);
 }
 
-Buffer Backend::create_buffer(std::string_view name,
-                              VkDeviceSize size,
-                              VkBufferUsageFlags usage,
-                              VmaMemoryUsage mem_usage) const {
-  Buffer buffer{};
-
+void Backend::load_buffer(VkBuffer& buffer,
+                          VmaAllocation& alloc,
+                          VmaAllocationInfo& alloc_info,
+                          VkDeviceSize size,
+                          VkBufferUsageFlags flags,
+                          VmaMemoryUsage mem_usage) const {
   VkBufferCreateInfo buffer_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
-      .usage = usage,
+      .usage = flags,
   };
 
-  VmaAllocationCreateInfo alloc_info = {
+  VmaAllocationCreateInfo create_info = {
       .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
       .usage = mem_usage,
   };
 
-  VkResult res_ =
-      vmaCreateBuffer(m_allocator, &buffer_info, &alloc_info, &buffer.buffer,
-                      &buffer.alloc, &buffer.alloc_info);
-  XEV_ASSERT(res_ == VK_SUCCESS);
+  VkResult res_ = vmaCreateBuffer(m_allocator, &buffer_info, &create_info,
+                                  &buffer, &alloc, &alloc_info);
 
-  XEV_INFO("Created buffer '{}' ({} bytes)", name, size);
-  return buffer;
+  XEV_ASSERT(res_ == VK_SUCCESS);
 }
 
-void Backend::destroy_buffer(Buffer buffer) {
-  vmaDestroyBuffer(m_allocator, buffer.buffer, buffer.alloc);
+void Backend::unload_buffer(VkBuffer buffer, VmaAllocation alloc) const {
+  vmaDestroyBuffer(m_allocator, buffer, alloc);
+}
+
+void Backend::copy_buffer(const void* src,
+                          const VmaAllocation& dst,
+                          uint64_t offset,
+                          uint64_t size) const {
+  vmaCopyMemoryToAllocation(m_allocator, src, dst, offset, size);
+}
+
+void Backend::load_image(VkImage& image,
+                         VkImageView& view,
+                         VmaAllocation& alloc,
+                         VmaAllocationInfo& alloc_info,
+                         uint32_t width,
+                         uint32_t height,
+                         VkFormat format,
+                         VkImageUsageFlags flags) const {
+  VkImageCreateInfo image_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .imageType = VK_IMAGE_TYPE_2D,
+      .format = format,
+      .extent = {width, height, 1},
+      .mipLevels = 1,
+      .arrayLayers = 1,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .tiling = VK_IMAGE_TILING_OPTIMAL,
+      .usage = flags,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+  };
+
+  VmaAllocationCreateInfo create_info = {
+      .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+  };
+
+  XEV_ASSERT_VK(vmaCreateImage(m_allocator, &image_info, &create_info, &image,
+                               &alloc, &alloc_info));
+
+  VkImageAspectFlags aspect_mask = 0;
+  if (flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+    aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+  if (flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  if (flags & VK_IMAGE_USAGE_SAMPLED_BIT && aspect_mask == 0)
+    aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+  VkImageViewCreateInfo view_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image = image,
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format = format,
+      .subresourceRange =
+          {
+              .aspectMask = aspect_mask,
+              .baseMipLevel = 0,
+              .levelCount = 1,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+  };
+
+  XEV_ASSERT_VK(vkCreateImageView(m_device, &view_info, nullptr, &view));
+}
+
+void Backend::unload_image(VkImage& image,
+                           VmaAllocation& alloc,
+                           VkImageView& view) const {
+  if (view != VK_NULL_HANDLE) {
+    vkDestroyImageView(m_device, view, nullptr);
+    view = VK_NULL_HANDLE;
+  }
+  if (image != VK_NULL_HANDLE) {
+    vmaDestroyImage(m_allocator, image, alloc);
+    image = VK_NULL_HANDLE;
+  }
 }
 
 VmaAllocator Backend::create_memory_allocator(VkInstance instance,
@@ -527,12 +649,12 @@ VmaAllocator Backend::create_memory_allocator(VkInstance instance,
   return allocator;
 }
 
-VkCommandBuffer enter_frame() {
+VkCommandBuffer Backend::enter_frame() {
   const Frame& frame = m_frames[m_current_frame_idx];
   XEV_ASSERT_VK(
       vkWaitForFences(m_device, 1, &frame.fence_render, VK_TRUE, NO_TIMEOUT));
 
-  const VkCommandBuffer& cmd = frame.cmd_buffer;
+  const VkCommandBuffer& cmd = frame.cmdbuf;
   VkCommandBufferBeginInfo begin_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
       .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -542,51 +664,56 @@ VkCommandBuffer enter_frame() {
   return cmd;
 }
 
-void leave_frame(VkCommandBuffer cmd,
-                 const Image& image,
-                 const FrameArg& args) {
+void Backend::leave_frame(VkCommandBuffer cmd,
+                          const Image& image,
+                          const FrameArg& args) {
   VkResult res_;
 
   // acquire swapchain image
   uint32_t img_idx;
-  const VkImage& swapchain_image;
   const Frame& current_frame = m_frames[m_current_frame_idx];
   res_ = vkAcquireNextImageKHR(m_device, m_swapchain, NO_TIMEOUT,
                                current_frame.sem_swapchain, VK_NULL_HANDLE,
                                &img_idx);
   if (res_ == VK_ERROR_OUT_OF_DATE_KHR || res_ == VK_SUBOPTIMAL_KHR) {
     m_is_swapchain_dirty = true;
-    swapchain_image = m_images[img_idx];
-  } else {
-    XEV_ASSERT_VK(res_, "Failed to acquaire swapchain image");
+    return;
+  } else if (res_ != VK_SUCCESS) {
+    XEV_ASSERT_VK(res_, "Failed to acquire swapchain image");
     return;
   }
+  VkImage swapchain_image = m_swapchain_images[img_idx];
 
   // reset fence
-  XEV_ASSERT_VK(vkResetFences(device, 1, &current_frame));
+  XEV_ASSERT_VK(vkResetFences(m_device, 1, &current_frame.fence_render));
 
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   // clearing
   layout = common::update_layout(cmd, swapchain_image, layout,
                                  VK_IMAGE_LAYOUT_GENERAL);
-  vkCmdClearColorImage(
-      cmd, swapchain_image, VK_IMAGE_LAYOUT_GENERAL,
-      &common::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT), 1,
-      &{{args.clear_color}});
+
+  VkImageSubresourceRange swapchain_range =
+      common::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+  VkClearColorValue clear_val = {{args.clear_color[0], args.clear_color[1],
+                                  args.clear_color[2], args.clear_color[3]}};
+
+  vkCmdClearColorImage(cmd, swapchain_image, VK_IMAGE_LAYOUT_GENERAL,
+                       &clear_val, 1, &swapchain_range);
 
   // copy to swapchain
-  if (args.copy_to_swapchain) {
+  if (args.copy_to_swapchain && image.image != VK_NULL_HANDLE) {
     common::update_layout(cmd, image.image, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     layout = common::update_layout(cmd, swapchain_image, layout,
                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    common::copy_image(cmd, image.image, swapchain_image, image.ext,
-                       m_swapchain_ext, args.filter);
+    common::copy_image(cmd, image.image, swapchain_image,
+                       {image.width, image.height}, m_extent, args.filter);
   }
 
   // present
-  update_layout(cmd, swapchain_image, layout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  layout = common::update_layout(cmd, swapchain_image, layout,
+                                 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
   XEV_ASSERT_VK(vkEndCommandBuffer(cmd));
 
   {  // submit
@@ -597,15 +724,13 @@ void leave_frame(VkCommandBuffer cmd,
         .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
         .deviceIndex = 0,
     };
-    VkSemaphoreSubmitInfo wait_info = {
+    VkSemaphoreSubmitInfo signal_info = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = current_frame.sem_swapchain,
+        .semaphore = current_frame.sem_render,
         .value = 1,
-        .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
         .deviceIndex = 0,
     };
-    const auto signalInfo = vkinit::semaphoreSubmitInfo(
-        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, current_frame.sem_render);
 
     VkCommandBufferSubmitInfo info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -638,7 +763,7 @@ void leave_frame(VkCommandBuffer cmd,
     if (res_ != VK_SUCCESS) {
       m_is_swapchain_dirty = true;
       if (res_ != VK_SUBOPTIMAL_KHR) {
-        XEV_ERROR("Failed to present {}", res_);
+        XEV_ERROR("Failed to present {}", (int)res_);
       }
     }
   }
@@ -646,9 +771,7 @@ void leave_frame(VkCommandBuffer cmd,
   m_current_frame_idx = (m_current_frame_idx + 1) % NUM_FRAME_OVERLAP;
 }
 
-VkPipelineShaderStageCreateInfo Backend::create_shader_stage(
-    const char* path,
-    VkShaderStageFlagBits stage_bit) {
+VkShaderModule Backend::create_shader_module(const char* path) {
   std::ifstream file(path, std::ios::ate | std::ios::binary);
   if (!file.is_open()) {
     XEV_ERROR("Failed to read {}", path);
@@ -666,19 +789,18 @@ VkPipelineShaderStageCreateInfo Backend::create_shader_stage(
 
   VkShaderModuleCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .codeSize = size,
+      .codeSize = static_cast<size_t>(size),
       .pCode = reinterpret_cast<const uint32_t*>(m_shader_src.data()),
   };
 
   res_ = vkCreateShaderModule(m_device, &info, nullptr, &module);
-  VK_ASSERT_VK(res_, "Failed to load shader module");
+  XEV_ASSERT_VK(res_, "Failed to load shader module");
 
-  return VkPipelineShaderStageCreateInfo{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = stage_bit,
-      .module = module,
-      .pName = "main",
-  };
+  return module;
+}
+
+void Backend::destroy_shader_module(VkShaderModule module) const {
+  vkDestroyShaderModule(m_device, module, nullptr);
 }
 
 VkPipelineLayout Backend::create_pipeline_layout(
@@ -687,7 +809,7 @@ VkPipelineLayout Backend::create_pipeline_layout(
   VkResult res_;
   VkPipelineLayout layout;
 
-  VkPipelineCreateInfo info{
+  VkPipelineLayoutCreateInfo info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .setLayoutCount = static_cast<uint32_t>(layouts.size()),
       .pSetLayouts = layouts.data(),
@@ -695,9 +817,13 @@ VkPipelineLayout Backend::create_pipeline_layout(
       .pPushConstantRanges = ranges.data(),
   };
 
-  res_ = vkCreatePipelineLayout(m_device, &info, nullptr & layout);
+  res_ = vkCreatePipelineLayout(m_device, &info, nullptr, &layout);
   XEV_ASSERT_VK(res_, "Failed to create pipeline layout.");
   return layout;
+}
+
+void Backend::destroy_pipeline_layout(VkPipelineLayout layout) const {
+  vkDestroyPipelineLayout(m_device, layout, nullptr);
 }
 
 void Backend::create_sampler(uint32_t id, VkSampler sampler) {
@@ -725,18 +851,18 @@ VkPipeline Backend::create_pipeline(const PipelineInfo& info) {
   };
 
   VkPipelineColorBlendAttachmentState blend_attachments = info.enable_blend
-    ? {
+    ? VkPipelineColorBlendAttachmentState{
         .blendEnable = VK_TRUE,
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
         .srcColorBlendFactor = info.blend_src_factor,
         .dstColorBlendFactor = info.blend_dst_factor,
         .colorBlendOp = info.blend_op,
         .srcAlphaBlendFactor = info.blend_src_alpha_factor,
         .dstAlphaBlendFactor = info.blend_dst_alpha_factor,
         .alphaBlendOp = info.blend_op,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
       }
-    : {
+    : VkPipelineColorBlendAttachmentState{
           .blendEnable = VK_FALSE,
           .colorWriteMask =
               VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -753,14 +879,20 @@ VkPipeline Backend::create_pipeline(const PipelineInfo& info) {
 
   VkPipelineVertexInputStateCreateInfo vertex_input_state = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount =
+          static_cast<uint32_t>(info.vertex_bindings.size()),
+      .pVertexBindingDescriptions = info.vertex_bindings.data(),
+      .vertexAttributeDescriptionCount =
+          static_cast<uint32_t>(info.vertex_attributes.size()),
+      .pVertexAttributeDescriptions = info.vertex_attributes.data(),
   };
   auto dynamic_states =
-      std::vector{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR}
+      std::vector{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 
   VkPipelineDynamicStateCreateInfo dynamic_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-      .dynamicStateCount = (std::uint32_t)dynamic_tates.size(),
-      .pDynamicStates = dynamic_tates.data(),
+      .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
+      .pDynamicStates = dynamic_states.data(),
   };
 
   VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {
@@ -782,28 +914,28 @@ VkPipeline Backend::create_pipeline(const PipelineInfo& info) {
       .alphaToOneEnable = VK_FALSE,
   };
   VkPipelineDepthStencilStateCreateInfo depth_stencil_state =
-      info.enable_depth ? {
+      info.enable_depth_test ? VkPipelineDepthStencilStateCreateInfo{
     .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-    .depthTestEnable = VK_TRUE;
-    .depthWriteEnable = VK_TRUE;
-    .depthCompareOp = info.depth_op;
-    .depthBoundsTestEnable = VK_FALSE;
-    .stencilTestEnable = VK_FALSE;
-    .front = {};
-    .back = {};
-    .minDepthBounds = 0.f;
-    .maxDepthBounds = 1.f;
-  } : {
+    .depthTestEnable = VK_TRUE,
+    .depthWriteEnable = VK_TRUE,
+    .depthCompareOp = info.depth_op,
+    .depthBoundsTestEnable = VK_FALSE,
+    .stencilTestEnable = VK_FALSE,
+    .front = {},
+    .back = {},
+    .minDepthBounds = 0.f,
+    .maxDepthBounds = 1.f,
+  } : VkPipelineDepthStencilStateCreateInfo{
     .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-    .depthTestEnable = VK_FALSE;
-    .depthWriteEnable = VK_FALSE;
-    .depthCompareOp = VK_COMPARE_OP_NEVER;
-    .depthBoundsTestEnable = VK_FALSE;
-    .stencilTestEnable = VK_FALSE;
-    .front = {};
-    .back = {};
-    .minDepthBounds = 0.f;
-    .maxDepthBounds = 1.f;
+    .depthTestEnable = VK_FALSE,
+    .depthWriteEnable = VK_FALSE,
+    .depthCompareOp = VK_COMPARE_OP_NEVER,
+    .depthBoundsTestEnable = VK_FALSE,
+    .stencilTestEnable = VK_FALSE,
+    .front = {},
+    .back = {},
+    .minDepthBounds = 0.f,
+    .maxDepthBounds = 1.f,
   };
 
   VkPipelineRenderingCreateInfo render_info = {
@@ -813,9 +945,23 @@ VkPipeline Backend::create_pipeline(const PipelineInfo& info) {
       .depthAttachmentFormat = info.depth_format,
   };
 
-  std::array<&VkPipelineShaderStageCreateInfo, 2> shader_stages = {
-      info.vert_shader,
-      info.frag_shader,
+  VkPipelineShaderStageCreateInfo vert_stage = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = info.vert_shader,
+      .pName = "main",
+  };
+
+  VkPipelineShaderStageCreateInfo frag_stage = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = info.frag_shader,
+      .pName = "main",
+  };
+
+  std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
+      vert_stage,
+      frag_stage,
   };
 
   VkGraphicsPipelineCreateInfo pipeline_info = {
@@ -831,8 +977,21 @@ VkPipeline Backend::create_pipeline(const PipelineInfo& info) {
       .pDepthStencilState = &depth_stencil_state,
       .pColorBlendState = &blend_state,
       .pDynamicState = &dynamic_info,
-      .layout = &info.layout,
+      .layout = info.layout,
   };
+
+  VkPipeline pipeline;
+  XEV_ASSERT_VK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1,
+                                          &pipeline_info, nullptr, &pipeline));
+  return pipeline;
+}
+
+void Backend::destroy_pipeline(VkPipeline pipeline) const {
+  vkDestroyPipeline(m_device, pipeline, nullptr);
+}
+
+VkDescriptorSetLayout Backend::create_bindless_descriptor_set_layout() {
+  return m_desc_set_layout;
 }
 
 }  // namespace xev

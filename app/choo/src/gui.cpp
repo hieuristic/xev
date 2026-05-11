@@ -1,13 +1,13 @@
-#include <choo/gui.h>
+#include "gui.h"
 
-GUI::GUI() {
+GUI::GUI(const xev::Backend &backend) {
 }
 
-GUI::create_initmenu() {
+void GUI::create_initmenu() {
 }
 
-GUI::create_mainmenu() {
+void GUI::create_mainmenu() {
 }
 
-GUI::create_gameplay() {
+void GUI::create_gameplay() {
 }

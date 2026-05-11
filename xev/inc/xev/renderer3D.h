@@ -1,25 +1,21 @@
 #pragma once
-#include <xev/image.h>
-#include <xev/renderer.h>
-#include <xev/pipelines/pipeline_mesh.h>
+#include <xev/pipeline/pipeline_mesh.h>
+#include <xev/resource/image.h>
 
 namespace xev {
 
-class Renderer3D : Renderer {
+class Renderer3D {
  public:
-  Renderer3D(std::shared_ptr<Backend> backend, ImageSize image_size);
+  Renderer3D(std::shared_ptr<Backend> backend, uint32_t width, uint32_t height);
   ~Renderer3D();
 
-  void draw(VkCommandBuffer cmd, const Scene& scene);
-  void draw_mesh(VkCommandBuffer cmd, const Scene& scene);
-  void draw_mesh_skinned(VkCommandBuffer cmd, const Scene& scene);
+  const Image& draw(VkCommandBuffer cmd,
+                    const Scene& scene,
+                    const Camera& camera,
+                    const FrameArg& arg);
+  void draw_mesh(VkCommandBuffer cmd, const Scene& scene, const Camera& camera);
 
  public:
-  struct ImageSize {
-    uint32_t width;
-    uint32_t height;
-  };
-
   // in sync with scene.slang
   struct RenderScene {
     // camera
@@ -33,7 +29,7 @@ class Renderer3D : Renderer {
 
     // fog
     glm::vec3 fog_color;
-    gloat fog_intensity;
+    float fog_intensity;
 
     // light
     VkDeviceAddress light_ids;
@@ -43,11 +39,25 @@ class Renderer3D : Renderer {
   };
 
  private:
+  std::shared_ptr<Backend> m_backend;
   PipelineMesh m_pipeline_mesh;
-  PipelineSkin m_pipeline_skin;
+  std::vector<PipelineMesh::Command> m_mesh_cmds;
 
-private:
-  Image m_image;
-}
+ private:
+  Image m_image{VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                             VK_IMAGE_USAGE_SAMPLED_BIT};
+  Image m_depth_image{VK_FORMAT_D32_SFLOAT,
+                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+
+ private:
+  VkSemaphore m_sem_image = VK_NULL_HANDLE;
+  VkSemaphore m_sem_drawn = VK_NULL_HANDLE;
+  VkFence m_fence_inflight;
+
+ public:  // scene limit
+  static const uint32_t MAX_LIGHTS = 1000;
+  static const uint32_t MAX_SHADOW_LIGHTS = 3;
+};
 
 }  // namespace xev

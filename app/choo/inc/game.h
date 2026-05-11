@@ -5,7 +5,6 @@
 #include <xev/logger.h>
 #include <xev/renderer.h>
 #include <xev/scene.h>
-#include <xev/shader.h>
 #include <xev/window.h>
 
 enum GameState {
@@ -23,19 +22,18 @@ public:
 
 public:
   // game state
-  init_initmenu();
-  init_mainmenu();
-  init_gameplay();
-  exit_gamePlay();
-  init_cutscene();
-  exit_cutscene();
+  void init_initmenu();
+  void init_mainmenu();
+  void init_gameplay();
+  void exit_gameplay();
+  void init_cutscene();
+  void exit_cutscene();
 
 private:
   bool m_running;
-  bool m_state;
-  std::unique_ptr<Window> m_window;
-  std::shared_ptr<Backend> m_backend;
-  std::unique_ptr<Shader> m_shader;
-  std::unique_ptr<Scene> m_scene;
-  std::unique_ptr<Renderer> m_renderer;
+  GameState m_state;
+  std::unique_ptr<xev::Window> m_window;
+  std::shared_ptr<xev::Backend> m_backend;
+  std::unique_ptr<xev::Scene> m_scene;
+  std::unique_ptr<xev::Renderer> m_renderer;
 };
