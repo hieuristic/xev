@@ -21,6 +21,8 @@ class Backend;
 class Scene : Resource {
  public:
   Scene();
+  void destroy(const Backend& backend);
+
   void load_gltf(std::string_view filepath);
   void create_test_triangle();
 
@@ -36,9 +38,10 @@ class Scene : Resource {
 
  private:
   void add_mesh(Mesh mesh);
-  Mesh parse_mesh(const tinygltf::Model& model,
+  void parse_mesh(Mesh& mesh,
+                  const tinygltf::Model& model,
                   const tinygltf::Node& node,
-                  glm::mat4 model_mat);
+                  glm::mat4 model_mat) const;
 };
 
 }  // namespace xev

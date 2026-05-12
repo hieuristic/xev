@@ -9,7 +9,7 @@ App::App() {
   m_backend = std::make_shared<xev::Backend>(m_window->get_native());
 
   auto size = m_window->get_size();
-  m_renderer3D = std::make_unique<xev::Renderer3D>(m_backend, xev::Renderer3D::ImageSize{static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y)});
+  m_renderer3D = std::make_unique<xev::Renderer3D>(m_backend, static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
 
   m_scene = std::make_unique<xev::Scene>();
   const char* base_path = SDL_GetBasePath();
@@ -17,9 +17,7 @@ App::App() {
 
   XEV_INFO("Loading Sponza...");
   m_scene->load_gltf(scene_path);
-  for (auto& mesh : m_scene->m_meshes) {
-    mesh.load(*m_backend);
-  }
+  m_scene->load(*m_backend);
 
   m_keystate = SDL_GetKeyboardState(NULL);
   m_last_time = SDL_GetTicks();

@@ -1,4 +1,6 @@
 #pragma once
+#include <xev/geometry/aabb.h>
+#include <xev/geometry/sphere.h>
 #include <xev/resource/buffer.h>
 #include <xev/resource/resource.h>
 #include <glm/glm.hpp>
@@ -11,22 +13,24 @@ namespace xev {
 
 class Backend;
 
-struct MeshPrimitive {
-  uint32_t voffset;
-  uint32_t vlength;
-  uint32_t foffset;
-  uint32_t flength;
-  uint32_t mat_idx;
-};
-
-struct Vertex {
-  glm::vec3 position;
-  glm::vec3 normal;
-  glm::vec2 uv;
-};
-
 class Mesh : Resource {
  public:
+  struct MeshPrimitive {
+    uint32_t voffset;
+    uint32_t vlength;
+    uint32_t foffset;
+    uint32_t flength;
+    uint32_t mat_idx;
+  };
+
+  struct Vertex {
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 uv;
+  };
+
+ public:
+  Mesh() = default;
   Mesh(std::string name,
        glm::mat4 model_mat,
        std::vector<MeshPrimitive> primitives,
@@ -35,26 +39,43 @@ class Mesh : Resource {
        std::vector<glm::vec2> uvs,
        std::vector<glm::uvec3> faces);
 
-  const std::string& get_name() const { return m_name; }
-  glm::mat4 get_model_mat() const { return m_model_mat; };
+  const std::string& get_name() const;
+  glm::mat4 get_model_mat() const;
+  const std::vector<MeshPrimitive>& get_primitives() const;
 
   uint64_t size_device() const override;
   uint64_t size_host() const override;
 
-  bool is_loaded() const override { return m_is_loaded; }
+  bool is_loaded() const override;
   void load(const Backend& backend) override;
   void unload(const Backend& backend) override;
 
-  VkBuffer get_face_buffer() { return m_device_face.buffer; }
-  VkBuffer get_vert_buffer() { return m_device_vert.buffer; };
+  VkBuffer get_face_buffer() const { return m_device_face.buffer; }
+  VkBuffer get_vert_buffer() const { return m_device_vert.buffer; };
 
+  // bounding structure queries
+ public:
+  bool has_bs() const { return m_has_bs; }
+  void get_bs(Sphere& sphere) const;
+  void compute_bs();
+  bool has_aabb() const { return m_has_aabb; }
+  void get_aabb(AABB& aabb) const;
+  void compute_aabb();
+
+ private:
+  bool m_has_bs = false;
+  bool m_has_aabb = false;
+  Sphere m_bs;
+  AABB m_aabb;
+
+ public:
   bool has_skeleton = false;
 
  private:
   bool m_is_loaded = false;
   std::string m_name;
   glm::mat4 m_model_mat{1.0f};
-  std::vector<MeshPrimitive> m_pris;
+  std::vector<MeshPrimitive> m_primitives;
 
   // device data
   Buffer m_device_face{0, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,

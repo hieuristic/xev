@@ -42,5 +42,6 @@ float4 main(VertOut vertex_output): SV_TARGET {
   float r = vertex_output.normal.x * 0.5 + 0.5;
   float g = vertex_output.normal.y * 0.5 + 0.5;
   float b = vertex_output.normal.z * 0.5 + 0.5;
-  return float4(r, g, b, 1.0);
+  return float4(1.0, 0.0, 0.0, 1.0);
+  // return float4(r, g, b, 1.0);
 }

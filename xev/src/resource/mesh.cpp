@@ -18,6 +18,16 @@ Mesh::Mesh(std::string name,
       m_uvs(std::move(uvs)),
       m_faces(std::move(faces)) {}
 
+const std::string& Mesh::get_name() const {
+  return m_name;
+}
+glm::mat4 Mesh::get_model_mat() const {
+  return m_model_mat;
+};
+const std::vector<Mesh::MeshPrimitive>& Mesh::get_primitives() const {
+  return m_primitives;
+}
+
 void Mesh::load(const Backend& backend) {
   if (m_is_loaded) {
     XEV_WARN("Mesh '{}' already on GPU, skipping  upload", m_name);
@@ -52,6 +62,10 @@ void Mesh::load(const Backend& backend) {
            m_positions.size(), m_faces.size());
 }
 
+bool Mesh::is_loaded() const {
+  return m_is_loaded;
+}
+
 void Mesh::unload(const Backend& backend) {
   m_device_face.unload(backend);
   m_device_vert.unload(backend);
@@ -67,6 +81,25 @@ uint64_t Mesh::size_host() const {
          m_positions.size() * sizeof(m_positions[0]) +
          m_normals.size() * sizeof(m_normals[0]) +
          m_uvs.size() * sizeof(m_uvs[0]);
+}
+
+void Mesh::get_bs(Sphere& bs) const {
+  bs = m_bs;
+}
+
+void Mesh::compute_bs() {
+  XEV_ERROR("NOT IMPLEMENTED");
+
+  m_has_bs = true;
+}
+
+void Mesh::get_aabb(AABB& aabb) const {
+  aabb = m_aabb;
+}
+
+void Mesh::compute_aabb() {
+  XEV_ERROR("NOT IMPLEMENTED");
+  m_has_aabb = true;
 }
 
 }  // namespace xev

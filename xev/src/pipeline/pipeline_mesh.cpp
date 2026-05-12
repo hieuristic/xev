@@ -1,4 +1,6 @@
+#include <SDL3/SDL_filesystem.h>
 #include <xev/pipeline/pipeline_mesh.h>
+#include <string>
 
 namespace xev {
 
@@ -6,9 +8,6 @@ void PipelineMesh::create(const Backend& backend,
                           VkFormat color_format,
                           VkFormat depth_format,
                           VkSampleCountFlagBits sample_count) {
-#include <SDL3/SDL_filesystem.h>
-#include <string>
-
   VkShaderModule shader_vert, shader_frag;
   const char* base_path = SDL_GetBasePath();
   std::string shader_path = base_path
@@ -39,8 +38,8 @@ void PipelineMesh::create(const Backend& backend,
       .samples = sample_count,
       .color_format = color_format,
       .depth_format = depth_format,
-      .enable_culling = true,
-      .enable_depth_test = true,
+      .enable_culling = false,
+      .enable_depth_test = false,
       .depth_op = VK_COMPARE_OP_LESS_OR_EQUAL,
 
       .enable_blend = false,
@@ -48,31 +47,28 @@ void PipelineMesh::create(const Backend& backend,
       .blend_src_factor = VK_BLEND_FACTOR_ONE,
       .blend_dst_alpha_factor = VK_BLEND_FACTOR_ZERO,
       .layout = m_layout,
-      .vertex_bindings = {{.binding = 0,
-                           .stride = sizeof(glm::vec3),
-                           .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-                          {.binding = 1,
-                           .stride = sizeof(glm::vec3),
-                           .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-                          {.binding = 2,
-                           .stride = sizeof(glm::vec2),
-                           .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}},
-      .vertex_attributes =
+      .vertex_bindings =
           {
-              {.location = 0,
-               .binding = 0,
-               .format = VK_FORMAT_R32G32B32_SFLOAT,
-               .offset = 0},
-              {.location = 1,
-               .binding = 1,
-               .format = VK_FORMAT_R32G32B32_SFLOAT,
-               .offset = 0},
-              {.location = 2,
-               .binding = 2,
-               .format = VK_FORMAT_R32G32_SFLOAT,
-               .offset = 0},
+              {
+                  .binding = 0,
+                  .stride = sizeof(Mesh::Vertex),
+                  .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+              },
           },
-  };
+      .vertex_attributes = {
+          {.location = 0,
+           .binding = 0,
+           .format = VK_FORMAT_R32G32B32_SFLOAT,
+           .offset = offsetof(Mesh::Vertex, position)},  // 0
+          {.location = 1,
+           .binding = 0,
+           .format = VK_FORMAT_R32G32B32_SFLOAT,
+           .offset = offsetof(Mesh::Vertex, normal)},  // 12
+          {.location = 2,
+           .binding = 0,
+           .format = VK_FORMAT_R32G32_SFLOAT,
+           .offset = offsetof(Mesh::Vertex, uv)},  // 24,
+      }};
 
   m_pipeline = backend.create_pipeline(pipeline_info);
 
@@ -91,6 +87,8 @@ void PipelineMesh::draw(const Backend& backend,
                         const Scene& scene,
                         const Camera& camera,
                         const std::vector<PipelineMesh::Command>& draw_cmds) {
+  XEV_INFO("DRAWING Camera x:{}, y:{}, z:{}", camera.pos.x, camera.pos.y,
+           camera.pos.z);
   vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
   VkViewport viewport = {
@@ -123,8 +121,9 @@ void PipelineMesh::draw(const Backend& backend,
       prev_mesh_id = cmd.mesh_id;
       vkCmdBindIndexBuffer(cmdbuf, mesh.get_face_buffer(), 0,
                            VK_INDEX_TYPE_UINT32);
-      vkCmdBindVertexBuffers(cmdbuf, 0, 1, &mesh.get_vert_buffer(),
-                             (VkDeviceSize[]){0});
+      VkBuffer tmp_buffer = mesh.get_vert_buffer();
+      VkDeviceSize tmp_size = 0;
+      vkCmdBindVertexBuffers(cmdbuf, 0, 1, &tmp_buffer, &tmp_size);
     }
 
     PushConst push_const = {
@@ -141,7 +140,7 @@ void PipelineMesh::draw(const Backend& backend,
         sizeof(PushConst), &push_const);
 
     // Render all primitives within the mesh
-    for (const auto& pri : mesh.pris) {
+    for (const auto& pri : mesh.get_primitives()) {
       vkCmdDrawIndexed(cmdbuf, pri.flength * 3, 1, pri.foffset * 3, pri.voffset,
                        0);
     }

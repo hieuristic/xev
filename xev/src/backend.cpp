@@ -771,7 +771,7 @@ void Backend::leave_frame(VkCommandBuffer cmd,
   m_current_frame_idx = (m_current_frame_idx + 1) % NUM_FRAME_OVERLAP;
 }
 
-VkShaderModule Backend::create_shader_module(const char* path) {
+VkShaderModule Backend::create_shader_module(const char* path) const {
   std::ifstream file(path, std::ios::ate | std::ios::binary);
   if (!file.is_open()) {
     XEV_ERROR("Failed to read {}", path);
@@ -805,7 +805,7 @@ void Backend::destroy_shader_module(VkShaderModule module) const {
 
 VkPipelineLayout Backend::create_pipeline_layout(
     std::span<const VkDescriptorSetLayout> layouts,
-    std::span<const VkPushConstantRange> ranges) {
+    std::span<const VkPushConstantRange> ranges) const {
   VkResult res_;
   VkPipelineLayout layout;
 
@@ -843,7 +843,7 @@ void Backend::create_sampler(uint32_t id, VkSampler sampler) {
   vkUpdateDescriptorSets(m_device, 1, &write_set, 0, nullptr);
 }
 
-VkPipeline Backend::create_pipeline(const PipelineInfo& info) {
+VkPipeline Backend::create_pipeline(const PipelineInfo& info) const {
   VkPipelineViewportStateCreateInfo viewport_state = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .viewportCount = 1,
@@ -990,7 +990,7 @@ void Backend::destroy_pipeline(VkPipeline pipeline) const {
   vkDestroyPipeline(m_device, pipeline, nullptr);
 }
 
-VkDescriptorSetLayout Backend::create_bindless_descriptor_set_layout() {
+VkDescriptorSetLayout Backend::create_bindless_descriptor_set_layout() const {
   return m_desc_set_layout;
 }
 
