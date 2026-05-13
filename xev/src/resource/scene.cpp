@@ -298,8 +298,47 @@ void Scene::unload(const Backend& backend) {
 }
 
 void Scene::create_test_triangle() {
-  // TODO rewrite this
   XEV_INFO("Created test triangle.");
+  XEV_ASSERT(meshes.size() == 0);
+
+  {
+    glm::mat4 model_mat = glm::mat4(1.0);
+    std::vector<glm::vec3> p = {
+        glm::vec3(0.0f, 0.5f, 1.0f),
+        glm::vec3(-0.5f, -0.5f, 1.0f),
+        glm::vec3(0.5f, -0.5f, 1.0f),
+    };
+    std::vector<glm::vec3> n = {
+        glm::vec3(0.0f, 0.0f, -1.0f),
+        glm::vec3(0.0f, 0.0f, -1.0f),
+        glm::vec3(0.0f, 0.0f, -1.0f),
+    };
+    std::vector<glm::vec2> u = {
+        glm::vec2(0.0f, 0.5f),
+        glm::vec2(1.0f, 0.0f),
+        glm::vec2(1.0f, 1.0f),
+    };
+    std::vector<glm::uvec3> f = {
+        glm::uvec3(0, 1, 2),
+    };
+    std::vector<Mesh::MeshPrimitive> mp{
+        {
+            .voffset = 0,
+            .vlength = 3,
+            .foffset = 0,
+            .flength = 1,
+            .mat_idx = 0,
+        },
+    };
+    Mesh trichen("trichen", model_mat, mp, p, n, u, f);
+    meshes.emplace_back(trichen);
+  }
+
+  {
+    glm::quat r = glm::quat();
+    glm::vec3 p = glm::vec3();
+    m_active_cam = Camera(r, p, 90.0f);
+  }
 }
 
 void Scene::destroy(const Backend& backend) {

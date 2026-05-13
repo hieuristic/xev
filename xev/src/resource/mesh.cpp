@@ -13,6 +13,7 @@ Mesh::Mesh(std::string name,
            std::vector<glm::uvec3> faces)
     : m_name(std::move(name)),
       m_model_mat(model_mat),
+      m_primitives(std::move(primitives)),
       m_positions(std::move(positions)),
       m_normals(std::move(normals)),
       m_uvs(std::move(uvs)),

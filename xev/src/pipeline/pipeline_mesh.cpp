@@ -38,9 +38,9 @@ void PipelineMesh::create(const Backend& backend,
       .samples = sample_count,
       .color_format = color_format,
       .depth_format = depth_format,
-      .enable_culling = false,
+      .enable_culling = true,
       .enable_depth_test = false,
-      .depth_op = VK_COMPARE_OP_LESS_OR_EQUAL,
+      .depth_op = VK_COMPARE_OP_GREATER_OR_EQUAL,
 
       .enable_blend = false,
       .blend_op = VK_BLEND_OP_ADD,
@@ -87,8 +87,8 @@ void PipelineMesh::draw(const Backend& backend,
                         const Scene& scene,
                         const Camera& camera,
                         const std::vector<PipelineMesh::Command>& draw_cmds) {
-  XEV_INFO("DRAWING Camera x:{}, y:{}, z:{}", camera.pos.x, camera.pos.y,
-           camera.pos.z);
+  // XEV_INFO("DRAWING Camera x:{}, y:{}, z:{}", camera.pos.x, camera.pos.y,
+  //          camera.pos.z);
   vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
   VkViewport viewport = {

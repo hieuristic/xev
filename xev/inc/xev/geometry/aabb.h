@@ -7,10 +7,10 @@ class AABB {
 public:
   AABB() = default;
   AABB(glm::vec3 pmin_, glm::vec3 pmax_) : pmin(pmin_), pmax(pmax_) {};
-  uint32_t volume();
-  uint32_t diagonal_length();
-  uint32_t shortest_length();
-  uint32_t longest_length();
+  float volume();
+  float diagonal_length();
+  float shortest_length();
+  float longest_length();
   bool is_empty();
 
   glm::vec3 pmin;
