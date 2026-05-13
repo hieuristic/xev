@@ -36,6 +36,15 @@ class Image : Resource {
   void load(uint32_t width_, uint32_t height_, const Backend& backend);
   void load(const Backend& backend) override;
   void unload(const Backend& backend) override;
+
+  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  void set_layout(const VkImageLayout& layout_);
+  void update_layout(const VkCommandBuffer& cmd,
+                     const VkImageLayout& new_layout_);
+
+  void copy(const VkCommandBuffer& cmd,
+            const Image& src,
+            const VkFilter& filter);
 };
 
 }  // namespace xev

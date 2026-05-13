@@ -702,9 +702,9 @@ void Backend::leave_frame(VkCommandBuffer cmd,
                        &clear_val, 1, &swapchain_range);
 
   // copy to swapchain
+  // NOTE: image is already in TRANSFER_SRC_OPTIMAL — Renderer3D transitions it
+  // at the end of draw(). Do NOT re-issue the barrier with a wrong oldLayout.
   if (args.copy_to_swapchain && image.image != VK_NULL_HANDLE) {
-    common::update_layout(cmd, image.image, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     layout = common::update_layout(cmd, swapchain_image, layout,
                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     common::copy_image(cmd, image.image, swapchain_image,
