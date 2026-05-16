@@ -14,6 +14,7 @@ class Window {
 
   SDL_Window* get_native() const { return m_window; }
   glm::ivec2 get_size() const { return glm::ivec2(m_width, m_height); }
+  float get_aspect() const { return static_cast<float>(m_width) / static_cast<float>(m_height); }
 
  private:
   void create_window(std::string name, uint32_t width, uint32_t height);

@@ -42,6 +42,7 @@ void Scene::parse_mesh(Mesh& mesh,
     mp.voffset = static_cast<uint32_t>(positions.size());
     mp.foffset = static_cast<uint32_t>(faces.size());
     mp.mat_idx = (pri.material >= 0) ? static_cast<uint32_t>(pri.material) : 0;
+    XEV_INFO("mesh {} material {}", name, pri.material);
 
     // positions
     const tinygltf::Accessor& pos_acc = model.accessors[pos_it->second];
@@ -152,6 +153,23 @@ void Scene::parse_mesh(Mesh& mesh,
               std::move(faces));
 }
 
+void Scene::parse_material(Material& material,
+                           const tinygltf::Material& gltf_material) const {
+  material.name = gltf_material.name;
+
+  material.base_color =
+      Color4(gltf_material.pbrMetallicRoughness.baseColorFactor);
+  material.metal_coef =
+      static_cast<float>(gltf_material.pbrMetallicRoughness.metallicFactor);
+  material.rough_coef =
+      static_cast<float>(gltf_material.pbrMetallicRoughness.roughnessFactor);
+
+  material.diffuse_texid =
+      gltf_material.pbrMetallicRoughness.baseColorTexture.index;
+  material.metallic_roughness_texid =
+      gltf_material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+}
+
 void Scene::load_gltf(std::string_view filepath) {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
@@ -181,6 +199,13 @@ void Scene::load_gltf(std::string_view filepath) {
   if (is_loaded()) {
     XEV_ERROR("Loading glTF into an active scene. Please call .unload().");
     return;
+  }
+
+  // parsing material
+  for (const auto& gltf_mat : model.materials) {
+    Material mat;
+    parse_material(mat, gltf_mat);
+    materials.emplace_back(mat);
   }
 
   // parsing geometry
@@ -235,7 +260,7 @@ void Scene::load_gltf(std::string_view filepath) {
       // Extract position and rotation from the absolute matrix
       glm::vec3 abs_pos = glm::vec3(abs_mat[3]);
       glm::quat abs_rot = glm::quat_cast(abs_mat);
-      m_active_cam =
+      active_cam =
           Camera(abs_rot, abs_pos,
                  glm::degrees(static_cast<float>(camera.perspective.yfov)));
       cam_found = true;
@@ -255,8 +280,8 @@ void Scene::load_gltf(std::string_view filepath) {
 
   if (!cam_found) {
     XEV_WARN("No active camera found! Creating default fly cam.");
-    m_active_cam = Camera();
-    m_active_cam.pos = glm::vec3(0.0f, 0.0f, -5.0f);
+    active_cam = Camera();
+    active_cam.pos = glm::vec3(0.0f, 0.0f, -5.0f);
   }
 }
 
@@ -337,7 +362,7 @@ void Scene::create_test_triangle() {
   {
     glm::quat r = glm::quat();
     glm::vec3 p = glm::vec3();
-    m_active_cam = Camera(r, p, 90.0f);
+    active_cam = Camera(r, p, 90.0f);
   }
 }
 

@@ -9,6 +9,7 @@ public:
   Frustum(const Camera& camera);
   ~Frustum();
   bool contains(const Sphere& sphere);
+
 private:
   // corner order in direction of +z, +y, +x (near to far, up to down, left to right)
   // For example: nul, nur, ndl, ndr, ...

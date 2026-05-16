@@ -5,6 +5,7 @@
 #include <xev/renderer3D.h>
 #include <xev/resource/scene.h>
 #include <xev/window.h>
+#include "controller.h"
 
 class App {
  public:
@@ -30,4 +31,5 @@ class App {
   std::unique_ptr<xev::Renderer3D> m_renderer3D;
   std::unique_ptr<xev::Renderer2D> m_renderer2D;
   std::unique_ptr<xev::Scene> m_scene;
+  Controller m_controller;
 };

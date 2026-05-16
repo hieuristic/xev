@@ -1,6 +1,7 @@
 #pragma once
 
 #include <xev/camera.h>
+#include <xev/resource/material.h>
 #include <xev/resource/mesh.h>
 #include <xev/resource/resource.h>
 #include <glm/glm.hpp>
@@ -12,6 +13,7 @@
 namespace tinygltf {
 struct Model;
 struct Node;
+struct Material;
 }  // namespace tinygltf
 
 namespace xev {
@@ -33,8 +35,9 @@ class Scene : Resource {
   void load(const Backend& backend) override;
   void unload(const Backend& backend) override;
 
-  Camera m_active_cam;
+  Camera active_cam;
   std::vector<Mesh> meshes;
+  std::vector<Material> materials;
 
  private:
   void add_mesh(Mesh mesh);
@@ -42,6 +45,8 @@ class Scene : Resource {
                   const tinygltf::Model& model,
                   const tinygltf::Node& node,
                   glm::mat4 model_mat) const;
+  void parse_material(Material& material,
+                      const tinygltf::Material& gltf_material) const;
 };
 
 }  // namespace xev

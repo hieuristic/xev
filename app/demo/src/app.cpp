@@ -6,7 +6,6 @@
 
 void compute_projection(const xev::Camera& cam,
                         const std::vector<glm::vec3> pos_world) {
-
   glm::mat4 proj_mat = cam.create_vp_mat();
   std::vector<glm::vec4> pos_clip;
   pos_clip.reserve(pos_world.size());
@@ -21,6 +20,7 @@ void compute_projection(const xev::Camera& cam,
 App::App() {
   m_window = std::make_unique<xev::Window>("Sponza Demo");
   m_backend = std::make_shared<xev::Backend>(m_window->get_native());
+  SDL_SetWindowRelativeMouseMode(m_window->get_native(), true);
 
   auto size = m_window->get_size();
   m_renderer3D = std::make_unique<xev::Renderer3D>(
@@ -36,15 +36,8 @@ App::App() {
   m_scene->load_gltf(scene_path);
   // XEV_INFO("Loading Triangle...");
   // m_scene->create_test_triangle();
-
   m_scene->load(*m_backend);
-
-  std::vector<glm::vec3> p = {
-      glm::vec3(0.0f, 0.5f, 1.0f),
-      glm::vec3(-0.5f, -0.5f, 1.0f),
-      glm::vec3(0.5f, -0.5f, 1.0f),
-  };
-  compute_projection(m_scene->m_active_cam, p);
+  m_scene->active_cam.set_aspect(m_window->get_aspect());
 
   m_keystate = SDL_GetKeyboardState(NULL);
   m_last_time = SDL_GetTicks();
@@ -58,14 +51,22 @@ App::~App() {
 
 void App::handle_inputs() {
   SDL_Event e;
+  float xrel = 0;
+  float yrel = 0;
+
   while (SDL_PollEvent(&e)) {
-    if (e.type == SDL_EVENT_QUIT) {
-      m_running = false;
-    }
-    if (e.type == SDL_EVENT_KEY_DOWN) {
-      if (e.key.key == SDLK_ESCAPE) {
+    switch (e.type) {
+      case SDL_EVENT_QUIT:
         m_running = false;
-      }
+        break;
+      case SDL_EVENT_KEY_DOWN:
+        if (e.key.key == SDLK_ESCAPE)
+          m_running = false;
+        break;
+      case SDL_EVENT_MOUSE_MOTION:
+        xrel = e.motion.xrel;
+        yrel = e.motion.yrel;
+        break;
     }
   }
 
@@ -73,47 +74,9 @@ void App::handle_inputs() {
   float dt = (current_time - m_last_time) / 1000.0f;
   m_last_time = current_time;
 
-  float speed = 5.0f * dt;
-  if (m_keystate[SDL_SCANCODE_LSHIFT])
-    speed *= 2.0f;
-
-  xev::Camera& cam = m_scene->m_active_cam;
-
-  // Get camera local axes
-  glm::mat4 R = glm::mat4_cast(cam.rot);
-  glm::vec3 forward = -glm::vec3(R[2]);  // -Z is forward in RDF
-  glm::vec3 right = glm::vec3(R[0]);     // +X is right
-  glm::vec3 up = glm::vec3(R[1]);        // -Y is up in RDF (Y is down)
-
-  if (m_keystate[SDL_SCANCODE_W])
-    cam.pos += forward * speed;
-  if (m_keystate[SDL_SCANCODE_S])
-    cam.pos -= forward * speed;
-  if (m_keystate[SDL_SCANCODE_A])
-    cam.pos -= right * speed;
-  if (m_keystate[SDL_SCANCODE_D])
-    cam.pos += right * speed;
-
-  float theta = 0.01f * speed;
-  glm::quat turn_up = glm::angleAxis(-theta, glm::vec3(1.0f, 0.0f, 0.0f));
-  glm::quat turn_down = glm::angleAxis(theta, glm::vec3(1.0f, 0.0f, 0.0f));
-  glm::quat turn_right = glm::angleAxis(theta, glm::vec3(0.0f, 1.0f, 0.0f));
-  glm::quat turn_left = glm::angleAxis(-theta, glm::vec3(0.0f, 1.0f, 0.0f));
-  if (m_keystate[SDL_SCANCODE_K])
-    cam.rot = turn_up * cam.rot;
-  if (m_keystate[SDL_SCANCODE_J])
-    cam.rot = turn_down * cam.rot;
-  if (m_keystate[SDL_SCANCODE_L])
-    cam.rot = turn_right * cam.rot;
-  if (m_keystate[SDL_SCANCODE_H])
-    cam.rot = turn_left * cam.rot;
-  cam.rot = glm::normalize(cam.rot);
-
-  // Q and E for up/down (world space)
-  if (m_keystate[SDL_SCANCODE_Q])
-    cam.pos -= glm::vec3(0.0f, 1.0f, 0.0f) * speed;  // Up (negative Y)
-  if (m_keystate[SDL_SCANCODE_E])
-    cam.pos += glm::vec3(0.0f, 1.0f, 0.0f) * speed;  // Down (positive Y)
+  xev::Camera& cam = m_scene->active_cam;
+  m_controller.update(dt, xrel, yrel, m_keystate, cam.pos, cam.rot);
+  return;
 }
 
 void App::draw() {
@@ -123,7 +86,7 @@ void App::draw() {
     args.clear_color = {0.1f, 0.1f, 0.1f, 1.0f};
     args.copy_to_swapchain = true;
     const xev::Image& output_image =
-        m_renderer3D->draw(cmd, *m_scene, m_scene->m_active_cam, args);
+        m_renderer3D->draw(cmd, *m_scene, m_scene->active_cam, args);
     m_backend->leave_frame(cmd, output_image, args);
   }
 }

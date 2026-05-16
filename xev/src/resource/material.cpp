@@ -1,1 +1,4 @@
-#include <xev/material.h>
+#include <xev/resource/material.h>
+
+namespace xev {
+}

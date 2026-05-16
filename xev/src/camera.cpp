@@ -21,8 +21,12 @@ Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fovx_deg, float fovy_deg) {
   fovy_rad = glm::radians(fovy_deg);
 }
 
-Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fovx_deg, float fovy_deg,
-               float shift_x_, float shift_y_) {
+Camera::Camera(glm::quat rot_,
+               glm::vec3 pos_,
+               float fovx_deg,
+               float fovy_deg,
+               float shift_x_,
+               float shift_y_) {
   rot = rot_;
   pos = pos_;
   fovx_rad = glm::radians(fovx_deg);
@@ -56,4 +60,14 @@ glm::mat4 Camera::create_vp_mat() const {
   return p * v;
 }
 
-} // namespace xev
+void Camera::set_aspect(float aspect_) {
+  aspect = aspect_;
+  fovx_rad = 2.0f * std::atan(aspect * std::tan(fovy_rad * 0.5f));
+}
+
+void Camera::set_fov_deg(float deg) {
+  fovy_rad = glm::radians(deg);
+  fovx_rad = 2.0f * std::atan(aspect * std::tan(fovy_rad * 0.5f));
+}
+
+}  // namespace xev
