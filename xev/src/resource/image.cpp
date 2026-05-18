@@ -4,17 +4,17 @@
 
 namespace xev {
 
-void Image::load(uint32_t width_, uint32_t height_, const Backend& backend) {
+void Image::reserve(uint32_t width_, uint32_t height_, const Backend& backend) {
   width = width_;
   height = height_;
-  load(backend);
+  reserve(backend);
 }
-void Image::load(const Backend& backend) {
-  backend.load_image(image, view, alloc, alloc_info, width, height, format,
+void Image::reserve(const Backend& backend) {
+  backend.reserve_image(image, view, alloc, alloc_info, width, height, format,
                      flags);
 }
-void Image::unload(const Backend& backend) {
-  backend.unload_image(image, alloc, view);
+void Image::release(const Backend& backend) {
+  backend.release_image(image, alloc, view);
 }
 
 void Image::set_layout(const VkImageLayout& layout_) {

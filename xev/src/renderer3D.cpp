@@ -7,23 +7,24 @@ Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
                        uint32_t width,
                        uint32_t height)
     : m_backend(std::move(backend)) {
-  m_pipeline_mesh.create(*m_backend, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_D32_SFLOAT,
-                         VK_SAMPLE_COUNT_1_BIT);
+  m_pipeline_mesh.create(*m_backend, VK_FORMAT_B8G8R8A8_SRGB,
+                         VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
 
-  m_image.load(width, height, *m_backend);
-  m_depth_image.load(width, height, *m_backend);
+  m_image.reserve(width, height, *m_backend);
+  m_depth_image.reserve(width, height, *m_backend);
 }
 
 Renderer3D::~Renderer3D() {
   m_pipeline_mesh.destroy(*m_backend);
-  m_image.unload(*m_backend);
-  m_depth_image.unload(*m_backend);
+  m_image.release(*m_backend);
+  m_depth_image.release(*m_backend);
 }
 
 const Image& Renderer3D::draw(VkCommandBuffer cmd,
                               const Scene& scene,
                               const Camera& camera,
                               const FrameArg& arg) {
+  XEV_ASSERT(scene.is_reserved());
   VkImageMemoryBarrier2 img_barrier = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
       .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,

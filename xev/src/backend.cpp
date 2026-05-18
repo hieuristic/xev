@@ -520,12 +520,12 @@ VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
   return create_swapchain(device, surface);
 }
 
-void Backend::load_buffer(VkBuffer& buffer,
-                          VmaAllocation& alloc,
-                          VmaAllocationInfo& alloc_info,
-                          VkDeviceSize size,
-                          VkBufferUsageFlags flags,
-                          VmaMemoryUsage mem_usage) const {
+void Backend::reserve_buffer(VkBuffer& buffer,
+                             VmaAllocation& alloc,
+                             VmaAllocationInfo& alloc_info,
+                             VkDeviceSize size,
+                             VkBufferUsageFlags flags,
+                             VmaMemoryUsage mem_usage) const {
   VkBufferCreateInfo buffer_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
@@ -544,25 +544,25 @@ void Backend::load_buffer(VkBuffer& buffer,
   XEV_ASSERT(res_ == VK_SUCCESS);
 }
 
-void Backend::unload_buffer(VkBuffer buffer, VmaAllocation alloc) const {
+void Backend::release_buffer(VkBuffer buffer, VmaAllocation alloc) const {
   vmaDestroyBuffer(m_allocator, buffer, alloc);
 }
 
-void Backend::copy_buffer(const void* src,
-                          const VmaAllocation& dst,
-                          uint64_t offset,
-                          uint64_t size) const {
+void Backend::upload_buffer(const void* src,
+                            const VmaAllocation& dst,
+                            uint64_t offset,
+                            uint64_t size) const {
   vmaCopyMemoryToAllocation(m_allocator, src, dst, offset, size);
 }
 
-void Backend::load_image(VkImage& image,
-                         VkImageView& view,
-                         VmaAllocation& alloc,
-                         VmaAllocationInfo& alloc_info,
-                         uint32_t width,
-                         uint32_t height,
-                         VkFormat format,
-                         VkImageUsageFlags flags) const {
+void Backend::reserve_image(VkImage& image,
+                            VkImageView& view,
+                            VmaAllocation& alloc,
+                            VmaAllocationInfo& alloc_info,
+                            uint32_t width,
+                            uint32_t height,
+                            VkFormat format,
+                            VkImageUsageFlags flags) const {
   VkImageCreateInfo image_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .imageType = VK_IMAGE_TYPE_2D,
@@ -609,9 +609,9 @@ void Backend::load_image(VkImage& image,
   XEV_ASSERT_VK(vkCreateImageView(m_device, &view_info, nullptr, &view));
 }
 
-void Backend::unload_image(VkImage& image,
-                           VmaAllocation& alloc,
-                           VkImageView& view) const {
+void Backend::release_image(VkImage& image,
+                            VmaAllocation& alloc,
+                            VkImageView& view) const {
   if (view != VK_NULL_HANDLE) {
     vkDestroyImageView(m_device, view, nullptr);
     view = VK_NULL_HANDLE;

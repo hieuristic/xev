@@ -44,11 +44,10 @@ class Mesh : Resource {
   const std::vector<MeshPrimitive>& get_primitives() const;
 
   uint64_t size_device() const override;
-  uint64_t size_host() const override;
 
-  bool is_loaded() const override;
-  void load(const Backend& backend) override;
-  void unload(const Backend& backend) override;
+  bool is_reserved() const override;
+  void reserve(const Backend& backend) override;
+  void release(const Backend& backend) override;
 
   VkBuffer get_face_buffer() const { return m_device_face.buffer; }
   VkBuffer get_vert_buffer() const { return m_device_vert.buffer; };
@@ -72,16 +71,14 @@ class Mesh : Resource {
   bool has_skeleton = false;
 
  private:
-  bool m_is_loaded = false;
+  bool m_is_reserved = false;
   std::string m_name;
   glm::mat4 m_model_mat{1.0f};
   std::vector<MeshPrimitive> m_primitives;
 
   // device data
-  Buffer m_device_face{0, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                       VMA_MEMORY_USAGE_AUTO};
-  Buffer m_device_vert{0, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                       VMA_MEMORY_USAGE_AUTO};
+  Buffer m_device_face{VK_BUFFER_USAGE_INDEX_BUFFER_BIT};
+  Buffer m_device_vert{VK_BUFFER_USAGE_VERTEX_BUFFER_BIT};
 
   // host data
   std::vector<glm::uvec3> m_faces;

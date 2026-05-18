@@ -29,13 +29,12 @@ class Image : Resource {
   VkImageUsageFlags flags;
 
   uint64_t size_device() const override { return alloc_info.size; }
-  uint64_t size_host() const override { return 0; }
 
-  bool is_loaded() const override { return image != VK_NULL_HANDLE; }
+  bool is_reserved() const override { return image != VK_NULL_HANDLE; }
 
-  void load(uint32_t width_, uint32_t height_, const Backend& backend);
-  void load(const Backend& backend) override;
-  void unload(const Backend& backend) override;
+  void reserve(uint32_t width_, uint32_t height_, const Backend& backend);
+  void reserve(const Backend& backend) override;
+  void release(const Backend& backend) override;
 
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   void set_layout(const VkImageLayout& layout_);

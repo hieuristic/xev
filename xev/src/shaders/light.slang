@@ -1,3 +1,4 @@
+// should be in sync with inc/xev/resouce/light.h
 module light;
 
 export enum LightType {

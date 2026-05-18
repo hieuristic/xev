@@ -36,7 +36,9 @@ App::App() {
   m_scene->load_gltf(scene_path);
   // XEV_INFO("Loading Triangle...");
   // m_scene->create_test_triangle();
-  m_scene->load(*m_backend);
+  m_scene->reserve(*m_backend);
+  m_scene->upload_meshes();
+  m_scene->upload_textures();
   m_scene->active_cam.set_aspect(m_window->get_aspect());
 
   m_keystate = SDL_GetKeyboardState(NULL);

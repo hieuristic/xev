@@ -154,20 +154,19 @@ void Scene::parse_mesh(Mesh& mesh,
 }
 
 void Scene::parse_material(Material& material,
-                           const tinygltf::Material& gltf_material) const {
-  material.name = gltf_material.name;
+                           const tinygltf::Material& gltf_material) const {}
 
-  material.base_color =
-      Color4(gltf_material.pbrMetallicRoughness.baseColorFactor);
-  material.metal_coef =
-      static_cast<float>(gltf_material.pbrMetallicRoughness.metallicFactor);
-  material.rough_coef =
-      static_cast<float>(gltf_material.pbrMetallicRoughness.roughnessFactor);
+void Scene::parse_texture(Texture& tex, const tinygltf::Model& model) {
+  tex.name = gltf_tex.name;
 
-  material.diffuse_texid =
-      gltf_material.pbrMetallicRoughness.baseColorTexture.index;
-  material.metallic_roughness_texid =
-      gltf_material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+  std::string name;
+  int width{-1};
+  int height{-1};
+  int component{-1};
+  int bits{-1};        // bit depth per channel. 8(byte), 16 or 32.
+  int pixel_type{-1};  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
+                       // UBYTE(bits = 8) or USHORT(bits = 16)
+  std::vector<unsigned char> image;
 }
 
 void Scene::load_gltf(std::string_view filepath) {
@@ -196,19 +195,42 @@ void Scene::load_gltf(std::string_view filepath) {
     XEV_ERROR("Failed to load glTF: {}", path);
     return;
   }
-  if (is_loaded()) {
-    XEV_ERROR("Loading glTF into an active scene. Please call .unload().");
+  if (is_reserved()) {
+    XEV_ERROR("Loading glTF into an active scene. Please call .release().");
     return;
   }
 
-  // parsing material
+  // parse light
+  // TODO
+
+  // parse material
   for (const auto& gltf_mat : model.materials) {
     Material mat;
-    parse_material(mat, gltf_mat);
+
+    material.name = gltf_material.name;
+
+    material.base_color =
+        Color4(gltf_material.pbrMetallicRoughness.baseColorFactor);
+    material.metal_coef =
+        static_cast<float>(gltf_material.pbrMetallicRoughness.metallicFactor);
+    material.rough_coef =
+        static_cast<float>(gltf_material.pbrMetallicRoughness.roughnessFactor);
+
+    material.diffuse_texid =
+        gltf_material.pbrMetallicRoughness.baseColorTexture.index;
+    material.metallic_roughness_texid =
+        gltf_material.pbrMetallicRoughness.metallicRoughnessTexture.index;
     materials.emplace_back(mat);
   }
 
-  // parsing geometry
+  // parse texture
+  for (const auto& gltf_tex : model.textures) {
+    Texture tex;
+    parse_texture(tex, model.images[gltf_tex.source]);
+    textures.emplace_back(tex);
+  }
+
+  // parse geometry
   std::queue<std::pair<int, glm::mat4>> to_visit;
   for (const int& nidx : model.scenes[model.defaultScene].nodes) {
     to_visit.push({nidx, glm::mat4(1.0f)});
@@ -253,7 +275,7 @@ void Scene::load_gltf(std::string_view filepath) {
 
     glm::mat4 abs_mat = parent_mat * local_mat;
 
-    // parsing camera
+    // parse camera
     if (node.camera != -1 && node.name == "cam.active") {
       tinygltf::Camera camera = model.cameras[node.camera];
       XEV_ASSERT(camera.type == "perspective");
@@ -266,7 +288,7 @@ void Scene::load_gltf(std::string_view filepath) {
       cam_found = true;
     }
 
-    // parsing geometries
+    // parse geometries
     if (node.mesh != -1) {
       Mesh mesh;
       parse_mesh(mesh, model, node, abs_mat);
@@ -293,33 +315,61 @@ uint64_t Scene::size_device() const {
   return total_size;
 }
 
-uint64_t Scene::size_host() const {
-  return sizeof(Camera);
-}
-
-bool Scene::is_loaded() const {
+bool Scene::is_reserved() const {
   if (meshes.size() == 0)
     return false;
 
   bool res = true;
   for (const auto& mesh : meshes) {
-    res &= mesh.is_loaded();
+    res &= mesh.is_reserved();
   }
   return res;
 }
 
-void Scene::load(const Backend& backend) {
+void Scene::reserve(const Backend& backend) {
+  m_scene_buffer.reserve(sizeof(Scene::SceneBuffer), backend);
+  m_light_buffer.reserve(sizeof(Light) * lights.size(), backend);
+
+  for (auto& tex : textures) {
+    if (!tex.is_reserved())
+      tex.reserve(backend);
+  }
   for (auto& mesh : meshes) {
-    if (!mesh.is_loaded())
-      mesh.load(backend);
+    if (!mesh.is_reserved())
+      mesh.reserve(backend);
   }
 }
 
-void Scene::unload(const Backend& backend) {
-  for (auto& mesh : meshes) {
-    if (mesh.is_loaded())
-      mesh.unload(backend);
+void Scene::release(const Backend& backend) {
+  for (auto& tex : textures) {
+    if (tex.is_reserved())
+      tex.release(backend);
   }
+
+  for (auto& mesh : meshes) {
+    if (mesh.is_reserved())
+      mesh.release(backend);
+  }
+}
+
+void upload_textures(const Backend& backend) {
+  for (const auto& tex: textures)
+    tex.upload(backend);
+}
+
+void upload_meshes(const Backend& backend) {
+  for (const auto& mesh: meshes)
+    mesh.upload(backend);
+}
+
+void upload_lights(const Backend& backend) {
+  m_light_buffer.upload();
+}
+
+void Scene::upload(const Backend& backend) {
+  upload_meshes(backend);
+  upload_textures(backend);
+  upload_lights(backend);
 }
 
 void Scene::create_test_triangle() {
@@ -367,7 +417,7 @@ void Scene::create_test_triangle() {
 }
 
 void Scene::destroy(const Backend& backend) {
-  unload(backend);
+  release(backend);
   meshes.clear();
 }
 
