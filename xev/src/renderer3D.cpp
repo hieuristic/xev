@@ -21,6 +21,7 @@ Renderer3D::~Renderer3D() {
 }
 
 const Image& Renderer3D::draw(VkCommandBuffer cmd,
+                              const Image& image,
                               const Scene& scene,
                               const Camera& camera,
                               const FrameArg& arg) {

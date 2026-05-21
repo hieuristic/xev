@@ -153,22 +153,6 @@ void Scene::parse_mesh(Mesh& mesh,
               std::move(faces));
 }
 
-void Scene::parse_material(Material& material,
-                           const tinygltf::Material& gltf_material) const {}
-
-void Scene::parse_texture(Texture& tex, const tinygltf::Model& model) {
-  tex.name = gltf_tex.name;
-
-  std::string name;
-  int width{-1};
-  int height{-1};
-  int component{-1};
-  int bits{-1};        // bit depth per channel. 8(byte), 16 or 32.
-  int pixel_type{-1};  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
-                       // UBYTE(bits = 8) or USHORT(bits = 16)
-  std::vector<unsigned char> image;
-}
-
 void Scene::load_gltf(std::string_view filepath) {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
@@ -225,9 +209,27 @@ void Scene::load_gltf(std::string_view filepath) {
 
   // parse texture
   for (const auto& gltf_tex : model.textures) {
-    Texture tex;
-    parse_texture(tex, model.images[gltf_tex.source]);
-    textures.emplace_back(tex);
+    // TODO
+    XEV_INFO("TEXTURE: {}x{}x{} {}-bits", gltf_tex.width, gltf_tex.height,
+             gltf_tex.component, gltf_tex.bits);
+    // Texture(name,
+    //
+    // tex.name = gltf_tex.name;
+    // tex.raw_data.reserve(image.size());
+    //
+    // std::copy(image.begin(), image.end(), std::back_inserter(tex.raw_data));
+    //
+    // std::string name;
+    // int width{-1};
+    // int height{-1};
+    // int component{-1};
+    // int bits{-1};        // bit depth per channel. 8(byte), 16 or 32.
+    // int pixel_type{-1};  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
+    //                      // UBYTE(bits = 8) or USHORT(bits = 16)
+    // std::vector<unsigned char> image;
+    // Texture tex;
+    // parse_texture(tex, model.images[gltf_tex.source]);
+    // textures.emplace_back(tex);
   }
 
   // parse geometry
@@ -353,17 +355,18 @@ void Scene::release(const Backend& backend) {
 }
 
 void upload_textures(const Backend& backend) {
-  for (const auto& tex: textures)
+  for (const auto& tex : textures)
     tex.upload(backend);
 }
 
 void upload_meshes(const Backend& backend) {
-  for (const auto& mesh: meshes)
+  for (const auto& mesh : meshes)
     mesh.upload(backend);
 }
 
 void upload_lights(const Backend& backend) {
-  m_light_buffer.upload();
+  uint64_t size = lights.size() * sizeof(lights[0]);
+  m_light_buffer.upload(lights.size(), 0, size, backend);
 }
 
 void Scene::upload(const Backend& backend) {

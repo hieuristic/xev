@@ -44,10 +44,10 @@ class Mesh : Resource {
   const std::vector<MeshPrimitive>& get_primitives() const;
 
   uint64_t size_device() const override;
-
   bool is_reserved() const override;
   void reserve(const Backend& backend) override;
   void release(const Backend& backend) override;
+  void upload(const Backend& backend);
 
   VkBuffer get_face_buffer() const { return m_device_face.buffer; }
   VkBuffer get_vert_buffer() const { return m_device_vert.buffer; };

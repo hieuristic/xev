@@ -76,21 +76,21 @@ Backend::Backend(SDL_Window* window) {
   uint32_t num_physdev;
   vkEnumeratePhysicalDevices(m_instance, &num_physdev, nullptr);
   if (num_physdev < 1) {
-    XEV_ERROR("No physical device found");
+    XEV_ERROR("No physical m_device found");
     return;
   }
 
   std::vector<VkPhysicalDevice> physdevs(num_physdev);
   res_ = vkEnumeratePhysicalDevices(m_instance, &num_physdev, physdevs.data());
   if (res_ != VK_SUCCESS) {
-    XEV_ERROR("Failed to get physical device: {}", (int)res_);
+    XEV_ERROR("Failed to get physical m_device: {}", (int)res_);
     return;
   }
   m_physical_device = physdevs[0];
 
   VkPhysicalDeviceProperties dev_prop;
   vkGetPhysicalDeviceProperties(m_physical_device, &dev_prop);
-  XEV_INFO("Using physical device {}", dev_prop.deviceName);
+  XEV_INFO("Using physical m_device {}", dev_prop.deviceName);
 
   m_qfam = get_queue_family(m_physical_device, m_surface);
 
@@ -133,7 +133,7 @@ Backend::Backend(SDL_Window* window) {
 
   res_ = vkCreateDevice(m_physical_device, &dev_info, nullptr, &m_device);
   if (res_ != VK_SUCCESS) {
-    XEV_ERROR("Failed to create logical device: {}", (int)res_);
+    XEV_ERROR("Failed to create logical m_device: {}", (int)res_);
     return;
   }
 
@@ -145,65 +145,6 @@ Backend::Backend(SDL_Window* window) {
   m_pre_queue = retrieve_queue(Q_PRESENT);
 
   m_swapchain = create_swapchain(m_device, m_surface);
-
-  // setup bindless descripter set
-  {  // descriptor pool
-    std::array<VkDescriptorPoolSize, 2> sizes = {{
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_BINDLESS_TEXTURE},
-        {VK_DESCRIPTOR_TYPE_SAMPLER, MAX_BINDLESS_SAMPLER},
-    }};
-    VkDescriptorPoolCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT,
-        .maxSets = MAX_BINDLESS_TEXTURE * 2,
-        .poolSizeCount = 2,
-        .pPoolSizes = sizes.data(),
-    };
-
-    res_ = vkCreateDescriptorPool(m_device, &info, nullptr, &m_desc_pool);
-    XEV_ASSERT_VK(res_, "Failed to create descriptor pool");
-  }
-
-  {  // creating descriptor set layout
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
-        {{
-             .binding = TEXTURE_BINDING,
-             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-             .descriptorCount = MAX_BINDLESS_TEXTURE,
-             .stageFlags = VK_SHADER_STAGE_ALL,
-         },
-         {
-             .binding = SAMPLER_BINDING,
-             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-             .descriptorCount = MAX_BINDLESS_SAMPLER,
-             .stageFlags = VK_SHADER_STAGE_ALL,
-         }}};
-    std::array<VkDescriptorBindingFlags, 2> flags = {{
-        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-            VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-            VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-    }};
-
-    VkDescriptorSetLayoutBindingFlagsCreateInfo flag_info = {
-        .sType =
-            VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-        .bindingCount = 2,
-        .pBindingFlags = flags.data(),
-    };
-
-    VkDescriptorSetLayoutCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = &flag_info,
-        .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
-        .bindingCount = 2,
-        .pBindings = bindings.data(),
-    };
-
-    res_ = vkCreateDescriptorSetLayout(m_device, &info, nullptr,
-                                       &m_desc_set_layout);
-    XEV_ASSERT_VK(res_, "Failed to create descriptor set layout");
-  }
 
   {  // creating descriptor set
     VkDescriptorSetAllocateInfo info = {
@@ -284,10 +225,6 @@ Backend::~Backend() {
     vkDestroyCommandPool(m_device, m_frames[i].cmd_pool, nullptr);
   }
 
-  vkDestroySampler(m_device, m_linear_sampler, nullptr);
-  vkDestroyDescriptorSetLayout(m_device, m_desc_set_layout, nullptr);
-  vkDestroyDescriptorPool(m_device, m_desc_pool, nullptr);
-
   for (auto imageView : m_swapchain_image_views) {
     vkDestroyImageView(m_device, imageView, nullptr);
   }
@@ -301,14 +238,15 @@ Backend::~Backend() {
     vkDestroyInstance(m_instance, nullptr);
 }
 
-Backend::QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
+Backend::QueueFamily Backend::get_queue_family(VkPhysicalDevice m_device,
                                                VkSurfaceKHR surface) {
   Backend::QueueFamily qfam;
   uint32_t qfam_cnt;
-  vkGetPhysicalDeviceQueueFamilyProperties(device, &qfam_cnt, nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(m_device, &qfam_cnt, nullptr);
 
   std::vector<VkQueueFamilyProperties> qfamprops(qfam_cnt);
-  vkGetPhysicalDeviceQueueFamilyProperties(device, &qfam_cnt, qfamprops.data());
+  vkGetPhysicalDeviceQueueFamilyProperties(m_device, &qfam_cnt,
+                                           qfamprops.data());
 
   for (uint32_t i = 0; i < qfam_cnt; i++) {
     if (qfamprops[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
@@ -317,7 +255,7 @@ Backend::QueueFamily Backend::get_queue_family(VkPhysicalDevice device,
       qfam.com = {i, 1};
 
     VkBool32 presentSupport = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+    vkGetPhysicalDeviceSurfaceSupportKHR(m_device, i, surface, &presentSupport);
     if (presentSupport)
       qfam.pre = {i, 1};
   }
@@ -369,7 +307,7 @@ VkQueue Backend::retrieve_queue(QFAM qfam, uint32_t qidx) {
   return queue;
 }
 
-VkSwapchainKHR Backend::create_swapchain(VkDevice device,
+VkSwapchainKHR Backend::create_swapchain(VkDevice m_device,
                                          VkSurfaceKHR surface) {
   VkResult res_;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -465,7 +403,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
     swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   }
 
-  res_ = vkCreateSwapchainKHR(device, &swapchain_info, nullptr, &m_swapchain);
+  res_ = vkCreateSwapchainKHR(m_device, &swapchain_info, nullptr, &m_swapchain);
   if (res_ != VK_SUCCESS) {
     XEV_ERROR("Swapchain creation failed: {}", (int)res_);
     return VK_NULL_HANDLE;
@@ -474,9 +412,9 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   m_extent = extent;
 
   uint32_t real_image_count;
-  vkGetSwapchainImagesKHR(device, m_swapchain, &real_image_count, nullptr);
+  vkGetSwapchainImagesKHR(m_device, m_swapchain, &real_image_count, nullptr);
   m_swapchain_images.resize(real_image_count);
-  vkGetSwapchainImagesKHR(device, m_swapchain, &real_image_count,
+  vkGetSwapchainImagesKHR(m_device, m_swapchain, &real_image_count,
                           m_swapchain_images.data());
 
   m_swapchain_image_views.resize(real_image_count);
@@ -499,7 +437,7 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
                 .layerCount = 1,
             },
     };
-    res_ = vkCreateImageView(device, &view_info, nullptr,
+    res_ = vkCreateImageView(m_device, &view_info, nullptr,
                              &m_swapchain_image_views[i]);
     XEV_ASSERT_VK(res_, "Failed to create swapchain image view!");
   }
@@ -507,17 +445,54 @@ VkSwapchainKHR Backend::create_swapchain(VkDevice device,
   return m_swapchain;
 }
 
-VkSwapchainKHR Backend::recreate_swapchain(VkDevice device,
+VkSwapchainKHR Backend::recreate_swapchain(VkDevice m_device,
                                            VkSurfaceKHR surface) {
-  vkDeviceWaitIdle(device);
+  vkDeviceWaitIdle(m_device);
   for (auto imageView : m_swapchain_image_views) {
-    vkDestroyImageView(device, imageView, nullptr);
+    vkDestroyImageView(m_device, imageView, nullptr);
   }
   m_swapchain_image_views.clear();
   if (m_swapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(device, m_swapchain, nullptr);
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
   }
-  return create_swapchain(device, surface);
+  return create_swapchain(m_device, surface);
+}
+
+void Backend::create_descriptor_pool(VkDescriptorPool& pool,
+                                     const VkDescriptorPoolCreateInfo& info) {
+  VkResult res_ = vkCreateDescriptorPool(m_device, &info, nullptr, &pool);
+  XEV_ASSERT_VK(res_, "Failed to create descriptor pool");
+}
+
+void Backend::create_descriptor_set_layout(
+    VkDescriptorSetLayout& layout,
+    const VkDescriptorSetLayoutCreateInfo& info) {
+  VkResult res_ =
+      vkCreateDescriptorSetLayout(m_device, &info, nullptr, &layout);
+  XEV_ASSERT_VK(res_, "Failed to create descriptor set layout");
+}
+
+void Backend::create_descriptor_set(VkDescriptorSet& desc_set,
+                                    const VkDescriptorSetAllocateInfo& info) {
+  VkResult res_ = vkAllocateDescriptorSets(m_device, &info, &desc_set);
+  XEV_ASSERT_VK(res_, "Failed to create descriptor set.");
+}
+
+void Backend::destroy_descriptor_pool(VkDescriptorPool& pool) {
+  VkResult res_ = vkDestroyDescriptorPool(m_device, pool, nullptr);
+  XEV_ASSERT_VK(res_, "Failed to destroy descriptor pool.");
+  pool = VK_NULL_HANDLE;
+}
+void Backend::destroy_descriptor_set_layout(VkDescriptorSetLayout& layout) {
+  VkResult res_ = vkDestroyDescriptorSetLayout(m_device, layout, nullptr);
+  XEV_ASSERT_VK(res_, "Failed to destroy descriptor set layout.");
+  layout = VK_NULL_HANDLE;
+}
+void Backend::destroy_descriptor_set(const VkDescriptorPool& pool,
+                                     VkDescriptorSet& desc_set) {
+  VkResult res_ = vkFreeDescriptorSets(m_device, pool, 1, &desc_set);
+  XEV_ASSERT_VK(res_, "Failed to destroy descriptor set.");
+  desc_set = VK_NULL_HANDLE;
 }
 
 void Backend::reserve_buffer(VkBuffer& buffer,
@@ -581,7 +556,8 @@ void Backend::reserve_image(VkImage& image,
   };
 
   XEV_ASSERT_VK(vmaCreateImage(m_allocator, &image_info, &create_info, &image,
-                               &alloc, &alloc_info));
+                               &alloc, &alloc_info),
+                "Failed to create image");
 
   VkImageAspectFlags aspect_mask = 0;
   if (flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
@@ -606,7 +582,8 @@ void Backend::reserve_image(VkImage& image,
           },
   };
 
-  XEV_ASSERT_VK(vkCreateImageView(m_device, &view_info, nullptr, &view));
+  XEV_ASSERT_VK(vkCreateImageView(m_device, &view_info, nullptr, &view),
+                "Failed to create image view.");
 }
 
 void Backend::release_image(VkImage& image,
@@ -624,7 +601,7 @@ void Backend::release_image(VkImage& image,
 
 VmaAllocator Backend::create_memory_allocator(VkInstance instance,
                                               VkPhysicalDevice physical_device,
-                                              VkDevice device) {
+                                              VkDevice m_device) {
   VkResult res_;
   VmaAllocator allocator;
 
@@ -633,7 +610,7 @@ VmaAllocator Backend::create_memory_allocator(VkInstance instance,
                VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT |
                VMA_ALLOCATOR_CREATE_KHR_BIND_MEMORY2_BIT,
       .physicalDevice = physical_device,
-      .device = device,
+      .m_device = m_device,
       .instance = instance,
       .vulkanApiVersion = VK_API_VERSION_1_3,
   };

@@ -1,6 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
-#include <xev/backend.h>
+#include <xev/engine.h>
 #include <xev/renderer2D.h>
 #include <xev/renderer3D.h>
 #include <xev/resource/scene.h>
@@ -27,7 +27,7 @@ class App {
   const bool* m_keystate = nullptr;
 
   std::unique_ptr<xev::Window> m_window;
-  std::shared_ptr<xev::Backend> m_backend;
+  std::unique_ptr<xev::Engine> m_engine;
   std::unique_ptr<xev::Renderer3D> m_renderer3D;
   std::unique_ptr<xev::Renderer2D> m_renderer2D;
   std::unique_ptr<xev::Scene> m_scene;

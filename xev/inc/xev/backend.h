@@ -2,8 +2,7 @@
 #include <SDL3/SDL.h>
 #include <xev/frame_arg.h>
 #include <xev/logger.h>
-#include <xev/resource/image.h>
-#include <xev/resource/resource.h>
+#include <xev/resource_manager.h>
 #include <xev/vma.h>
 #include <xev/volk.h>
 #include <memory>
@@ -34,6 +33,15 @@ class Backend {
   uint32_t app_version = VK_MAKE_VERSION(0, 0, 0);
   const char* engine_name = "xev_engine";
   uint32_t engine_version = VK_MAKE_VERSION(0, 0, 0);
+
+  std::unique_ptr<ResourceBackend> resource_backend;
+  std::unique_ptr<PipelineBackend> pipeline_backend;
+  std::unique_ptr<GlobalDescriptorSet> global_descriptor_set;
+
+  void init_resource_backend();
+  void init_pipeline_backend();
+  void init_global_descriptor_set();
+
 
   // this define the rendering scope
   VkCommandBuffer enter_frame();
@@ -104,18 +112,20 @@ class Backend {
       std::span<const VkPushConstantRange> ranges) const;
   void destroy_pipeline_layout(VkPipelineLayout) const;
 
- private:  // pipeline resources
-  static const uint32_t MAX_BINDLESS_TEXTURE = 2 << 14;
-  static const uint32_t MAX_BINDLESS_SAMPLER = 2 << 5;
-  static const uint32_t TEXTURE_BINDING = 0;
-  static const uint32_t SAMPLER_BINDING = 0;
-  VkDescriptorPool m_desc_pool;
-  VkDescriptorSetLayout m_desc_set_layout;
-  VkDescriptorSet m_desc_set;
+ private:  // descriptor set
+  void create_descriptor_pool(VkDescriptorPool& pool,
+                              const VkDescriptorPoolCreateInfo& info);
+  void create_descriptor_set_layout(
+      VkDescriptorSetLayout& layout,
+      const VkDescriptorSetLayoutCreateInfo& info);
+  void create_descriptor_set(VkDescriptorSet& desc_set,
+                             const VkDescriptorSetAllocateInfo& info);
 
-  static const uint32_t LINEAR_SAMPLER_ID = 0;
-  static constexpr float MAX_SAMPLER_ANISOTROPY{1.0f};
-  VkSampler m_linear_sampler;
+  void destroy_descriptor_pool(VkDescriptorPool& pool);
+  void destroy_descriptor_set_layout(VkDescriptorPool& pool);
+  void destroy_descriptor_set(const VkDescriptorPool& pool,
+                              VkDescriptorSet& desc_set);
+
   void create_sampler(uint32_t id, VkSampler sampler);  // for valid m_desc_set
 
  public:  // pipeline creation

@@ -1,25 +1,34 @@
-#include <xev/backend.h>
 #include <xev/common.h>
 #include <xev/resource/image.h>
+#include <xev/resource_manager.h>
 
 namespace xev {
 
-void Image::reserve(uint32_t width_, uint32_t height_, const Backend& backend) {
+void Image::reserve(uint32_t width_,
+                    uint32_t height_,
+                    const ResourceManager& manager) {
   width = width_;
   height = height_;
-  reserve(backend);
+  manager.reserve_image(image, view, alloc, alloc_info, width, heigth, format,
+                        flags);
 }
-void Image::reserve(const Backend& backend) {
-  backend.reserve_image(image, view, alloc, alloc_info, width, height, format,
-                     flags);
+
+void Image::reserve(const ResourceManager& manager) {
+  manager.reserve_image(image, view, alloc, alloc_info, width, heigth, format,
+                        flags);
 }
-void Image::release(const Backend& backend) {
-  backend.release_image(image, alloc, view);
+
+void Image::release(const ResourceManager& manager) {
+  manager.release_image(image, alloc, view);
 }
 
 void Image::set_layout(const VkImageLayout& layout_) {
   XEV_ASSERT(layout == VK_IMAGE_LAYOUT_UNDEFINED);
   layout = layout_;
+}
+
+void Image::upload() {
+  // TODO
 }
 
 void Image::update_layout(const VkCommandBuffer& cmd,

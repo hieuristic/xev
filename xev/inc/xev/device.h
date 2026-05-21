@@ -1,0 +1,49 @@
+#pragma once
+
+namespace xev {
+
+enum QFAM {
+  Q_GRAPHICS,
+  Q_PRESENT,
+  Q_COMPUTE,
+};
+
+struct QueueFamilyEntry {
+  uint32_t idx;
+  uint32_t cnt;  // number of queues within the family
+};
+
+struct QueueFamily {
+  std::optional<QueueFamilyEntry> graphics;
+  std::optional<QueueFamilyEntry> present;
+  std::optional<QueueFamilyEntry> compute;
+
+  bool isComplete() { return gfx.has_value() && pre.has_value(); }
+};
+
+class Device() {
+ public:
+  Device();
+  Device(*SDL_Window window);
+  ~Device();
+
+  Device(const Device&) = delete;
+  Device& operator=(const Device&) = delete;
+  Device(Device&&) = default;
+  Device& operator=(Device&&) = default;
+
+  VkInstance instance{VK_NULL_HANDLE};
+  VkSurfaceKHR surface{VK_NULL_HANDLE};
+  VkPhysicalDevice physical_device{VK_NULL_HANDLE};
+  VkDevice logical_device{VK_NULL_HANDLE};
+  QueueFamily queue_family{};
+
+ private:
+  void init_instance();
+  void pick_physical_device();
+  void init_logical_device();
+  void find_queue_family();
+  void init_surface(SDL_Window* window);
+};
+
+}  // namespace xev

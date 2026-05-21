@@ -4,10 +4,12 @@
 
 namespace xev {
 
-void PipelineMesh::create(const Backend& backend,
-                          VkFormat color_format,
-                          VkFormat depth_format,
-                          VkSampleCountFlagBits sample_count) {
+void PipelineMesh::create(
+    const Backend& backend,
+    VkFormat color_format,
+    VkFormat depth_format,
+    const VkDescriptorSetLayout& global_decriptor_set_layout,
+    VkSampleCountFlagBits sample_count) {
   VkShaderModule shader_vert, shader_frag;
   const char* base_path = SDL_GetBasePath();
   std::string shader_path = base_path
@@ -17,16 +19,13 @@ void PipelineMesh::create(const Backend& backend,
   shader_vert = backend.create_shader_module(shader_path.c_str());
   shader_frag = backend.create_shader_module(shader_path.c_str());
 
-  VkDescriptorSetLayout desc_set_layout =
-      backend.create_bindless_descriptor_set_layout();
-
   VkPushConstantRange push_const_range = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,
       .size = sizeof(PipelineMesh::PushConst),
   };
 
-  std::vector<VkDescriptorSetLayout> layouts = {desc_set_layout};
+  std::vector<VkDescriptorSetLayout> layouts = {global_decriptor_set_layout};
   std::vector<VkPushConstantRange> ranges = {push_const_range};
   m_layout = backend.create_pipeline_layout(layouts, ranges);
 
