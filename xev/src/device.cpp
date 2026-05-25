@@ -1,8 +1,18 @@
 #include <xev/device.h>
 #include <xev/logger.h>
 #include <xev/volk.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#include <vector>
+#include <string>
+#include <set>
 
 namespace xev {
+
+constexpr const char* app_name = "xev_app";
+constexpr uint32_t app_version = 1;
+constexpr const char* engine_name = "xev";
+constexpr uint32_t engine_version = 1;
 
 Device::Device() {
   init_instance();
@@ -19,9 +29,9 @@ Device::Device(SDL_Window* window) {
   init_logical_device();
 }
 
-~Device() {
-  if (device != VK_NULL_HANDLE)
-    vkDestroyDevice(device, nullptr);
+Device::~Device() {
+  if (logical_device != VK_NULL_HANDLE)
+    vkDestroyDevice(logical_device, nullptr);
   if (surface != VK_NULL_HANDLE)
     vkDestroySurfaceKHR(instance, surface, nullptr);
   if (instance != VK_NULL_HANDLE)
@@ -113,7 +123,7 @@ void Device::pick_physical_device() {
   XEV_INFO("Using physical device {}", dev_prop.deviceName);
 }
 
-void Device::init_surface(SDLWindow* window) {
+void Device::init_surface(SDL_Window* window) {
   if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
     XEV_ERROR("Failed to create surface: {}", SDL_GetError());
   }

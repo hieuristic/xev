@@ -21,6 +21,19 @@ cmake -B build && cmake --build build -j8 && ./build/bin/xev
 
 Local object frame uses right-handed RDF system (+x - Right, +y - Down, +z - Front).
 
-3. Engine Feature
- - Clustered Forward Renderer
- - Bindless Descriptor Set, Dynamic Rendering
+
+3. Features
+
+ - headless renderering
+ - clustered forward renderer
+ - bindless descriptor set, dynamic rendering
+
+
+4. Architecture
+
+The code base is split into system and resource. All systems and their lifetime are
+completely owned by the Engine class. The engine class contains a unique_ptr to
+uninitialized systems and require explicit initialization via the init_<system_name>()
+call. Resources do NOT own their own data and have to be explicitly created
+and destroyed either by a system or the application. To get started, please checkout
+`app/demo/` where you can find a minimal example on how to draw a gltf scene.

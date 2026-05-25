@@ -3,30 +3,18 @@
 
 namespace xev {
 
-Renderer3D::Renderer3D(std::shared_ptr<Backend> backend,
-                       uint32_t width,
-                       uint32_t height)
-    : m_backend(std::move(backend)) {
-  m_pipeline_mesh.create(*m_backend, VK_FORMAT_B8G8R8A8_SRGB,
-                         VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
-
-  m_image.reserve(width, height, *m_backend);
-  m_depth_image.reserve(width, height, *m_backend);
+Renderer3D::Renderer3D(PipelineManager& pipeline_manager)
+    : m_pipeline_manager(pipeline_manager) {
+  m_pipeline_manager.create(m_mesh_pipeline, VK_FORMAT_B8G8R8A8_SRGB,
+                            VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
 }
 
 Renderer3D::~Renderer3D() {
-  m_pipeline_mesh.destroy(*m_backend);
-  m_image.release(*m_backend);
-  m_depth_image.release(*m_backend);
+  m_pipeline_manager.destroy(m_mesh_pipeline);
 }
 
-const Image& Renderer3D::draw(VkCommandBuffer cmd,
-                              const Image& image,
-                              const Scene& scene,
-                              const Camera& camera,
-                              const FrameArg& arg) {
-  XEV_ASSERT(scene.is_reserved());
-  VkImageMemoryBarrier2 img_barrier = {
+void Renderer3D::prepare_image(VkCommandBuffer& cmd, const Image& image) {
+  VkImageMemoryBarrier2 barrier = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
       .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
       .srcAccessMask = 0,
@@ -34,73 +22,78 @@ const Image& Renderer3D::draw(VkCommandBuffer cmd,
       .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
       .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
       .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .image = m_image.image,
+      .image = image.image,
       .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
   };
-  VkImageMemoryBarrier2 depth_barrier = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-      .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-                      VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-      .srcAccessMask = 0,
-      .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-                      VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-      .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                       VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-      .image = m_depth_image.image,
-      .subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1},
-  };
-  VkImageMemoryBarrier2 barriers[] = {img_barrier, depth_barrier};
-  VkDependencyInfo dep_info = {
+  VkDependencyInfo info = {
       .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-      .imageMemoryBarrierCount = 2,
-      .pImageMemoryBarriers = barriers,
+      .imageMemoryBarrierCount = 1,
+      .pImageMemoryBarriers = &barrier,
   };
-  vkCmdPipelineBarrier2(cmd, &dep_info);
+  vkCmdPipelineBarrier2(cmd, &info);
+}
 
+void Renderer3D::prepare_transfer(VkCommandBuffer& cmd, const Image& image) {
+  VkImageMemoryBarrier2 barrier = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+      .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+      .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT,
+      .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
+      .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      .image = image.image,
+      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+  };
+  VkDependencyInfo info = {
+      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+      .imageMemoryBarrierCount = 1,
+      .pImageMemoryBarriers = &barrier,
+  };
+  vkCmdPipelineBarrier2(cmd, &info);
+}
+
+void Renderer3D::begin_render(VkCommandBuffer& cmd,
+                              const Image& image,
+                              const Color4<float> clear_color) {
   VkRenderingAttachmentInfo color_attachment = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = m_image.view,
+      .imageView = image.view,
       .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
       .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .clearValue = {arg.clear_color[0], arg.clear_color[1], arg.clear_color[2],
-                     arg.clear_color[3]},
-  };
-
-  VkRenderingAttachmentInfo depth_attachment = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = m_depth_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-      .clearValue = {.depthStencil = {1.0f, 0}},
-
+      .clearValue = {clear_color.r, clear_color.g, clear_color.b,
+                     clear_color.a},
   };
 
   VkRenderingInfo render_info = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      .renderArea = {{0, 0}, {m_image.width, m_image.height}},
+      .renderArea = {{0, 0}, {image.width, image.height}},
       .layerCount = 1,
       .colorAttachmentCount = 1,
       .pColorAttachments = &color_attachment,
-      .pDepthAttachment = &depth_attachment,
   };
   vkCmdBeginRendering(cmd, &render_info);
+}
 
-  draw_mesh(cmd, scene, camera);
-
+void Renderer3D::end_render(VkCommandBuffer& cmd) {
   vkCmdEndRendering(cmd);
+}
 
-  img_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-  img_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-  img_barrier.dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
-  img_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-  img_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  img_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-  dep_info.imageMemoryBarrierCount = 1;
-  vkCmdPipelineBarrier2(cmd, &dep_info);
+void Renderer3D::draw(VkCommandBuffer& cmd,
+                      const Image& image,
+                      const Scene& scene,
+                      const Camera& camera,
+                      const Color4<float> clear_color) {
+  XEV_ASSERT(scene.on_device() && image.on_device());
+
+  prepare_draw(cmd, image);
+
+  begin_render(cmd, image, clear_color);
+  draw_mesh(cmd, scene, camera);
+  end_render(cmd);
+
+  prepare_transfer(cmd, image);
 
   return m_image;
 }

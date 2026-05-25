@@ -1,4 +1,3 @@
-#include <xev/backend.h>
 #include <xev/logger.h>
 #include <xev/resource/mesh.h>
 
@@ -29,8 +28,8 @@ const std::vector<Mesh::MeshPrimitive>& Mesh::get_primitives() const {
   return m_primitives;
 }
 
-void Mesh::reserve(const Backend& backend) {
-  if (m_is_reserved) {
+void Mesh::alloc(const ResourceManager& manager) {
+  if (m_is_alloced) {
     XEV_WARN("Mesh '{}' already on GPU, skipping reserve", m_name);
     return;
   }
@@ -44,26 +43,27 @@ void Mesh::reserve(const Backend& backend) {
 
   // face (index) buffer
   size = sizeof(glm::uvec3) * m_faces.size();
-  m_device_face.reserve(size, backend);
+  m_device_face.size = size;
+  manager.alloc(m_device_face);
 
   // vertex buffer
   size = m_positions.size() * sizeof(Vertex);
-  m_device_vert.reserve(size, backend);
-  m_device_vert.copy(interleaved_vertex_data.data(), 0, size, backend);
+  m_device_vert.size = size;
+  manager.alloc(m_device_vert);
 
-  m_is_reserved = true;
+  m_on_device = true;
   XEV_INFO("Mesh '{}' reserved on GPU ({} verts, {} faces)", m_name,
            m_positions.size(), m_faces.size());
 }
 
-void Mesh::upload(const Backend& backend) {
+void Mesh::upload(const ResourceManager& manager) {
+  XEV_ASSERT(m_device_face.on_device() && m_device_vert.on_device());
+
   uint64_t size;
 
-  XEV_ASSERT(m_device_face.is_reserved());
   size = sizeof(glm::uvec3) * m_faces.size();
-  m_device_face.upload(m_faces.data(), 0, size, backend);
+  manager.upload(m_device_face, m_faces.data(), 0, size);
 
-  XEV_ASSERT(m_device_vert.is_reserved());
   size = m_positions.size() * sizeof(Vertex);
   std::vector<Vertex> interleaved_vertex_data(m_positions.size(), Vertex{});
   for (uint32_t i = 0; i < interleaved_vertex_data.size(); ++i) {
@@ -71,17 +71,17 @@ void Mesh::upload(const Backend& backend) {
     interleaved_vertex_data[i].normal = m_normals[i];
     interleaved_vertex_data[i].uv = m_uvs[i];
   }
-  m_device_vert.upload(interleaved_vertex_data.data(), 0, size, backend);
+  manager.upload(m_device_vert, interleaved_vertex_data.data(), 0, size);
 }
 
-bool Mesh::is_reserved() const {
-  return m_is_reserved;
+bool Mesh::on_device() const {
+  return m_on_device;
 }
 
-void Mesh::release(const Backend& backend) {
-  m_device_face.release(backend);
-  m_device_vert.release(backend);
-  m_is_reserved = false;
+void Mesh::free(const ResourceManager& manager) {
+  manager.free(m_device_face);
+  manager.free(m_device_vert);
+  m_on_device = false;
 }
 
 uint64_t Mesh::size_device() const {

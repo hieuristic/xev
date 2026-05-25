@@ -1,11 +1,17 @@
 #pragma once
+#include <xev/volk.h>
 #include <xev/resource/image.h>
+#include <vector>
 
 namespace xev {
 
-class Swapchain() {
+class Swapchain {
  public:
-  Swapchain();
+  Swapchain(VkPhysicalDevice physical_device,
+            VkSurfaceKHR surface,
+            VkDevice device,
+            uint32_t graphics_family_idx,
+            uint32_t present_family_idx);
   ~Swapchain();
 
   Swapchain(const Swapchain&) = delete;
@@ -13,44 +19,35 @@ class Swapchain() {
   Swapchain(Swapchain&&) = default;
   Swapchain& operator=(Swapchain&&) = default;
 
-  inline constexpr uint32_t MAX_FRAME_OVERLAP = 2;
-  std::array<float, 4> clear_color{0.5f, 0.5f, 0.5f, 1.0f};
+  uint32_t width{0};
+  uint32_t height{0};
+  bool m_is_swapchain_dirty{false};
 
-  VkCommandBuffer acquire_frame();
-  void release_frame();
+  const Image& acquire_image(VkSemaphore swapchain_sem);
+  void present(VkQueue queue, VkSemaphore wait_sem);
+  void reinit_swapchain();
+
+  VkSwapchainKHR get_swapchain() const { return m_swapchain; }
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};
   VkPhysicalDevice m_physical_device{VK_NULL_HANDLE};
   VkSurfaceKHR m_surface{VK_NULL_HANDLE};
-  QueueFamily m_queue_family{VK_NULL_HANDLE};
+  uint32_t m_graphics_family_idx{0};
+  uint32_t m_present_family_idx{0};
   VkSwapchainKHR m_swapchain{VK_NULL_HANDLE};
-  VkExtent2D m_extent{0, 0};
   VkSurfaceFormatKHR m_ideal_format{
       .format = VK_FORMAT_B8G8R8A8_SRGB,
       .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
   };
   VkSurfaceFormatKHR m_surface_format{};
 
-  uint32_t m_frame_idx{0};
-  std::array<Frame, MAX_FRAME_OVERLAP> m_frames;
+  uint32_t m_acquired_idx{0};
   std::vector<Image> m_images;
 
   void init_swapchain();
-  void reinit_swapchain();
-  void create_images(Frame& frame);
-  void destroy_images(Frame& frame);
-  void create_frame(Frame& frame);
-  void destroy_frame(Frame& frame);
-  const Image& acquire_image();
-
-  struct Frame {
-    VkCommandPool pool{VK_NULL_HANDLE};
-    VkCommandBuffer render_cmdbuf{VK_NULL_HANDLE};
-    VkSemaphore present_sem{VK_NULL_HANDLE};
-    VkSemaphore render_sem{VK_NULL_HANDLE};
-    VkFence render_fence{VK_NULL_HANDLE};
-  };
-}
+  void create_images();
+  void destroy_images();
+};
 
 }  // namespace xev

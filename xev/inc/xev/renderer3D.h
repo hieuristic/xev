@@ -6,13 +6,14 @@ namespace xev {
 
 class Renderer3D {
  public:
-  Renderer3D(std::shared_ptr<Backend> backend, uint32_t width, uint32_t height);
+  Renderer3D(PipelineManager& pipeline_manager_);
   ~Renderer3D();
 
-  const Image& draw(VkCommandBuffer cmd,
-                    const Scene& scene,
-                    const Camera& camera,
-                    const FrameArg& arg);
+  void draw(VkCommandBuffer cmd,
+            const Image& image,
+            const Scene& scene,
+            const Camera& camera,
+            const FrameArg& arg);
   void draw_mesh(VkCommandBuffer cmd, const Scene& scene, const Camera& camera);
 
  public:
@@ -42,18 +43,6 @@ class Renderer3D {
   std::shared_ptr<Backend> m_backend;
   PipelineMesh m_pipeline_mesh;
   std::vector<PipelineMesh::Command> m_mesh_cmds;
-
- private:
-  Image m_image{VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                                             VK_IMAGE_USAGE_SAMPLED_BIT};
-  Image m_depth_image{VK_FORMAT_D32_SFLOAT,
-                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
-
- private:
-  VkSemaphore m_sem_image = VK_NULL_HANDLE;
-  VkSemaphore m_sem_drawn = VK_NULL_HANDLE;
-  VkFence m_fence_inflight;
 
  public:  // scene limit
   static const uint32_t MAX_LIGHTS = 1000;

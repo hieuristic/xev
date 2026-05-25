@@ -1,8 +1,12 @@
 #pragma once
 #include <xev/vma.h>
 #include <xev/volk.h>
+#include <xev/resource/sampler.h>
 
 namespace xev {
+
+class Buffer;
+class Image;
 
 class ResourceManager {
  public:
@@ -16,35 +20,22 @@ class ResourceManager {
   ResourceManager(ResourceManager&&) = default;
   ResourceManager& operator=(ResourceManager&&) = default;
 
-  void reserve_buffer(VkBuffer& buffer,
-                      VmaAllocation& alloc,
-                      const VmaAllocationInfo& alloc_info,
-                      VkDeviceSize size,
-                      const VkBufferUsageFlags& flags,
-                      VmaMemoryUsage mem_usage) const;
-  void release_buffer(VkBuffer buffer, VmaAllocation alloc) const;
-  void upload_buffer(const void* src,
-                     const VmaAllocation& dst_alloc,
-                     uint64_t offset,
-                     uint64_t size) const;
+  void alloc(Buffer& buf);
+  void alloc(Image& img);
+  void free(Buffer& buf);
+  void free(Image& img);
+  void upload(Buffer& buf, const void* src, uint64_t offset, uint64_t size);
 
-  void reserve_image(VkImage& image,
-                     VkImageView& view,
-                     VmaAllocation& alloc,
-                     VmaAllocationInfo& alloc_info,
-                     uint32_t width,
-                     uint32_t height,
-                     VkFormat format,
-                     VkImageUsageFlags flags) const;
-  void release_image(VkImage& image,
-                     VmaAllocation& alloc,
-                     VkImageView& view) const;
+  void alloc(VkSampler& sampler, SamplerType type);
+  void free(VkSampler& sampler);
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};
   VmaAllocator m_allocator{nullptr};
 
-  void init_allocator();
+  void init_allocator(VkInstance instance,
+                      VkPhysicalDevice physical_device,
+                      VkDevice device);
 };
 
 }  // namespace xev

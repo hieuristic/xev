@@ -24,11 +24,11 @@ App::App() {
   m_engine = std::make_unique<xev::Engine>(m_window->get_native());
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
-  m_engine->init_global_descriptor_set();
+  m_engine->init_pipeline_manager();
+  m_engine->init_frame_context();
 
-  auto size = m_window->get_size();
-  m_renderer3D = std::make_unique<xev::Renderer3D>(
-      m_engine, static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
+  m_renderer3D = std::make_unique<xev::Renderer3D>(m_engine->resource_manager,
+                                                   m_engine->pipeline_manager);
 
   m_scene = std::make_unique<xev::Scene>();
   const char* base_path = SDL_GetBasePath();
@@ -38,9 +38,8 @@ App::App() {
 
   XEV_INFO("Loading Sponza...");
   m_scene->load_gltf(scene_path);
-  // XEV_INFO("Loading Triangle...");
   // m_scene->create_test_triangle();
-  m_scene->reserve(*m_engine);
+  m_scene->reserve(rman);
   m_scene->upload_meshes();
   m_scene->upload_textures();
   m_scene->active_cam.set_aspect(m_window->get_aspect());
@@ -86,14 +85,15 @@ void App::handle_inputs() {
 }
 
 void App::draw() {
-  VkCommandBuffer cmd = m_engine->enter_frame();
-  if (cmd != VK_NULL_HANDLE) {
+  VkCommandBuffer cmdbuf = m_engine->swapchain->acquire_frame();
+
+  if (cmdbuf != VK_NULL_HANDLE) {
     xev::FrameArg args;
     args.clear_color = {0.1f, 0.1f, 0.1f, 1.0f};
     args.copy_to_swapchain = true;
     const xev::Image& output_image =
-        m_renderer3D->draw(cmd, *m_scene, m_scene->active_cam, args);
-    m_engine->leave_frame(cmd, output_image, args);
+        m_renderer3D->draw(cmdbuf, *m_scene, m_scene->active_cam, args);
+    m_engine->leave_frame(cmdbuf, output_image, args);
   }
 }
 

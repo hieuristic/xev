@@ -13,7 +13,7 @@ namespace xev {
 
 class Backend;
 
-class Mesh : Resource {
+class Mesh : public Resource {
  public:
   struct MeshPrimitive {
     uint32_t voffset;
@@ -45,9 +45,9 @@ class Mesh : Resource {
 
   uint64_t size_device() const override;
   bool is_reserved() const override;
-  void reserve(const Backend& backend) override;
-  void release(const Backend& backend) override;
-  void upload(const Backend& backend);
+  void reserve(ResourceManager& manager);
+  void release(ResourceManager& manager);
+  void upload(ResourceManager& manager);
 
   VkBuffer get_face_buffer() const { return m_device_face.buffer; }
   VkBuffer get_vert_buffer() const { return m_device_vert.buffer; };

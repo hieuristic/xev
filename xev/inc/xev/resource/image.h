@@ -1,4 +1,5 @@
 #pragma once
+#include <xev/color.h>
 #include <xev/resource/resource.h>
 #include <xev/vma.h>
 #include <xev/volk.h>
@@ -8,8 +9,11 @@ namespace xev {
 
 class ResourceManager;
 
-class Image : Resource {
+typedef uint32_t ImageId;
+
+class Image : public Resource {
  public:
+  Image() = default;
   Image(VkFormat format_, VkImageUsageFlags flags_)
       : format(format_), flags(flags_) {}
   Image(uint32_t width_,
@@ -41,22 +45,18 @@ class Image : Resource {
   VkImageUsageFlags flags{0};
 
   uint64_t size_device() const override { return alloc_info.size; }
-  bool is_reserved() const override { return image != VK_NULL_HANDLE; }
-  void reserve(uint32_t width_,
-               uint32_t height_,
-               const ResourceManager& manager);
-  void reserve(const ResourceManager& manager) override;
-  void release(const ResourceManager& manager) override;
-  void upload(const ResourceManager& manager);
+  bool on_device() const override { return image != VK_NULL_HANDLE; }
 
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   void set_layout(const VkImageLayout& layout_);
   void update_layout(const VkCommandBuffer& cmd,
                      const VkImageLayout& new_layout_);
 
-  void copy(const VkCommandBuffer& cmd,
-            const Image& src,
-            const VkFilter& filter);
+  void clear(const VkCommandBuffer& cmd, Color<float, 4> color);
+
+  void blit_from(const VkCommandBuffer& cmd,
+                 const Image& src,
+                 const VkFilter& filter);
 };
 
 }  // namespace xev

@@ -9,28 +9,20 @@ class Backend;
 
 class Buffer : Resource {
  public:
-  VkBuffer buffer = VK_NULL_HANDLE;
-  VkDeviceSize size;
-  VkBufferUsageFlags flags;
-  VmaMemoryUsage usage;
-  VmaAllocation alloc;
-  VmaAllocationInfo alloc_info;
-
-  Buffer(VkBufferUsageFlags flags_)
-      : size(0), flags(flags_), usage(VMA_MEMORY_USAGE_AUTO) {}
+  Buffer(VkBufferUsageFlags flags_) : size(0), flags(flags_) {}
   Buffer(VkDeviceSize size_, VkBufferUsageFlags flags_, VmaMemoryUsage usage_)
       : size(size_), flags(flags_), usage(usage_) {}
 
+  VkBuffer buffer{VK_NULL_HANDLE};
+  VmaAllocation alloc{VK_NULL_HANDLE};
+  VmaAllocationInfo alloc_info{};
+  VkBufferUsageFlags flags{0};
+  VmaMemoryUsage usage{VMA_MEMORY_USAGE_AUTO};
+  VkDeviceSize size{0};
+
   uint64_t size_device() const override { return size; }
 
-  bool is_reserved() const override { return (buffer == VK_NULL_HANDLE); };
-  void reserve(const Backend& backend) override;
-  void reserve(VkDeviceSize size_, const Backend& backend);
-  void release(const Backend& backend) override;
-  void upload(const void* src,
-              uint64_t offset,
-              uint64_t size_,
-              const Backend& backend);
+  bool on_device() const override { return buffer != VK_NULL_HANDLE; }
 };
 
 }  // namespace xev

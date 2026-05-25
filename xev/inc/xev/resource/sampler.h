@@ -3,13 +3,18 @@
 
 namespace xev {
 
-class Sampler : Resource {
+enum SamplerType {
+  SAMPLER_LINEAR,
+};
+
+constexpr float MAX_SAMPLER_ANISOTROPY = 1.0;
+
+class Sampler : public Resource {
  public:
-  uint64_t size_device() const override;
-  bool is_reserved() const override;
-  void reserve(const Backend& backend) override;
-  void release(const Backend& backend) override;
-  void upload(const Backend& backend);
+  uint64_t size_device() const override { return 0; }
+  bool on_device() const override { return sampler != VK_NULL_HANDLE; }
+  VkSampler sampler{VK_NULL_HANDLE};
+  SamplerType type{SAMPLER_LINEAR};
 };
 
 }  // namespace xev

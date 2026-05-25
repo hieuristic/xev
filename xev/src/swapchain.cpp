@@ -1,26 +1,24 @@
-#include <xev/m_device.h>
 #include <xev/swapchain.h>
+#include <xev/logger.h>
 
 namespace xev {
+
 Swapchain::Swapchain(VkPhysicalDevice physical_device,
                      VkSurfaceKHR surface,
                      VkDevice device,
-                     QueueFamily queue_family)
-    : m_physical_device(physical_device),
-      m_device(device),
-      m_surface(surface) m_queue_family(queue_family),
-{
+                     uint32_t graphics_family_idx,
+                     uint32_t present_family_idx)
+    : m_device(device),
+      m_physical_device(physical_device),
+      m_surface(surface),
+      m_graphics_family_idx(graphics_family_idx),
+      m_present_family_idx(present_family_idx) {
   XEV_ASSERT(surface != VK_NULL_HANDLE);
   init_swapchain();
   create_images();
-  for (auto& frame : m_frames)
-    create_frame(frame);
 }
 
 Swapchain::~Swapchain() {
-  for (auto& frame : m_frames)
-    Swapchain::destroy_frame(frame);
-
   destroy_images();
 
   if (m_swapchain != VK_NULL_HANDLE)
@@ -29,12 +27,6 @@ Swapchain::~Swapchain() {
 
 void Swapchain::init_swapchain() {
   VkResult res_;
-  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-
-  if (!m_queue_family.isComplete()) {
-    XEV_ERROR("Queue families incomplete for swapchain");
-    return;
-  }
 
   VkSurfaceCapabilitiesKHR capabilities;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_device, m_surface,
@@ -44,7 +36,7 @@ void Swapchain::init_swapchain() {
   vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_device, m_surface,
                                        &format_count, nullptr);
   if (format_count == 0) {
-    XEV_ERROR("No m_surface formats supported");
+    XEV_ERROR("No surface formats supported");
   }
   std::vector<VkSurfaceFormatKHR> formats(format_count);
   vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_device, m_surface,
@@ -54,7 +46,7 @@ void Swapchain::init_swapchain() {
   vkGetPhysicalDeviceSurfacePresentModesKHR(m_physical_device, m_surface,
                                             &present_mode_count, nullptr);
   if (present_mode_count == 0) {
-    XEV_ERROR("No m_surface present modes supported");
+    XEV_ERROR("No surface present modes supported");
   }
   std::vector<VkPresentModeKHR> present_modes(present_mode_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -69,8 +61,8 @@ void Swapchain::init_swapchain() {
     }
   }
 
-  if (surface_format.format != m_ideal_format.format ||
-      surface_format.colorSpace != m_ideal_format.colorSpace) {
+  if (m_surface_format.format != m_ideal_format.format ||
+      m_surface_format.colorSpace != m_ideal_format.colorSpace) {
     XEV_ERROR("Ideal format not supported by swapchain");
   }
 
@@ -82,7 +74,8 @@ void Swapchain::init_swapchain() {
     }
   }
 
-  m_extent = capabilities.currentExtent;
+  height = capabilities.currentExtent.height;
+  width = capabilities.currentExtent.width;
 
   uint32_t image_count = capabilities.minImageCount + 1;
   if (capabilities.maxImageCount > 0 &&
@@ -90,16 +83,16 @@ void Swapchain::init_swapchain() {
     image_count = capabilities.maxImageCount;
   }
 
-  XEV_INFO("image count supported for swapchain {}",
+  XEV_INFO("Image count supported for swapchain: {}",
            capabilities.minImageCount);
 
   VkSwapchainCreateInfoKHR swapchain_info{
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-      .m_surface = m_surface,
+      .surface = m_surface,
       .minImageCount = image_count,
-      .imageFormat = surface_format.format,
-      .imageColorSpace = surface_format.colorSpace,
-      .imageExtent = m_extent,
+      .imageFormat = m_surface_format.format,
+      .imageColorSpace = m_surface_format.colorSpace,
+      .imageExtent = {width, height},
       .imageArrayLayers = 1,
       .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
       .preTransform = capabilities.currentTransform,
@@ -109,12 +102,11 @@ void Swapchain::init_swapchain() {
       .oldSwapchain = VK_NULL_HANDLE,
   };
 
-  uint32_t queue_family_indices[] = {m_queue_family.graphics.value().idx,
-                                     m_queue_family.pre.value().idx};
-  if (m_queue_family.graphics.value().idx != m_queue_family.pre.value().idx) {
+  uint32_t queueFamilyIndices[] = {m_graphics_family_idx, m_present_family_idx};
+  if (m_graphics_family_idx != m_present_family_idx) {
     swapchain_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     swapchain_info.queueFamilyIndexCount = 2;
-    swapchain_info.pQueueFamilyIndices = queue_family_indices;
+    swapchain_info.pQueueFamilyIndices = queueFamilyIndices;
   } else {
     swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   }
@@ -124,6 +116,7 @@ void Swapchain::init_swapchain() {
 }
 
 void Swapchain::create_images() {
+  VkResult res_;
   uint32_t cnt;
   vkGetSwapchainImagesKHR(m_device, m_swapchain, &cnt, nullptr);
   std::vector<VkImage> images(cnt);
@@ -133,9 +126,9 @@ void Swapchain::create_images() {
   for (uint32_t i = 0; i < cnt; i++) {
     VkImageViewCreateInfo view_info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = m_images[i],
+        .image = images[i],
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = surface_format.format,
+        .format = m_surface_format.format,
         .components = {VK_COMPONENT_SWIZZLE_IDENTITY,
                        VK_COMPONENT_SWIZZLE_IDENTITY,
                        VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -154,8 +147,8 @@ void Swapchain::create_images() {
     res_ = vkCreateImageView(m_device, &view_info, nullptr, &view);
     XEV_ASSERT_VK(res_, "Failed to create swapchain image view!");
 
-    m_images.emplace_back(Image(images[i], view, m_extent.width,
-                                m_extent.height, VK_FORMAT_B8G8R8A8_SRGB,
+    m_images.emplace_back(Image(images[i], view, width, height,
+                                m_surface_format.format,
                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT));
   }
 }
@@ -174,178 +167,38 @@ void Swapchain::reinit_swapchain() {
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
 
   init_swapchain();
-}
-
-void Swapchain::create_frame(Swapchain::Frame& frame) {
-  VkResult res_;
-
-  {  // command pool
-    VkCommandPoolCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = m_queue_family.graphics.value().idx,
-    };
-    res_ = vkCreateCommandPool(m_device, &info, nullptr, &frame.pool);
-    XEV_ASSERT_VK(res_, "Failed to create frame command pool");
-  }
-
-  {  // command buffer
-    VkCommandBufferAllocateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = m_frames[i].cmd_pool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-    res_ = vkAllocateCommandBuffers(m_device, &info, &frame.render_cmdbuf);
-    XEV_ASSERT_VK(res_, "Failed to allocate frame command buffer");
-  }
-
-  {  // fence for command buffer
-    VkFenceCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-    res_ = vkCreateFence(m_device, &info, nullptr, &frame.render_fence);
-    XEV_ASSERT_VK(res_, "Failed to create frame render fence");
-  }
-
-  {  // semaphores for render and present
-    VkSemaphoreCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    };
-    res_ = vkCreateSemaphore(m_device, &info, nullptr, &frame.render_sem);
-    XEV_ASSERT_VK(res_, "Failed to create frame drawn semaphore");
-    res_ = vkCreateSemaphore(m_device, &info, nullptr, &frame.present_sem);
-    XEV_ASSERT_VK(res_, "Failed to create frame image semaphore");
-  }
-}
-
-void Swapchain::destroy_frame(Swapchain::Frame& frame) {
-  vkDestroyFence(m_device, frame.render_fence, nullptr);
-  vkDestroySemaphore(m_device, frame.render_sem, nullptr);
-  vkDestroySemaphore(m_device, frame.present_sem, nullptr);
-  vkDestroyCommandPool(m_device, frame.cmd_pool, nullptr);
-}
-
-VkCommandBuffer Swapchain::acquire_frame() {
-  VkResult res_;
-  const Swapchain::Frame& frame = m_frames[m_frame_idx];
-  res_ = vkWaitForFences(m_device, 1, &frame.render_fence, VK_TRUE, NO_TIMEOUT);
-  XEV_ASSERT_VK(res_, "Failed to acquire frame");
-
-  VkCommandBufferBeginInfo info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-  res_ = vkBeginCommandBuffer(frame.render_cmdbuf, &info);
-  XEV_ASSERT_VK(res_, "Failed to begin command buffer");
-
-  return frame.render_cmdbuf;
+  create_images();
+  m_is_swapchain_dirty = false;
 }
 
 const Image& Swapchain::acquire_image(VkSemaphore swapchain_sem) {
   VkResult res_;
-  uint32_t idx;
-  res_ = vkAcquireNextImageKHR(m_device, m_swapchain, NO_TIMEOUT, swapchain_sem,
-                               VK_NULL_HANDLE, &idx);
-  // if (res_ == VK_ERROR_OUT_OF_DATE_KHR || res_ == VK_SUBOPTIMAL_KHR) {
-  //   m_is_swapchain_dirty = true;
-  XEV_ASSERT_VK(res_, "Failed to acquire swapchain image");
-  return m_images[idx];
+  res_ = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, swapchain_sem,
+                               VK_NULL_HANDLE, &m_acquired_idx);
+  if (res_ == VK_ERROR_OUT_OF_DATE_KHR) {
+    m_is_swapchain_dirty = true;
+  } else if (res_ != VK_SUCCESS && res_ != VK_SUBOPTIMAL_KHR) {
+    XEV_ASSERT_VK(res_, "Failed to acquire swapchain image");
+  }
+  return m_images[m_acquired_idx];
 }
 
-void Swapchain::release_frame() {
-  VkResult res_;
+void Swapchain::present(VkQueue queue, VkSemaphore wait_sem) {
+  VkPresentInfoKHR info = {
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &wait_sem,
+      .swapchainCount = 1,
+      .pSwapchains = &m_swapchain,
+      .pImageIndices = &m_acquired_idx,
+  };
 
-  const Swapchain::Frame& frame = m_frames[m_frame_idx];
-  const Image& image = acquire_image(frame.swapchain_sem);
-
-  // reset fence
-  XEV_ASSERT_VK(vkResetFences(m_device, 1, &current_frame.fence_render));
-
-  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-  // clearing
-  layout = common::update_layout(cmd, swapchain_image, layout,
-                                 VK_IMAGE_LAYOUT_GENERAL);
-
-  VkImageSubresourceRange swapchain_range =
-      common::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-  VkClearColorValue clear_val = {{args.clear_color[0], args.clear_color[1],
-                                  args.clear_color[2], args.clear_color[3]}};
-
-  vkCmdClearColorImage(cmd, swapchain_image, VK_IMAGE_LAYOUT_GENERAL,
-                       &clear_val, 1, &swapchain_range);
-
-  // copy to swapchain
-  // NOTE: image is already in TRANSFER_SRC_OPTIMAL — Renderer3D transitions it
-  // at the end of draw(). Do NOT re-issue the barrier with a wrong oldLayout.
-  if (args.copy_to_swapchain && image.image != VK_NULL_HANDLE) {
-    // XEV_INFO("This is executed.");
-    layout = common::update_layout(cmd, swapchain_image, layout,
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    common::copy_image(cmd, image.image, swapchain_image,
-                       {image.width, image.height}, m_extent, args.filter);
+  VkResult res_ = vkQueuePresentKHR(queue, &info);
+  if (res_ == VK_ERROR_OUT_OF_DATE_KHR || res_ == VK_SUBOPTIMAL_KHR) {
+    m_is_swapchain_dirty = true;
+  } else if (res_ != VK_SUCCESS) {
+    XEV_ERROR("Failed to present: {}", (int)res_);
   }
-
-  // present
-  layout = common::update_layout(cmd, swapchain_image, layout,
-                                 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-  XEV_ASSERT_VK(vkEndCommandBuffer(cmd));
-
-  {  // submit
-    VkSemaphoreSubmitInfo wait_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = frame.swapchain_sema,
-        .value = 1,
-        .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
-        .deviceIndex = 0,
-    };
-    VkSemaphoreSubmitInfo signal_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = frame.render_sema,
-        .value = 1,
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-        .deviceIndex = 0,
-    };
-
-    VkCommandBufferSubmitInfo info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-        .commandBuffer = cmd,
-    };
-    VkSubmitInfo2 info2 = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .waitSemaphoreInfoCount = 1,
-        .pWaitSemaphoreInfos = &wait_info,
-        .commandBufferInfoCount = 1,
-        .pCommandBufferInfos = &info,
-        .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &signal_info,
-    };
-    XEV_ASSERT_VK(
-        vkQueueSubmit2(m_gfx_queue, 1, &info2, current_frame.fence_render));
-  }
-
-  {  // present
-    VkPresentInfoKHR info = {
-        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &current_frame.sem_render,
-        .swapchainCount = 1,
-        .pSwapchains = &m_swapchain,
-        .pImageIndices = &img_idx,
-    };
-
-    res_ = vkQueuePresentKHR(m_gfx_queue, &info);
-    if (res_ != VK_SUCCESS) {
-      m_is_swapchain_dirty = true;
-      if (res_ != VK_SUBOPTIMAL_KHR) {
-        XEV_ERROR("Failed to present {}", (int)res_);
-      }
-    }
-  }
-
-  m_current_frame_idx = (m_current_frame_idx + 1) % NUM_FRAME_OVERLAP;
 }
 
 }  // namespace xev

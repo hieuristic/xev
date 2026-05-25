@@ -4,31 +4,9 @@
 
 namespace xev {
 
-void Image::reserve(uint32_t width_,
-                    uint32_t height_,
-                    const ResourceManager& manager) {
-  width = width_;
-  height = height_;
-  manager.reserve_image(image, view, alloc, alloc_info, width, heigth, format,
-                        flags);
-}
-
-void Image::reserve(const ResourceManager& manager) {
-  manager.reserve_image(image, view, alloc, alloc_info, width, heigth, format,
-                        flags);
-}
-
-void Image::release(const ResourceManager& manager) {
-  manager.release_image(image, alloc, view);
-}
-
 void Image::set_layout(const VkImageLayout& layout_) {
   XEV_ASSERT(layout == VK_IMAGE_LAYOUT_UNDEFINED);
   layout = layout_;
-}
-
-void Image::upload() {
-  // TODO
 }
 
 void Image::update_layout(const VkCommandBuffer& cmd,
@@ -62,9 +40,9 @@ void Image::update_layout(const VkCommandBuffer& cmd,
   vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void Image::copy(const VkCommandBuffer& cmd,
-                 const Image& src,
-                 const VkFilter& filter) {
+void Image::blit_to(const VkCommandBuffer& cmd,
+                    const Image& src,
+                    const VkFilter& filter) {
   VkImageBlit2 region = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
       .srcSubresource =

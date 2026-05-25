@@ -1,5 +1,7 @@
 #pragma once
-#include <unique_ptr>
+#include <memory>
+
+struct SDL_Window;
 
 namespace xev {
 
@@ -8,6 +10,7 @@ class Swapchain;
 class ResourceManager;
 class PipelineManager;
 class GlobalDescriptorSet;
+class FrameContext;
 
 class Engine {
  public:
@@ -26,11 +29,13 @@ class Engine {
   std::unique_ptr<ResourceManager> resource_manager;
   std::unique_ptr<PipelineManager> pipeline_manager;
   std::unique_ptr<GlobalDescriptorSet> global_decriptor_set;
+  std::unique_ptr<FrameContext> frame_context;
 
   void init_swapchain();
   void init_resource_manager();
   void init_pipeline_manager();
   void init_global_descriptor_set();
-}
+  void init_renderer();
+};
 
 }  // namespace xev

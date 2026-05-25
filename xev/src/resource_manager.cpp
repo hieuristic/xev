@@ -1,4 +1,8 @@
+#include <xev/resource/buffer.h>
+#include <xev/resource/image.h>
+#include <xev/resource/sampler.h>
 #include <xev/resource_manager.h>
+#include <xev/logger.h>
 
 namespace xev {
 
@@ -36,59 +40,51 @@ void ResourceManager::init_allocator(VkInstance instance,
   XEV_ASSERT_VK(res_, "Failed to create VMA");
 }
 
-void ResourceManager::reserve_buffer(VkBuffer& buffer,
-                                     VmaAllocation& alloc,
-                                     VmaAllocationInfo& alloc_info,
-                                     VkDeviceSize size,
-                                     VkBufferUsageFlags flags,
-                                     VmaMemoryUsage mem_usage) const {
+void ResourceManager::alloc(Buffer& buf) {
+  XEV_ASSERT(buf.size != 0, "Trying to allocate an empty buffer.");
+
   VkBufferCreateInfo buffer_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-      .size = size,
-      .usage = flags,
+      .size = buf.size,
+      .usage = buf.flags,
   };
 
   VmaAllocationCreateInfo create_info = {
       .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-      .usage = mem_usage,
+      .usage = buf.usage,
   };
 
   VkResult res_ = vmaCreateBuffer(m_allocator, &buffer_info, &create_info,
-                                  &buffer, &alloc, &alloc_info);
+                                  &buf.buffer, &buf.alloc, &buf.alloc_info);
 
   XEV_ASSERT_VK(res_, "Failed to create buffer");
 }
 
-void ResourceManager::release_buffer(VkBuffer buffer,
-                                     VmaAllocation alloc) const {
-  vmaDestroyBuffer(m_allocator, buffer, alloc);
+void ResourceManager::free(Buffer& buf) {
+  vmaDestroyBuffer(m_allocator, buf.buffer, buf.alloc);
 }
 
-void ResourceManager::upload_buffer(const void* src,
-                                    const VmaAllocation& dst_alloc,
-                                    uint64_t offset,
-                                    uint64_t size) const {
-  vmaCopyMemoryToAllocation(m_allocator, src, dst, offset, size);
+void ResourceManager::upload(Buffer& buf,
+                             const void* src,
+                             uint64_t offset,
+                             uint64_t size) {
+  vmaCopyMemoryToAllocation(m_allocator, src, buf.alloc, offset, size);
 }
 
-void ResourceManager::reserve_image(VkImage& image,
-                                    VmaAllocation& alloc,
-                                    VmaAllocationInfo& alloc_info,
-                                    uint32_t width,
-                                    uint32_t height,
-                                    VkFormat format,
-                                    VkImageUsageFlags flags) const {
+void ResourceManager::alloc(Image& img) {
+  XEV_ASSERT(img.width != 0 && img.height != 0);
+
   VkImageCreateInfo image_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .imageType = VK_IMAGE_TYPE_2D,
-      .format = format,
-      .extent = {width, height, 1},
+      .format = img.format,
+      .extent = {img.width, img.height, 1},
       .mipLevels = 1,
       .arrayLayers = 1,
       .samples = VK_SAMPLE_COUNT_1_BIT,
       .tiling = VK_IMAGE_TILING_OPTIMAL,
-      .usage = flags,
+      .usage = img.flags,
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
 
@@ -96,23 +92,23 @@ void ResourceManager::reserve_image(VkImage& image,
       .usage = VMA_MEMORY_USAGE_GPU_ONLY,
   };
 
-  VkResult res_ = vmaCreateImage(m_allocator, &image_info, &create_info, &image,
-                                 &alloc, &alloc_info);
+  VkResult res_ = vmaCreateImage(m_allocator, &image_info, &create_info,
+                                 &img.image, &img.alloc, &img.alloc_info);
   XEV_ASSERT_VK(res_, "Failed to allocate image");
 
   VkImageAspectFlags aspect_mask = 0;
-  if (flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+  if (img.flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
     aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
-  if (flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+  if (img.flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
     aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  if (flags & VK_IMAGE_USAGE_SAMPLED_BIT && aspect_mask == 0)
+  if (img.flags & VK_IMAGE_USAGE_SAMPLED_BIT && aspect_mask == 0)
     aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
 
   VkImageViewCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = image,
+      .image = img.image,
       .viewType = VK_IMAGE_VIEW_TYPE_2D,
-      .format = format,
+      .format = img.format,
       .subresourceRange =
           {
               .aspectMask = aspect_mask,
@@ -123,20 +119,44 @@ void ResourceManager::reserve_image(VkImage& image,
           },
   };
 
-  VkResult res_ = vkCreateImageView(m_device, &info, nullptr, &view);
+  VkResult res_ = vkCreateImageView(m_device, &info, nullptr, &img.view);
   XEV_ASSERT_VK(res_, "Failed to create image view");
 }
 
-void ResourceManager::release_image(VkImage& image,
-                                    VmaAllocation& alloc) const {
-  if (view != VK_NULL_HANDLE) {
-    vkDestroyImageView(m_device, view, nullptr);
-    view = VK_NULL_HANDLE;
+void ResourceManager::free(Image& img) {
+  if (img.view != VK_NULL_HANDLE) {
+    vkDestroyImageView(m_device, img.view, nullptr);
+    img.view = VK_NULL_HANDLE;
   }
-  if (image != VK_NULL_HANDLE) {
-    vmaDestroyImage(m_allocator, image, alloc);
-    image = VK_NULL_HANDLE;
+  if (img.image != VK_NULL_HANDLE) {
+    vmaDestroyImage(m_allocator, img.image, img.alloc);
+    img.image = VK_NULL_HANDLE;
   }
+}
+
+void ResourceManager::alloc(VkSampler& sampler, SamplerType type) {
+  VkSamplerCreateInfo info = {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .anisotropyEnable = VK_TRUE,
+      .maxAnisotropy = MAX_SAMPLER_ANISOTROPY,
+  };
+
+  switch (type) {
+    case SamplerType::SAMPLER_LINEAR:
+      info.magFilter = VK_FILTER_LINEAR;
+      info.minFilter = VK_FILTER_LINEAR;
+      info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+      info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      break;
+  }
+
+  VkResult res_ = vkCreateSampler(m_device, &info, nullptr, &sampler);
+  XEV_ASSERT_VK(res_, "Failed to create sampler");
+}
+
+void ResourceManager::free(VkSampler& sampler) {
+  vkDestroySampler(m_device, sampler);
 }
 
 }  // namespace xev

@@ -1,5 +1,4 @@
 #pragma once
-#include <xev/backend.h>
 #include <xev/camera.h>
 #include <xev/pipeline/pipeline.h>
 #include <xev/resource/scene.h>
