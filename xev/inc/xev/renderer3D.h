@@ -1,20 +1,23 @@
 #pragma once
 #include <xev/pipeline/pipeline_mesh.h>
 #include <xev/resource/image.h>
+#include <xev/color.h>
 
 namespace xev {
 
+class PipelineManager;
+
 class Renderer3D {
  public:
-  Renderer3D(PipelineManager& pipeline_manager_);
+  Renderer3D(PipelineManager& pipeline_manager_, VkDescriptorSetLayout global_layout);
   ~Renderer3D();
 
   void draw(VkCommandBuffer cmd,
             const Image& image,
             const Scene& scene,
             const Camera& camera,
-            const FrameArg& arg);
-  void draw_mesh(VkCommandBuffer cmd, const Scene& scene, const Camera& camera);
+            Color4<float> clear_color);
+  void draw_mesh(VkCommandBuffer cmd, const Scene& scene, const Camera& camera, VkExtent2D extent);
 
  public:
   // in sync with scene.slang
@@ -40,7 +43,12 @@ class Renderer3D {
   };
 
  private:
-  std::shared_ptr<Backend> m_backend;
+  void prepare_image(VkCommandBuffer& cmd, const Image& image);
+  void prepare_transfer(VkCommandBuffer& cmd, const Image& image);
+  void begin_render(VkCommandBuffer& cmd, const Image& image, const Color4<float> clear_color);
+  void end_render(VkCommandBuffer& cmd);
+
+  PipelineManager& m_pipeline_manager;
   PipelineMesh m_pipeline_mesh;
   std::vector<PipelineMesh::Command> m_mesh_cmds;
 

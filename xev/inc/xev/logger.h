@@ -14,11 +14,12 @@ void InitLogger();
 #define XEV_WARN(...) spdlog::warn(__VA_ARGS__)
 #define XEV_DEBUG(...) spdlog::debug(__VA_ARGS__)
 
-#define XEV_ASSERT(expr)                                                  \
+#define XEV_ASSERT(expr, ...)                                             \
     do {                                                                  \
         if (!(expr)) {                                                    \
             spdlog::critical("[" __FILE__ ":" XEV_STR(__LINE__) "] "      \
                              "Assertion failed: " #expr);                 \
+            spdlog::critical("" __VA_ARGS__);                             \
             std::abort();                                                 \
         }                                                                 \
     } while (0)
@@ -27,6 +28,7 @@ void InitLogger();
     do {                               \
         if ((res_) != VK_SUCCESS) {    \
             XEV_ERROR(__VA_ARGS__);    \
+            std::abort();              \
         }                              \
     } while (0)
 

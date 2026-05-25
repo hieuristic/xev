@@ -1,5 +1,6 @@
 #include <xev/logger.h>
 #include <xev/resource/scene.h>
+#include <xev/resource_manager.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <limits>
 
@@ -179,7 +180,7 @@ void Scene::load_gltf(std::string_view filepath) {
     XEV_ERROR("Failed to load glTF: {}", path);
     return;
   }
-  if (is_reserved()) {
+  if (on_device()) {
     XEV_ERROR("Loading glTF into an active scene. Please call .release().");
     return;
   }
@@ -191,27 +192,27 @@ void Scene::load_gltf(std::string_view filepath) {
   for (const auto& gltf_mat : model.materials) {
     Material mat;
 
-    material.name = gltf_material.name;
+    mat.name = gltf_mat.name;
 
-    material.base_color =
-        Color4(gltf_material.pbrMetallicRoughness.baseColorFactor);
-    material.metal_coef =
-        static_cast<float>(gltf_material.pbrMetallicRoughness.metallicFactor);
-    material.rough_coef =
-        static_cast<float>(gltf_material.pbrMetallicRoughness.roughnessFactor);
+    mat.base_color =
+        Color4(gltf_mat.pbrMetallicRoughness.baseColorFactor);
+    mat.metal_coef =
+        static_cast<float>(gltf_mat.pbrMetallicRoughness.metallicFactor);
+    mat.rough_coef =
+        static_cast<float>(gltf_mat.pbrMetallicRoughness.roughnessFactor);
 
-    material.diffuse_texid =
-        gltf_material.pbrMetallicRoughness.baseColorTexture.index;
-    material.metallic_roughness_texid =
-        gltf_material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+    mat.diffuse_texid =
+        gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
+    mat.metallic_roughness_texid =
+        gltf_mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
     materials.emplace_back(mat);
   }
 
   // parse texture
   for (const auto& gltf_tex : model.textures) {
     // TODO
-    XEV_INFO("TEXTURE: {}x{}x{} {}-bits", gltf_tex.width, gltf_tex.height,
-             gltf_tex.component, gltf_tex.bits);
+    // XEV_INFO("TEXTURE: {}x{}x{} {}-bits", gltf_tex.width, gltf_tex.height,
+    //          gltf_tex.component, gltf_tex.bits);
     // Texture(name,
     //
     // tex.name = gltf_tex.name;
@@ -317,62 +318,70 @@ uint64_t Scene::size_device() const {
   return total_size;
 }
 
-bool Scene::is_reserved() const {
+bool Scene::on_device() const {
   if (meshes.size() == 0)
     return false;
 
   bool res = true;
   for (const auto& mesh : meshes) {
-    res &= mesh.is_reserved();
+    res &= mesh.on_device();
   }
   return res;
 }
 
-void Scene::reserve(const Backend& backend) {
-  m_scene_buffer.reserve(sizeof(Scene::SceneBuffer), backend);
-  m_light_buffer.reserve(sizeof(Light) * lights.size(), backend);
+void Scene::reserve(const ResourceManager& manager) {
+  scene_buffer_device.size = sizeof(Scene::SceneBuffer);
+  manager.alloc(scene_buffer_device);
+
+  if (!lights.empty()) {
+    light_buffer_device.size = sizeof(Light) * lights.size();
+    manager.alloc(light_buffer_device);
+  }
 
   for (auto& tex : textures) {
-    if (!tex.is_reserved())
-      tex.reserve(backend);
+    if (!tex.on_device())
+      manager.alloc(tex);
   }
   for (auto& mesh : meshes) {
-    if (!mesh.is_reserved())
-      mesh.reserve(backend);
+    if (!mesh.on_device())
+      mesh.alloc(manager);
   }
 }
 
-void Scene::release(const Backend& backend) {
+void Scene::release(const ResourceManager& manager) {
+  manager.free(scene_buffer_device);
+  manager.free(light_buffer_device);
+
   for (auto& tex : textures) {
-    if (tex.is_reserved())
-      tex.release(backend);
+    if (tex.on_device())
+      manager.free(tex);
   }
 
   for (auto& mesh : meshes) {
-    if (mesh.is_reserved())
-      mesh.release(backend);
+    if (mesh.on_device())
+      mesh.free(manager);
   }
 }
 
-void upload_textures(const Backend& backend) {
-  for (const auto& tex : textures)
-    tex.upload(backend);
+void Scene::upload_textures(const ResourceManager& manager) {
+  // Direct image uploading not implemented yet
 }
 
-void upload_meshes(const Backend& backend) {
-  for (const auto& mesh : meshes)
-    mesh.upload(backend);
+void Scene::upload_meshes(const ResourceManager& manager) {
+  for (auto& mesh : meshes)
+    mesh.upload(manager);
 }
 
-void upload_lights(const Backend& backend) {
+void Scene::upload_lights(const ResourceManager& manager) {
+  if (lights.empty()) return;
   uint64_t size = lights.size() * sizeof(lights[0]);
-  m_light_buffer.upload(lights.size(), 0, size, backend);
+  manager.upload(light_buffer_device, lights.data(), 0, size);
 }
 
-void Scene::upload(const Backend& backend) {
-  upload_meshes(backend);
-  upload_textures(backend);
-  upload_lights(backend);
+void Scene::upload(const ResourceManager& manager) {
+  upload_meshes(manager);
+  upload_textures(manager);
+  upload_lights(manager);
 }
 
 void Scene::create_test_triangle() {
@@ -419,8 +428,8 @@ void Scene::create_test_triangle() {
   }
 }
 
-void Scene::destroy(const Backend& backend) {
-  release(backend);
+void Scene::destroy(const ResourceManager& manager) {
+  release(manager);
   meshes.clear();
 }
 

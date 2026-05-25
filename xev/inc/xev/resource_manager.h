@@ -20,14 +20,14 @@ class ResourceManager {
   ResourceManager(ResourceManager&&) = default;
   ResourceManager& operator=(ResourceManager&&) = default;
 
-  void alloc(Buffer& buf);
-  void alloc(Image& img);
-  void free(Buffer& buf);
-  void free(Image& img);
-  void upload(Buffer& buf, const void* src, uint64_t offset, uint64_t size);
+  void alloc(Buffer& buf) const;
+  void alloc(Image& img) const;
+  void free(Buffer& buf) const;
+  void free(Image& img) const;
+  void upload(Buffer& buf, const void* src, uint64_t offset, uint64_t size) const;
 
-  void alloc(VkSampler& sampler, SamplerType type);
-  void free(VkSampler& sampler);
+  void alloc(VkSampler& sampler, SamplerType type) const;
+  void free(VkSampler& sampler) const;
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};

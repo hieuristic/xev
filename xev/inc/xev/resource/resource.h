@@ -6,6 +6,7 @@ namespace xev {
 class Backend;
 
 class Resource {
+ public:
   virtual uint64_t size_device() const = 0;
   virtual bool on_device() const = 0;
 };

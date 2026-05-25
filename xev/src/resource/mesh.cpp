@@ -1,5 +1,6 @@
 #include <xev/logger.h>
 #include <xev/resource/mesh.h>
+#include <xev/resource_manager.h>
 
 namespace xev {
 
@@ -29,7 +30,7 @@ const std::vector<Mesh::MeshPrimitive>& Mesh::get_primitives() const {
 }
 
 void Mesh::alloc(const ResourceManager& manager) {
-  if (m_is_alloced) {
+  if (m_on_device) {
     XEV_WARN("Mesh '{}' already on GPU, skipping reserve", m_name);
     return;
   }

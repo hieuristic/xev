@@ -40,7 +40,7 @@ void ResourceManager::init_allocator(VkInstance instance,
   XEV_ASSERT_VK(res_, "Failed to create VMA");
 }
 
-void ResourceManager::alloc(Buffer& buf) {
+void ResourceManager::alloc(Buffer& buf) const {
   XEV_ASSERT(buf.size != 0, "Trying to allocate an empty buffer.");
 
   VkBufferCreateInfo buffer_info = {
@@ -61,18 +61,18 @@ void ResourceManager::alloc(Buffer& buf) {
   XEV_ASSERT_VK(res_, "Failed to create buffer");
 }
 
-void ResourceManager::free(Buffer& buf) {
+void ResourceManager::free(Buffer& buf) const {
   vmaDestroyBuffer(m_allocator, buf.buffer, buf.alloc);
 }
 
 void ResourceManager::upload(Buffer& buf,
                              const void* src,
                              uint64_t offset,
-                             uint64_t size) {
+                             uint64_t size) const {
   vmaCopyMemoryToAllocation(m_allocator, src, buf.alloc, offset, size);
 }
 
-void ResourceManager::alloc(Image& img) {
+void ResourceManager::alloc(Image& img) const {
   XEV_ASSERT(img.width != 0 && img.height != 0);
 
   VkImageCreateInfo image_info = {
@@ -119,11 +119,11 @@ void ResourceManager::alloc(Image& img) {
           },
   };
 
-  VkResult res_ = vkCreateImageView(m_device, &info, nullptr, &img.view);
+  res_ = vkCreateImageView(m_device, &info, nullptr, &img.view);
   XEV_ASSERT_VK(res_, "Failed to create image view");
 }
 
-void ResourceManager::free(Image& img) {
+void ResourceManager::free(Image& img) const {
   if (img.view != VK_NULL_HANDLE) {
     vkDestroyImageView(m_device, img.view, nullptr);
     img.view = VK_NULL_HANDLE;
@@ -134,7 +134,7 @@ void ResourceManager::free(Image& img) {
   }
 }
 
-void ResourceManager::alloc(VkSampler& sampler, SamplerType type) {
+void ResourceManager::alloc(VkSampler& sampler, SamplerType type) const {
   VkSamplerCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .anisotropyEnable = VK_TRUE,
@@ -155,8 +155,8 @@ void ResourceManager::alloc(VkSampler& sampler, SamplerType type) {
   XEV_ASSERT_VK(res_, "Failed to create sampler");
 }
 
-void ResourceManager::free(VkSampler& sampler) {
-  vkDestroySampler(m_device, sampler);
+void ResourceManager::free(VkSampler& sampler) const {
+  vkDestroySampler(m_device, sampler, nullptr);
 }
 
 }  // namespace xev

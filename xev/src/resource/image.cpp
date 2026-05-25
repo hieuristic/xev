@@ -1,6 +1,7 @@
 #include <xev/common.h>
 #include <xev/resource/image.h>
 #include <xev/resource_manager.h>
+#include <xev/logger.h>
 
 namespace xev {
 
@@ -40,9 +41,9 @@ void Image::update_layout(const VkCommandBuffer& cmd,
   vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void Image::blit_to(const VkCommandBuffer& cmd,
-                    const Image& src,
-                    const VkFilter& filter) {
+void Image::blit_from(const VkCommandBuffer& cmd,
+                      const Image& src,
+                      const VkFilter& filter) {
   VkImageBlit2 region = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
       .srcSubresource =

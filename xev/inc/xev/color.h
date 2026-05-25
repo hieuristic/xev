@@ -108,9 +108,9 @@ class Color {
   }
 };
 
-template <typename T>
+template <typename T = float>
 using Color3 = Color<T, 3>;
-template <typename T>
+template <typename T = float>
 using Color4 = Color<T, 4>;
 
 }  // namespace xev

@@ -1,15 +1,21 @@
+#include <xev/pipeline_manager.h>
+#include <xev/pipeline/pipeline_mesh.h>
+#include <xev/logger.h>
+#include <fstream>
+#include <vector>
 
 namespace xev {
 
 void PipelineManager::create(PipelineMesh& pipe,
                              VkFormat format_color,
                              VkFormat format_depth,
+                             VkDescriptorSetLayout global_layout,
                              VkSampleCountFlagBits sample_count) const {
-  ;
+  pipe.create(m_device, format_color, format_depth, global_layout, sample_count);
 }
 
 void PipelineManager::destroy(PipelineMesh& pipe) const {
-  ;
+  pipe.destroy(m_device);
 }
 
 void PipelineManager::create(VkShaderModule& mod, const char* path) const {
@@ -37,7 +43,7 @@ void PipelineManager::create(VkShaderModule& mod, const char* path) const {
   XEV_ASSERT_VK(res_, "Failed to load shader module");
 }
 
-void destroy(VkShaderModule& mod) const {
+void PipelineManager::destroy(VkShaderModule& mod) const {
   if (mod != VK_NULL_HANDLE) {
     vkDestroyShaderModule(m_device, mod, nullptr);
     mod = VK_NULL_HANDLE;

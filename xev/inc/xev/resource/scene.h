@@ -5,7 +5,8 @@
 #include <xev/resource/material.h>
 #include <xev/resource/mesh.h>
 #include <xev/resource/resource.h>
-#include <xev/resource/texture.h>
+#include <xev/resource/image.h>
+#include <xev/resource/sampler.h>
 #include <glm/glm.hpp>
 #include <queue>
 #include <string>
@@ -23,30 +24,30 @@ namespace xev {
 
 class Backend;
 
-class Scene : Resource {
+class Scene : public Resource {
  public:
   Scene();
-  void destroy(const Backend& backend);
+  void destroy(const ResourceManager& manager);
 
   void load_gltf(std::string_view filepath);
   void create_test_triangle();
 
   uint64_t size_device() const override;
 
-  bool is_reserved() const override;
-  void reserve(const Backend& backend) override;
-  void release(const Backend& backend) override;
+  bool on_device() const override;
+  void reserve(const ResourceManager& manager);
+  void release(const ResourceManager& manager);
 
   Camera active_cam;
   std::vector<Mesh> meshes;
   std::vector<Material> materials;
-  std::vector<Texture> textures;
+  std::vector<Image> textures;
   std::vector<Light> lights;
 
-  void upload(const Backend& backend);
-  void upload_meshes(const Backend& backend);
-  void upload_textures(const Backend& backend);
-  void upload_lights(const Backend& backend);
+  void upload(const ResourceManager& manager);
+  void upload_meshes(const ResourceManager& manager);
+  void upload_textures(const ResourceManager& manager);
+  void upload_lights(const ResourceManager& manager);
 
  private:
   void add_mesh(Mesh mesh);
@@ -54,9 +55,9 @@ class Scene : Resource {
                   const tinygltf::Model& model,
                   const tinygltf::Node& node,
                   glm::mat4 model_mat) const;
-  void parse_material(Material& material,
+  void parse_material(Material<>& material,
                       const tinygltf::Material& gltf_material) const;
-  void parse_texture(Material& material,
+  void parse_texture(Material<>& material,
                      const tinygltf::Material& gltf_material) const;
 
  public:

@@ -1,14 +1,45 @@
 #include <SDL3/SDL_filesystem.h>
 #include <xev/pipeline/pipeline_mesh.h>
+#include <xev/logger.h>
 #include <string>
+#include <fstream>
+#include <vector>
+#include <array>
 
 namespace xev {
 
+static VkShaderModule load_shader_module(VkDevice device, const char* path) {
+  std::ifstream file(path, std::ios::ate | std::ios::binary);
+  if (!file.is_open()) {
+    XEV_ERROR("Failed to read {}", path);
+  }
+
+  std::vector<char> m_shader_src;
+  auto size = file.tellg();
+  m_shader_src.resize(size);
+  file.seekg(0, std::ios::beg);
+  file.read(m_shader_src.data(), static_cast<std::streamsize>(size));
+  file.close();
+
+  VkResult res_;
+  VkShaderModule mod;
+
+  VkShaderModuleCreateInfo info = {
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = static_cast<size_t>(size),
+      .pCode = reinterpret_cast<const uint32_t*>(m_shader_src.data()),
+  };
+
+  res_ = vkCreateShaderModule(device, &info, nullptr, &mod);
+  XEV_ASSERT_VK(res_, "Failed to load shader module");
+  return mod;
+}
+
 void PipelineMesh::create(
-    const Backend& backend,
+    VkDevice device,
     VkFormat color_format,
     VkFormat depth_format,
-    const VkDescriptorSetLayout& global_decriptor_set_layout,
+    VkDescriptorSetLayout global_layout,
     VkSampleCountFlagBits sample_count) {
   VkShaderModule shader_vert, shader_frag;
   const char* base_path = SDL_GetBasePath();
@@ -16,8 +47,8 @@ void PipelineMesh::create(
                                 ? std::string(base_path) + "../shaders/mesh.spv"
                                 : "shaders/mesh.spv";
 
-  shader_vert = backend.create_shader_module(shader_path.c_str());
-  shader_frag = backend.create_shader_module(shader_path.c_str());
+  shader_vert = load_shader_module(device, shader_path.c_str());
+  shader_frag = load_shader_module(device, shader_path.c_str());
 
   VkPushConstantRange push_const_range = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -25,69 +56,165 @@ void PipelineMesh::create(
       .size = sizeof(PipelineMesh::PushConst),
   };
 
-  std::vector<VkDescriptorSetLayout> layouts = {global_decriptor_set_layout};
+  std::vector<VkDescriptorSetLayout> layouts = {global_layout};
   std::vector<VkPushConstantRange> ranges = {push_const_range};
-  m_layout = backend.create_pipeline_layout(layouts, ranges);
 
-  Backend::PipelineInfo pipeline_info = {
-      .vert_shader = shader_vert,
-      .frag_shader = shader_frag,
+  VkPipelineLayoutCreateInfo layout_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = static_cast<uint32_t>(layouts.size()),
+      .pSetLayouts = layouts.data(),
+      .pushConstantRangeCount = static_cast<uint32_t>(ranges.size()),
+      .pPushConstantRanges = ranges.data(),
+  };
+  VkResult res_ = vkCreatePipelineLayout(device, &layout_info, nullptr, &m_layout);
+  XEV_ASSERT_VK(res_, "Failed to create pipeline layout");
+
+  VkPipelineViewportStateCreateInfo viewport_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .viewportCount = 1,
+      .scissorCount = 1,
+  };
+
+  VkPipelineColorBlendAttachmentState blend_attachments = {
+      .blendEnable = VK_FALSE,
+      .colorWriteMask =
+          VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+  };
+
+  VkPipelineColorBlendStateCreateInfo blend_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+      .logicOpEnable = VK_FALSE,
+      .logicOp = VK_LOGIC_OP_COPY,
+      .attachmentCount = 1,
+      .pAttachments = &blend_attachments,
+  };
+
+  VkVertexInputBindingDescription vertex_binding = {
+      .binding = 0,
+      .stride = sizeof(Mesh::Vertex),
+      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+  };
+
+  std::array<VkVertexInputAttributeDescription, 3> vertex_attributes = {{
+      {.location = 0,
+       .binding = 0,
+       .format = VK_FORMAT_R32G32B32_SFLOAT,
+       .offset = offsetof(Mesh::Vertex, position)},
+      {.location = 1,
+       .binding = 0,
+       .format = VK_FORMAT_R32G32B32_SFLOAT,
+       .offset = offsetof(Mesh::Vertex, normal)},
+      {.location = 2,
+       .binding = 0,
+       .format = VK_FORMAT_R32G32_SFLOAT,
+       .offset = offsetof(Mesh::Vertex, uv)},
+  }};
+
+  VkPipelineVertexInputStateCreateInfo vertex_input_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount = 1,
+      .pVertexBindingDescriptions = &vertex_binding,
+      .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertex_attributes.size()),
+      .pVertexAttributeDescriptions = vertex_attributes.data(),
+  };
+  
+  std::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+
+  VkPipelineDynamicStateCreateInfo dynamic_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+      .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
+      .pDynamicStates = dynamic_states.data(),
+  };
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-      .polygon = VK_POLYGON_MODE_FILL,
-      .samples = sample_count,
-      .color_format = color_format,
-      .depth_format = depth_format,
-      .enable_culling = true,
-      .enable_depth_test = true,
-      .depth_op = VK_COMPARE_OP_LESS_OR_EQUAL,
+      .primitiveRestartEnable = VK_FALSE,
+  };
+  VkPipelineRasterizationStateCreateInfo rasterizer_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_BACK_BIT,
+      .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .lineWidth = 1.f,
+  };
+  VkPipelineMultisampleStateCreateInfo multisampling_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .sampleShadingEnable = VK_FALSE,
+      .rasterizationSamples = sample_count,
+      .minSampleShading = 1.0f,
+  };
+  VkPipelineDepthStencilStateCreateInfo depth_stencil_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+      .depthTestEnable = VK_TRUE,
+      .depthWriteEnable = VK_TRUE,
+      .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+      .depthBoundsTestEnable = VK_FALSE,
+      .stencilTestEnable = VK_FALSE,
+      .minDepthBounds = 0.f,
+      .maxDepthBounds = 1.f,
+  };
 
-      .enable_blend = false,
-      .blend_op = VK_BLEND_OP_ADD,
-      .blend_src_factor = VK_BLEND_FACTOR_ONE,
-      .blend_dst_alpha_factor = VK_BLEND_FACTOR_ZERO,
+  VkPipelineRenderingCreateInfo render_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+      .colorAttachmentCount = 1,
+      .pColorAttachmentFormats = &color_format,
+      .depthAttachmentFormat = depth_format,
+  };
+
+  VkPipelineShaderStageCreateInfo vert_stage = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = shader_vert,
+      .pName = "main",
+  };
+
+  VkPipelineShaderStageCreateInfo frag_stage = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = shader_frag,
+      .pName = "main",
+  };
+
+  std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
+      vert_stage,
+      frag_stage,
+  };
+
+  VkGraphicsPipelineCreateInfo pipeline_create_info = {
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = &render_info,
+      .stageCount = (std::uint32_t)shader_stages.size(),
+      .pStages = shader_stages.data(),
+      .pVertexInputState = &vertex_input_state,
+      .pInputAssemblyState = &input_assembly_state,
+      .pViewportState = &viewport_state,
+      .pRasterizationState = &rasterizer_state,
+      .pMultisampleState = &multisampling_state,
+      .pDepthStencilState = &depth_stencil_state,
+      .pColorBlendState = &blend_state,
+      .pDynamicState = &dynamic_info,
       .layout = m_layout,
-      .vertex_bindings =
-          {
-              {
-                  .binding = 0,
-                  .stride = sizeof(Mesh::Vertex),
-                  .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-              },
-          },
-      .vertex_attributes = {
-          {.location = 0,
-           .binding = 0,
-           .format = VK_FORMAT_R32G32B32_SFLOAT,
-           .offset = offsetof(Mesh::Vertex, position)},  // 0
-          {.location = 1,
-           .binding = 0,
-           .format = VK_FORMAT_R32G32B32_SFLOAT,
-           .offset = offsetof(Mesh::Vertex, normal)},  // 12
-          {.location = 2,
-           .binding = 0,
-           .format = VK_FORMAT_R32G32_SFLOAT,
-           .offset = offsetof(Mesh::Vertex, uv)},  // 24,
-      }};
+  };
 
-  m_pipeline = backend.create_pipeline(pipeline_info);
+  res_ = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &m_pipeline);
+  XEV_ASSERT_VK(res_, "Failed to create graphics pipeline");
 
-  backend.destroy_shader_module(shader_vert);
-  backend.destroy_shader_module(shader_frag);
+  vkDestroyShaderModule(device, shader_vert, nullptr);
+  vkDestroyShaderModule(device, shader_frag, nullptr);
 }
 
-void PipelineMesh::destroy(const Backend& backend) {
-  backend.destroy_pipeline_layout(m_layout);
-  backend.destroy_pipeline(m_pipeline);
+void PipelineMesh::destroy(VkDevice device) {
+  vkDestroyPipelineLayout(device, m_layout, nullptr);
+  vkDestroyPipeline(device, m_pipeline, nullptr);
 }
 
-void PipelineMesh::draw(const Backend& backend,
-                        VkCommandBuffer cmdbuf,
+void PipelineMesh::draw(VkCommandBuffer cmdbuf,
                         VkExtent2D ext,
                         const Scene& scene,
                         const Camera& camera,
                         const std::vector<PipelineMesh::Command>& draw_cmds) {
-  // XEV_INFO("DRAWING Camera x:{}, y:{}, z:{}", camera.pos.x, camera.pos.y,
-  //          camera.pos.z);
   vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
   VkViewport viewport = {
@@ -106,10 +233,6 @@ void PipelineMesh::draw(const Backend& backend,
   };
   vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 
-  // In real renderer we'd bind global descriptor sets here
-  // vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout,
-  // 0, 1, &backend.get_desc_set(), 0, nullptr);
-
   glm::mat4 vp = camera.create_vp_mat();
 
   uint32_t prev_mesh_id = static_cast<uint32_t>(-1);
@@ -127,8 +250,8 @@ void PipelineMesh::draw(const Backend& backend,
 
     PushConst push_const = {
         .mvp = vp * cmd.to_world,
-        .scene_uniform = 0,  // Not implemented yet
-        .vertex_buffer = 0,  // BufferDeviceAddress not set up yet
+        .scene_uniform = 0,
+        .vertex_buffer = 0,
         .material_id = cmd.material_id,
         .padding = 0,
     };
@@ -138,7 +261,6 @@ void PipelineMesh::draw(const Backend& backend,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
         sizeof(PushConst), &push_const);
 
-    // Render all primitives within the mesh
     for (const auto& pri : mesh.get_primitives()) {
       vkCmdDrawIndexed(cmdbuf, pri.flength * 3, 1, pri.foffset * 3, pri.voffset,
                        0);

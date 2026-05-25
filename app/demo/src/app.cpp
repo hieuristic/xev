@@ -24,11 +24,12 @@ App::App() {
   m_engine = std::make_unique<xev::Engine>(m_window->get_native());
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
+  m_engine->init_global_descriptor_set();
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
 
-  m_renderer3D = std::make_unique<xev::Renderer3D>(m_engine->resource_manager,
-                                                   m_engine->pipeline_manager);
+  m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipeline_manager,
+                                                   m_engine->global_decriptor_set->get_layout());
 
   m_scene = std::make_unique<xev::Scene>();
   const char* base_path = SDL_GetBasePath();
@@ -39,9 +40,9 @@ App::App() {
   XEV_INFO("Loading Sponza...");
   m_scene->load_gltf(scene_path);
   // m_scene->create_test_triangle();
-  m_scene->reserve(rman);
-  m_scene->upload_meshes();
-  m_scene->upload_textures();
+  m_scene->reserve(*m_engine->resource_manager);
+  m_scene->upload_meshes(*m_engine->resource_manager);
+  m_scene->upload_textures(*m_engine->resource_manager);
   m_scene->active_cam.set_aspect(m_window->get_aspect());
 
   m_keystate = SDL_GetKeyboardState(NULL);
@@ -49,7 +50,7 @@ App::App() {
 }
 
 App::~App() {
-  if (m_scene) {
+  if (m_scene && m_engine->resource_manager) {
     m_scene->destroy(*m_engine->resource_manager);
   }
 }
@@ -85,15 +86,12 @@ void App::handle_inputs() {
 }
 
 void App::draw() {
-  VkCommandBuffer cmdbuf = m_engine->swapchain->acquire_frame();
+  VkCommandBuffer cmdbuf = m_engine->frame_context->acquire_frame();
 
   if (cmdbuf != VK_NULL_HANDLE) {
-    xev::FrameArg args;
-    args.clear_color = {0.1f, 0.1f, 0.1f, 1.0f};
-    args.copy_to_swapchain = true;
-    const xev::Image& output_image =
-        m_renderer3D->draw(cmdbuf, *m_scene, m_scene->active_cam, args);
-    m_engine->leave_frame(cmdbuf, output_image, args);
+    const xev::Image& output_image = m_engine->frame_context->get_current_render_target();
+    m_renderer3D->draw(cmdbuf, output_image, *m_scene, m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+    m_engine->leave_frame(cmdbuf, output_image);
   }
 }
 

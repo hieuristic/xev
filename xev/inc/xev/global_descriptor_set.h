@@ -1,5 +1,7 @@
 #pragma once
 #include <xev/volk.h>
+#include <xev/resource/image.h>
+#include <array>
 
 namespace xev {
 
@@ -8,6 +10,7 @@ class Backend;
 class GlobalDescriptorSet {
  public:
   GlobalDescriptorSet(VkDevice device);
+  ~GlobalDescriptorSet();
   static const uint32_t MAX_TEXTURE = 2 << 14;
   static const uint32_t MAX_SAMPLER = 2 << 5;
   enum SamplerType {
@@ -20,8 +23,10 @@ class GlobalDescriptorSet {
   uint32_t set(const Image& image);
   void set(const Image& image, uint32_t id);
 
-  void unset_texture(id);
-  void unset_sampler(id);
+  void unset_texture(uint32_t id);
+  void unset_sampler(uint32_t id);
+
+  VkDescriptorSetLayout get_layout() const { return m_layout; }
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};

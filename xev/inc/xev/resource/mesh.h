@@ -11,7 +11,7 @@
 
 namespace xev {
 
-class Backend;
+class ResourceManager;
 
 class Mesh : public Resource {
  public:
@@ -44,10 +44,10 @@ class Mesh : public Resource {
   const std::vector<MeshPrimitive>& get_primitives() const;
 
   uint64_t size_device() const override;
-  bool is_reserved() const override;
-  void reserve(ResourceManager& manager);
-  void release(ResourceManager& manager);
-  void upload(ResourceManager& manager);
+  bool on_device() const override;
+  void alloc(const ResourceManager& manager);
+  void free(const ResourceManager& manager);
+  void upload(const ResourceManager& manager);
 
   VkBuffer get_face_buffer() const { return m_device_face.buffer; }
   VkBuffer get_vert_buffer() const { return m_device_vert.buffer; };
@@ -71,7 +71,7 @@ class Mesh : public Resource {
   bool has_skeleton = false;
 
  private:
-  bool m_is_reserved = false;
+  bool m_on_device = false;
   std::string m_name;
   glm::mat4 m_model_mat{1.0f};
   std::vector<MeshPrimitive> m_primitives;

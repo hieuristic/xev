@@ -1,9 +1,14 @@
 #include <xev/global_descriptor_set.h>
+#include <xev/logger.h>
 
 namespace xev {
 
 GlobalDescriptorSet::GlobalDescriptorSet(VkDevice device) : m_device(device) {
   VkResult res_;
+
+  free_textures_l1.fill(0);
+  free_textures_l0.fill(0);
+  free_samplers = 0;
 
   {  // create descriptor pool
     std::array<VkDescriptorPoolSize, 2> sizes = {{
@@ -18,7 +23,7 @@ GlobalDescriptorSet::GlobalDescriptorSet(VkDevice device) : m_device(device) {
         .pPoolSizes = sizes.data(),
     };
 
-    res_ = vkCreateDescriptorPool(m_device, &info, nullptr, &pool);
+    res_ = vkCreateDescriptorPool(m_device, &info, nullptr, &m_pool);
     XEV_ASSERT_VK(res_, "Failed to create descriptor pool");
   }
 
@@ -57,7 +62,7 @@ GlobalDescriptorSet::GlobalDescriptorSet(VkDevice device) : m_device(device) {
         .bindingCount = 2,
         .pBindings = bindings.data(),
     };
-    res_ = vkCreateDescriptorSetLayout(m_device, &info, nullptr, &layout);
+    res_ = vkCreateDescriptorSetLayout(m_device, &info, nullptr, &m_layout);
     XEV_ASSERT_VK(res_, "Failed to create descriptor set layout");
   }
 
@@ -68,22 +73,21 @@ GlobalDescriptorSet::GlobalDescriptorSet(VkDevice device) : m_device(device) {
         .descriptorSetCount = 1,
         .pSetLayouts = &m_layout,
     };
-    res_ = vkAllocateDescriptorSets(m_device, &info, &set);
+    res_ = vkAllocateDescriptorSets(m_device, &info, &m_set);
     XEV_ASSERT_VK(res_, "Failed to create descriptor set.");
   }
 }
 
 GlobalDescriptorSet::~GlobalDescriptorSet() {
-  VkResult res_;
+  if (m_pool != VK_NULL_HANDLE) {
+    vkDestroyDescriptorPool(m_device, m_pool, nullptr);
+    m_pool = VK_NULL_HANDLE;
+  }
 
-  res_ = vkFreeDescriptorSets(m_device, pool, 1, &set);
-  XEV_ASSERT_VK(res_, "Failed to destroy descriptor set.");
-
-  res_ = vkDestroyDescriptorSetLayout(m_device, layout, nullptr);
-  XEV_ASSERT_VK(res_, "Failed to destroy descriptor set layout.");
-
-  res_ = vkFreeDescriptorSets(m_device, pool, 1, &desc_set);
-  XEV_ASSERT_VK(res_, "Failed to destroy descriptor set.");
+  if (m_layout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(m_device, m_layout, nullptr);
+    m_layout = VK_NULL_HANDLE;
+  }
 }
 
 uint32_t GlobalDescriptorSet::set(const Image& image) {
@@ -107,8 +111,6 @@ void GlobalDescriptorSet::set(const Image& image, uint32_t id) {
       .pImageInfo = &info,
   };
   vkUpdateDescriptorSets(m_device, 1, &write_set, 0, nullptr);
-
-  return id;
 }
 
 constexpr uint32_t GlobalDescriptorSet::get_free_bit(uint64_t bitset) const {
@@ -122,13 +124,17 @@ constexpr uint32_t GlobalDescriptorSet::get_free_bit(uint64_t bitset) const {
   return offset;
 }
 
-void GlobalDescriptorSet::unset(uint32_t id) {
+void GlobalDescriptorSet::unset_texture(uint32_t id) {
   uint32_t idx_l1 = id / 64;
   uint32_t free_bit_l1 = idx_l1 % 64;
   if (free_textures_l0[idx_l1] == 0xFFFFFFFFFFFFFFFF)
     free_textures_l1[idx_l1 / 64] &= ~(1ULL << free_bit_l1);
-  free_bit_l0 = get_free_bit(free_textures_l0[idx_l1]);
+  uint32_t free_bit_l0 = id % 64;
   free_textures_l0[idx_l1] &= ~(1ULL << free_bit_l0);
+}
+
+void GlobalDescriptorSet::unset_sampler(uint32_t id) {
+  free_samplers &= ~(1ULL << id);
 }
 
 uint32_t GlobalDescriptorSet::get_free_texture_id() {

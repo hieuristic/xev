@@ -17,11 +17,12 @@ class PipelineManager {
   void create(PipelineMesh& pipe,
               VkFormat format_color,
               VkFormat format_depth,
+              VkDescriptorSetLayout global_layout,
               VkSampleCountFlagBits sample_count) const;
   void create(VkShaderModule& mod, const char* path) const;
 
   void destroy(PipelineMesh& pipe) const;
-  void destroy(VkShaderModule& mod);
+  void destroy(VkShaderModule& mod) const;
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};

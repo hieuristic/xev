@@ -23,13 +23,13 @@ class PipelineMesh : Pipeline {
   };
 
  public:
-  void create(const Backend& backend,
+  void create(VkDevice device,
               VkFormat color_format,
               VkFormat depth_format,
+              VkDescriptorSetLayout global_layout,
               VkSampleCountFlagBits sample_count);
-  void destroy(const Backend& backend);
-  void draw(const Backend& backend,
-            VkCommandBuffer cmdbuf,
+  void destroy(VkDevice device);
+  void draw(VkCommandBuffer cmdbuf,
             VkExtent2D ext,
             const Scene& scene,
             const Camera& camera,

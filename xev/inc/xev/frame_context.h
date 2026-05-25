@@ -10,6 +10,18 @@ class ResourceManager;
 
 class FrameContext {
  public:
+  struct Frame {
+    VkCommandPool pool{VK_NULL_HANDLE};
+    VkCommandBuffer render_cmdbuf{VK_NULL_HANDLE};
+    VkSemaphore present_sem{VK_NULL_HANDLE};
+    VkSemaphore render_sem{VK_NULL_HANDLE};
+    VkFence render_fence{VK_NULL_HANDLE};
+    Image render_target{
+        VK_FORMAT_B8G8R8A8_SRGB,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    };
+  };
+
   FrameContext(VkDevice device,
                uint32_t graphics_family_idx,
                const ResourceManager& manager,
@@ -26,22 +38,14 @@ class FrameContext {
   VkCommandBuffer acquire_frame();
   void release_frame();
 
+  const Frame& get_current_frame() const { return m_frames[m_curr_idx]; }
+  const Image& get_current_render_target() const { return m_frames[m_curr_idx].render_target; }
+
  private:
   uint32_t m_family_idx;
   VkDevice m_device;
   const ResourceManager& m_manager;
 
-  struct Frame {
-    VkCommandPool pool{VK_NULL_HANDLE};
-    VkCommandBuffer render_cmdbuf{VK_NULL_HANDLE};
-    VkSemaphore present_sem{VK_NULL_HANDLE};
-    VkSemaphore render_sem{VK_NULL_HANDLE};
-    VkFence render_fence{VK_NULL_HANDLE};
-    Image render_target{
-        VK_FORMAT_B8G8R8A8_SRGB,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-    };
-  };
   std::array<Frame, max_in_flight> m_frames;
   uint32_t m_curr_idx;
 
