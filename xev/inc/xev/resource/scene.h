@@ -1,12 +1,14 @@
 #pragma once
 
 #include <xev/camera.h>
+#include <xev/resource/image.h>
 #include <xev/resource/light.h>
 #include <xev/resource/material.h>
 #include <xev/resource/mesh.h>
 #include <xev/resource/resource.h>
-#include <xev/resource/image.h>
 #include <xev/resource/sampler.h>
+#include <xev/scene_buffer.h>
+#include <xev/global_descriptor_set.h>
 #include <glm/glm.hpp>
 #include <queue>
 #include <string>
@@ -33,59 +35,46 @@ class Scene : public Resource {
   void create_test_triangle();
 
   uint64_t size_device() const override;
-
   bool on_device() const override;
-  void reserve(const ResourceManager& manager);
-  void release(const ResourceManager& manager);
+
+  void alloc(const ResourceManager& manager);
+  void free(const ResourceManager& manager);
 
   Camera active_cam;
+  SceneBuffer scene_buffer;
   std::vector<Mesh> meshes;
-  std::vector<Material> materials;
-  std::vector<Image> textures;
+  std::vector<Image> images;
   std::vector<Light> lights;
+  std::vector<Material> materials;
 
-  void upload(const ResourceManager& manager);
-  void upload_meshes(const ResourceManager& manager);
-  void upload_textures(const ResourceManager& manager);
-  void upload_lights(const ResourceManager& manager);
+  std::vector<Camera> cameras;
+
+  Buffer scene_device{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                      VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+  Buffer lights_device{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                       VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+  Buffer materials_device{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+
+  void upload(const ResourceManager& manager, const HotExec& hot_exec);
+  void upload_meshes(const ResourceManager& manager, const HotExec& hot_exec);
+  void upload_images(const ResourceManager& manager, const HotExec& hot_exec);
+  void upload_lights(const ResourceManager& manager, const HotExec& hot_exec);
+  void upload_materials(const ResourceManager& manager,
+                        const HotExec& hot_exec);
+  void upload_scene(const ResourceManager& manager, const HotExec& hot_exec);
+
+  void bind(const GlobalDescriptorSet& desc_set);
+
 
  private:
-  void add_mesh(Mesh mesh);
-  void parse_mesh(Mesh& mesh,
+  void parse_mesh(std::vector<Mesh>& out_meshes,
                   const tinygltf::Model& model,
                   const tinygltf::Node& node,
                   glm::mat4 model_mat) const;
-  void parse_material(Material<>& material,
-                      const tinygltf::Material& gltf_material) const;
-  void parse_texture(Material<>& material,
-                     const tinygltf::Material& gltf_material) const;
-
- public:
-  struct SceneBuffer {
-    glm::mat4 view;
-    glm::mat4 proj;
-    glm::vec3 view_pos;
-
-    // ambient
-    glm::vec3 ambient_color;
-    float ambient_intensity;
-
-    // fog
-    glm::vec3 fog_color;
-    float fog_density;
-
-    // light
-    VkDeviceAddress light_buffer_address;
-
-    // material
-    VkDeviceAddress material_buffer_address;
-  };
-  SceneBuffer scene_buffer;
-
-  Buffer scene_buffer_device{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
-  Buffer light_buffer_device{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
 };
 
 }  // namespace xev

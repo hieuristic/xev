@@ -1,18 +1,19 @@
+#include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
 #include <xev/frame_context.h>
+#include <xev/global_descriptor_set.h>
+#include <xev/logger.h>
 #include <xev/pipeline_manager.h>
 #include <xev/resource_manager.h>
-#include <xev/global_descriptor_set.h>
 #include <xev/swapchain.h>
-#include <xev/common.h>
-#include <xev/logger.h>
 
 namespace xev {
 
 Engine::Engine() {
   m_device = std::make_unique<Device>();
   init_resource_manager();
+  init_hot_exec();
 }
 
 Engine::Engine(SDL_Window* window) {
@@ -21,30 +22,48 @@ Engine::Engine(SDL_Window* window) {
 }
 
 void Engine::init_swapchain() {
-  if (swapchain != nullptr) return;
+  if (swapchain != nullptr)
+    return;
+
   XEV_ASSERT(m_device->surface != VK_NULL_HANDLE,
              "Failed to initialize swapchain: invalid surface");
 
   swapchain = std::make_unique<Swapchain>(
-      m_device->physical_device, m_device->surface, m_device->logical_device,
+      m_device->physical_device, m_device->surface, m_device->device,
       m_device->queue_family.graphics.value().idx,
       m_device->queue_family.present.value().idx);
 }
 
+void Engine::init_hot_exec() {
+  if (hot_exec != nullptr)
+    return;
+
+  hot_exec =
+      std::make_unique<HotExec>(m_device->device, m_device->graphics_queue,
+                                m_device->queue_family.graphics.value().idx);
+}
+
 void Engine::init_resource_manager() {
-  if (resource_manager != nullptr) return;
+  if (resource_manager != nullptr)
+    return;
+
   resource_manager = std::make_unique<ResourceManager>(
-      m_device->instance, m_device->physical_device, m_device->logical_device);
+      m_device->instance, m_device->physical_device, m_device->device);
 }
 
 void Engine::init_pipeline_manager() {
-  if (pipeline_manager != nullptr) return;
-  pipeline_manager = std::make_unique<PipelineManager>(m_device->logical_device);
+  if (pipeline_manager != nullptr)
+    return;
+
+  pipeline_manager = std::make_unique<PipelineManager>(m_device->device);
 }
 
 void Engine::init_global_descriptor_set() {
-  if (global_decriptor_set != nullptr) return;
-  global_decriptor_set = std::make_unique<GlobalDescriptorSet>(m_device->logical_device);
+  if (global_decriptor_set != nullptr)
+    return;
+
+  global_decriptor_set =
+      std::make_unique<GlobalDescriptorSet>(m_device->device);
 }
 
 void Engine::init_frame_context() {
@@ -55,7 +74,7 @@ void Engine::init_frame_context() {
     init_swapchain();
 
   frame_context = std::make_unique<FrameContext>(
-      m_device->logical_device, m_device->queue_family.graphics.value().idx,
+      m_device->device, m_device->queue_family.graphics.value().idx,
       *resource_manager, swapchain->width, swapchain->height);
 }
 
@@ -67,14 +86,16 @@ void Engine::leave_frame(VkCommandBuffer cmd, const Image& image) {
 
   const Image& swapchain_img = swapchain->acquire_image(frame.present_sem);
 
-  vkResetFences(m_device->logical_device, 1, &frame.render_fence);
+  vkResetFences(m_device->device, 1, &frame.render_fence);
 
   if (image.image != VK_NULL_HANDLE) {
-    const_cast<Image&>(swapchain_img).update_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    const_cast<Image&>(swapchain_img)
+        .update_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     const_cast<Image&>(swapchain_img).blit_from(cmd, image, VK_FILTER_LINEAR);
   }
 
-  const_cast<Image&>(swapchain_img).update_layout(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  const_cast<Image&>(swapchain_img)
+      .update_layout(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   VkSemaphoreSubmitInfo wait_info = {
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
@@ -103,7 +124,9 @@ void Engine::leave_frame(VkCommandBuffer cmd, const Image& image) {
   };
 
   VkQueue graphics_queue;
-  vkGetDeviceQueue(m_device->logical_device, m_device->queue_family.graphics.value().idx, 0, &graphics_queue);
+  vkGetDeviceQueue(m_device->device,
+                   m_device->queue_family.graphics.value().idx, 0,
+                   &graphics_queue);
 
   res_ = vkQueueSubmit2(graphics_queue, 1, &submit_info, frame.render_fence);
   XEV_ASSERT_VK(res_, "Failed to submit queue");
@@ -113,7 +136,10 @@ void Engine::leave_frame(VkCommandBuffer cmd, const Image& image) {
   frame_context->release_frame();
 }
 
-void Engine::init_renderer() {
-}
+void Engine::init_renderer() {}
+
+Engine::~Engine() = default;
+Engine::Engine(Engine&&) = default;
+Engine& Engine::operator=(Engine&&) = default;
 
 }  // namespace xev

@@ -3,6 +3,9 @@
 #include "app.h"
 #include <xev/logger.h>
 #include <xev/volk.h>
+#include <xev/global_descriptor_set.h>
+#include <xev/frame_context.h>
+#include <xev/resource_manager.h>
 
 void compute_projection(const xev::Camera& cam,
                         const std::vector<glm::vec3> pos_world) {
@@ -24,6 +27,7 @@ App::App() {
   m_engine = std::make_unique<xev::Engine>(m_window->get_native());
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
+  m_engine->init_hot_exec();
   m_engine->init_global_descriptor_set();
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
@@ -40,9 +44,8 @@ App::App() {
   XEV_INFO("Loading Sponza...");
   m_scene->load_gltf(scene_path);
   // m_scene->create_test_triangle();
-  m_scene->reserve(*m_engine->resource_manager);
-  m_scene->upload_meshes(*m_engine->resource_manager);
-  m_scene->upload_textures(*m_engine->resource_manager);
+  m_scene->alloc(*m_engine->resource_manager);
+  m_scene->upload(*m_engine->resource_manager, *m_engine->hot_exec);
   m_scene->active_cam.set_aspect(m_window->get_aspect());
 
   m_keystate = SDL_GetKeyboardState(NULL);

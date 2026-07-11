@@ -30,17 +30,19 @@ class PipelineMesh : Pipeline {
               VkSampleCountFlagBits sample_count);
   void destroy(VkDevice device);
   void draw(VkCommandBuffer cmdbuf,
-            VkExtent2D ext,
             const Scene& scene,
             const Camera& camera,
-            const std::vector<Command>& draw_cmds);
+            const std::vector<Command>& draw_cmds,
+            uint32_t width,
+            uint32_t height);
 
  private:
+  // This is in-sync with shaders/mesh.slang
   struct PushConst {
-    glm::mat4 mvp;
-    VkDeviceAddress scene_uniform;
-    VkDeviceAddress vertex_buffer;
-    uint32_t material_id;
+    glm::mat4 view_proj;
+    VkDeviceAddress scene_addr;
+    VkDeviceAddress vert_addr;
+    uint32_t mat_id;
     uint32_t padding;
   };
 };

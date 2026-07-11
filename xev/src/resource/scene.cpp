@@ -13,7 +13,7 @@ namespace xev {
 
 Scene::Scene() {}
 
-void Scene::parse_mesh(Mesh& mesh,
+void Scene::parse_mesh(std::vector<Mesh>& meshes,
                        const tinygltf::Model& model,
                        const tinygltf::Node& node,
                        glm::mat4 model_mat) const {
@@ -21,15 +21,9 @@ void Scene::parse_mesh(Mesh& mesh,
 
   const tinygltf::Mesh& gltf_mesh = model.meshes[node.mesh];
 
-  std::vector<Mesh::MeshPrimitive> primitives;
-  std::vector<glm::vec3> positions;
-  std::vector<glm::vec3> normals;
-  std::vector<glm::vec2> uvs;
-  std::vector<glm::uvec3> faces;
-
   for (const tinygltf::Primitive& pri : gltf_mesh.primitives) {
     if (pri.mode != -1 && pri.mode != TINYGLTF_MODE_TRIANGLES) {
-      XEV_WARN("Skipping non-triangle primitive in mesh '{}'", name);
+      XEV_WARN("Skiipping non-triangle primitive in mesh '{}'", name);
       continue;
     }
 
@@ -39,119 +33,123 @@ void Scene::parse_mesh(Mesh& mesh,
       continue;
     }
 
-    Mesh::MeshPrimitive mp{};
-    mp.voffset = static_cast<uint32_t>(positions.size());
-    mp.foffset = static_cast<uint32_t>(faces.size());
-    mp.mat_idx = (pri.material >= 0) ? static_cast<uint32_t>(pri.material) : 0;
-    XEV_INFO("mesh {} material {}", name, pri.material);
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> uvs;
+    std::vector<glm::uvec3> faces;
+    uint32_t mat_id =
+        (pri.material >= 0) ? static_cast<uint32_t>(pri.material) : 0;
 
-    // positions
-    const tinygltf::Accessor& pos_acc = model.accessors[pos_it->second];
-    const tinygltf::BufferView& pos_bv = model.bufferViews[pos_acc.bufferView];
-    const tinygltf::Buffer& pos_buf = model.buffers[pos_bv.buffer];
-    const int pos_stride = pos_acc.ByteStride(pos_bv);
-    const unsigned char* pos_data =
-        pos_buf.data.data() + pos_bv.byteOffset + pos_acc.byteOffset;
+    {  // positions
+      const tinygltf::Accessor& pos_acc = model.accessors[pos_it->second];
+      const tinygltf::BufferView& pos_bv =
+          model.bufferViews[pos_acc.bufferView];
+      const tinygltf::Buffer& pos_buf = model.buffers[pos_bv.buffer];
+      const int pos_stride = pos_acc.ByteStride(pos_bv);
+      const unsigned char* pos_data =
+          pos_buf.data.data() + pos_bv.byteOffset + pos_acc.byteOffset;
 
-    for (size_t i = 0; i < pos_acc.count; ++i) {
-      const float* v =
-          reinterpret_cast<const float*>(pos_data + i * pos_stride);
-      // glTF RUB → RDF: negate Y and Z
-      positions.emplace_back(v[0], -v[1], -v[2]);
-    }
-    mp.vlength = static_cast<uint32_t>(pos_acc.count);
-
-    // normals
-    auto nrm_it = pri.attributes.find("NORMAL");
-    if (nrm_it != pri.attributes.end()) {
-      const tinygltf::Accessor& nrm_acc = model.accessors[nrm_it->second];
-      const tinygltf::BufferView& nrm_bv =
-          model.bufferViews[nrm_acc.bufferView];
-      const tinygltf::Buffer& nrm_buf = model.buffers[nrm_bv.buffer];
-      const int nrm_stride = nrm_acc.ByteStride(nrm_bv);
-      const unsigned char* nrm_data =
-          nrm_buf.data.data() + nrm_bv.byteOffset + nrm_acc.byteOffset;
-
-      for (size_t i = 0; i < nrm_acc.count; ++i) {
-        const float* n =
-            reinterpret_cast<const float*>(nrm_data + i * nrm_stride);
+      for (size_t i = 0; i < pos_acc.count; ++i) {
+        const float* v =
+            reinterpret_cast<const float*>(pos_data + i * pos_stride);
         // glTF RUB → RDF: negate Y and Z
-        normals.emplace_back(n[0], -n[1], -n[2]);
-      }
-    } else {
-      // fill with zero normals to keep alignment with vbuff
-      for (size_t i = 0; i < pos_acc.count; ++i) {
-        normals.emplace_back(0.0f, 0.0f, 0.0f);
+        positions.emplace_back(v[0], -v[1], -v[2]);
       }
     }
 
-    // uvs (TEXCOORD_0)
-    auto uv_it = pri.attributes.find("TEXCOORD_0");
-    if (uv_it != pri.attributes.end()) {
-      const tinygltf::Accessor& uv_acc = model.accessors[uv_it->second];
-      const tinygltf::BufferView& uv_bv = model.bufferViews[uv_acc.bufferView];
-      const tinygltf::Buffer& uv_buf = model.buffers[uv_bv.buffer];
-      const int uv_stride = uv_acc.ByteStride(uv_bv);
-      const unsigned char* uv_data =
-          uv_buf.data.data() + uv_bv.byteOffset + uv_acc.byteOffset;
+    {  // normals
+      auto nrm_it = pri.attributes.find("NORMAL");
+      if (nrm_it != pri.attributes.end()) {
+        const tinygltf::Accessor& nrm_acc = model.accessors[nrm_it->second];
+        const tinygltf::BufferView& nrm_bv =
+            model.bufferViews[nrm_acc.bufferView];
+        const tinygltf::Buffer& nrm_buf = model.buffers[nrm_bv.buffer];
+        const int nrm_stride = nrm_acc.ByteStride(nrm_bv);
+        const unsigned char* nrm_data =
+            nrm_buf.data.data() + nrm_bv.byteOffset + nrm_acc.byteOffset;
 
-      for (size_t i = 0; i < uv_acc.count; ++i) {
-        const float* u =
-            reinterpret_cast<const float*>(uv_data + i * uv_stride);
-        uvs.emplace_back(u[0], u[1]);
-      }
-    } else {
-      // fill with zero UVs to keep alignment with vbuff
-      for (size_t i = 0; i < pos_acc.count; ++i) {
-        uvs.emplace_back(0.0f, 0.0f);
-      }
-    }
-
-    // indices
-    if (pri.indices >= 0) {
-      const tinygltf::Accessor& idx_acc = model.accessors[pri.indices];
-      const tinygltf::BufferView& idx_bv =
-          model.bufferViews[idx_acc.bufferView];
-      const tinygltf::Buffer& idx_buf = model.buffers[idx_bv.buffer];
-      const unsigned char* idx_data =
-          idx_buf.data.data() + idx_bv.byteOffset + idx_acc.byteOffset;
-
-      std::vector<uint32_t> indices(idx_acc.count);
-      switch (idx_acc.componentType) {
-        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
-          for (size_t i = 0; i < idx_acc.count; ++i)
-            indices[i] = idx_data[i];
-          break;
-        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-          for (size_t i = 0; i < idx_acc.count; ++i)
-            indices[i] = reinterpret_cast<const uint16_t*>(idx_data)[i];
-          break;
-        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-          for (size_t i = 0; i < idx_acc.count; ++i)
-            indices[i] = reinterpret_cast<const uint32_t*>(idx_data)[i];
-          break;
-        default:
-          XEV_WARN("Unsupported index type {} in mesh '{}'",
-                   idx_acc.componentType, name);
-          continue;
-      }
-
-      for (size_t i = 0; i + 2 < indices.size(); i += 3) {
-        faces.emplace_back(indices[i], indices[i + 2], indices[i + 1]);
-      }
-    } else {
-      for (uint32_t i = 0; i + 2 < mp.vlength; i += 3) {
-        faces.emplace_back(i, i + 2, i + 1);
+        for (size_t i = 0; i < nrm_acc.count; ++i) {
+          const float* n =
+              reinterpret_cast<const float*>(nrm_data + i * nrm_stride);
+          // glTF RUB → RDF: negate Y and Z
+          normals.emplace_back(n[0], -n[1], -n[2]);
+        }
+      } else {
+        // fill with zero normals to keep alignment with vbuff
+        for (size_t i = 0; i < positions.size(); ++i) {
+          normals.emplace_back(0.0f, 0.0f, 0.0f);
+        }
       }
     }
 
-    mp.flength = static_cast<uint32_t>(faces.size()) - mp.foffset;
-    primitives.push_back(mp);
+    {  // TEXCOORD_0
+
+      auto uv_it = pri.attributes.find("TEXCOORD_0");
+      if (uv_it != pri.attributes.end()) {
+        const tinygltf::Accessor& uv_acc = model.accessors[uv_it->second];
+        const tinygltf::BufferView& uv_bv =
+            model.bufferViews[uv_acc.bufferView];
+        const tinygltf::Buffer& uv_buf = model.buffers[uv_bv.buffer];
+        const int uv_stride = uv_acc.ByteStride(uv_bv);
+        const unsigned char* uv_data =
+            uv_buf.data.data() + uv_bv.byteOffset + uv_acc.byteOffset;
+
+        for (size_t i = 0; i < uv_acc.count; ++i) {
+          const float* u =
+              reinterpret_cast<const float*>(uv_data + i * uv_stride);
+          uvs.emplace_back(u[0], u[1]);
+        }
+      } else {
+        // fill with zero UVs to keep alignment with vbuff
+        for (size_t i = 0; i < positions.size(); ++i) {
+          uvs.emplace_back(0.0f, 0.0f);
+        }
+      }
+    }
+
+    {  // faces
+      if (pri.indices >= 0) {
+        const tinygltf::Accessor& idx_acc = model.accessors[pri.indices];
+        const tinygltf::BufferView& idx_bv =
+            model.bufferViews[idx_acc.bufferView];
+        const tinygltf::Buffer& idx_buf = model.buffers[idx_bv.buffer];
+        const unsigned char* idx_data =
+            idx_buf.data.data() + idx_bv.byteOffset + idx_acc.byteOffset;
+
+        std::vector<uint32_t> indices(idx_acc.count);
+        switch (idx_acc.componentType) {
+          case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+            for (size_t i = 0; i < idx_acc.count; ++i)
+              indices[i] = idx_data[i];
+            break;
+          case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+            for (size_t i = 0; i < idx_acc.count; ++i)
+              indices[i] = reinterpret_cast<const uint16_t*>(idx_data)[i];
+            break;
+          case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+            for (size_t i = 0; i < idx_acc.count; ++i)
+              indices[i] = reinterpret_cast<const uint32_t*>(idx_data)[i];
+            break;
+          default:
+            XEV_WARN("Unsupported index type {} in mesh '{}'",
+                     idx_acc.componentType, name);
+            continue;
+        }
+
+        for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+          faces.emplace_back(indices[i], indices[i + 2], indices[i + 1]);
+        }
+      } else {
+        for (uint32_t i = 0; i + 2 < positions.size(); i += 3) {
+          faces.emplace_back(i, i + 2, i + 1);
+        }
+      }
+    }
+
+    meshes.push_back(Mesh(name, model_mat, mat_id, std::move(positions),
+                          std::move(normals), std::move(uvs),
+                          std::move(faces)));
   }
-
-  mesh = Mesh(std::move(name), model_mat, std::move(primitives),
-              std::move(positions), std::move(normals), std::move(uvs),
-              std::move(faces));
 }
 
 void Scene::load_gltf(std::string_view filepath) {
@@ -186,54 +184,54 @@ void Scene::load_gltf(std::string_view filepath) {
   }
 
   // parse light
-  // TODO
+  for (const auto& gltf_light : model.lights) {
+    Light light = {
+        .name = gltf_light.name,
+        .color =
+            {
+                static_cast<float>(gltf_light.color[0]),
+                static_cast<float>(gltf_light.color[1]),
+                static_cast<float>(gltf_light.color[2]),
+            },
+        .range = static_cast<float>(gltf_light.range),
+        .intensity = static_cast<float>(gltf_light.intensity),
+        // .type = TODO
+    };
+    lights.emplace_back(light);
+  };
 
-  // parse material
+  // parsing material
   for (const auto& gltf_mat : model.materials) {
     Material mat;
-
     mat.name = gltf_mat.name;
-
-    mat.base_color =
-        Color4(gltf_mat.pbrMetallicRoughness.baseColorFactor);
+    mat.albedo =
+        Color4<uint8_t>(gltf_mat.pbrMetallicRoughness.baseColorFactor);
     mat.metal_coef =
         static_cast<float>(gltf_mat.pbrMetallicRoughness.metallicFactor);
     mat.rough_coef =
         static_cast<float>(gltf_mat.pbrMetallicRoughness.roughnessFactor);
 
-    mat.diffuse_texid =
-        gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
+    mat.albedo_texid = gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
     mat.metallic_roughness_texid =
         gltf_mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
     materials.emplace_back(mat);
   }
 
-  // parse texture
-  for (const auto& gltf_tex : model.textures) {
-    // TODO
-    // XEV_INFO("TEXTURE: {}x{}x{} {}-bits", gltf_tex.width, gltf_tex.height,
-    //          gltf_tex.component, gltf_tex.bits);
-    // Texture(name,
-    //
-    // tex.name = gltf_tex.name;
-    // tex.raw_data.reserve(image.size());
-    //
-    // std::copy(image.begin(), image.end(), std::back_inserter(tex.raw_data));
-    //
-    // std::string name;
-    // int width{-1};
-    // int height{-1};
-    // int component{-1};
-    // int bits{-1};        // bit depth per channel. 8(byte), 16 or 32.
-    // int pixel_type{-1};  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
-    //                      // UBYTE(bits = 8) or USHORT(bits = 16)
-    // std::vector<unsigned char> image;
-    // Texture tex;
-    // parse_texture(tex, model.images[gltf_tex.source]);
-    // textures.emplace_back(tex);
+  // parsing images
+  for (const auto& gltf_img : model.images) {
+    if (gltf_img.bits != 8)
+      XEV_INFO("LOADING NON-8BITS IMAGES");
+    XEV_INFO("TEXTURE: {}x{}x{} {}-bits", gltf_img.width, gltf_img.height,
+             gltf_img.component, gltf_img.bits);
+    Image img{static_cast<uint32_t>(gltf_img.width),
+              static_cast<uint32_t>(gltf_img.height), VK_FORMAT_R8G8B8A8_SRGB,
+              VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT};
+    std::copy(gltf_img.image.begin(), gltf_img.image.end(),
+              std::back_inserter(img.host_data));
+    images.emplace_back(img);
   }
 
-  // parse geometry
+  // parsing geometry
   std::queue<std::pair<int, glm::mat4>> to_visit;
   for (const int& nidx : model.scenes[model.defaultScene].nodes) {
     to_visit.push({nidx, glm::mat4(1.0f)});
@@ -293,9 +291,13 @@ void Scene::load_gltf(std::string_view filepath) {
 
     // parse geometries
     if (node.mesh != -1) {
-      Mesh mesh;
-      parse_mesh(mesh, model, node, abs_mat);
-      meshes.emplace_back(mesh);
+      parse_mesh(meshes, model, node, abs_mat);
+    }
+
+    // parse light
+    if (node.light != -1) {
+      lights[node.light].position = glm::vec3(abs_mat[3]);
+      lights[node.light].direction = glm::normalize(glm::vec3(abs_mat[2]));
     }
 
     for (const int& child : node.children) {
@@ -308,7 +310,7 @@ void Scene::load_gltf(std::string_view filepath) {
     active_cam = Camera();
     active_cam.pos = glm::vec3(0.0f, 0.0f, -5.0f);
   }
-}
+}  // namespace xev
 
 uint64_t Scene::size_device() const {
   uint64_t total_size = 0;
@@ -329,16 +331,21 @@ bool Scene::on_device() const {
   return res;
 }
 
-void Scene::reserve(const ResourceManager& manager) {
-  scene_buffer_device.size = sizeof(Scene::SceneBuffer);
-  manager.alloc(scene_buffer_device);
+void Scene::alloc(const ResourceManager& manager) {
+  scene_device.size = sizeof(SceneBuffer);
+  manager.alloc(scene_device);
 
   if (!lights.empty()) {
-    light_buffer_device.size = sizeof(Light) * lights.size();
-    manager.alloc(light_buffer_device);
+    lights_device.size = sizeof(Light) * lights.size();
+    manager.alloc(lights_device);
   }
 
-  for (auto& tex : textures) {
+  if (!materials.empty()) {
+    materials_device.size = sizeof(Material) * materials.size();
+    manager.alloc(materials_device);
+  }
+
+  for (auto& tex : images) {
     if (!tex.on_device())
       manager.alloc(tex);
   }
@@ -348,11 +355,12 @@ void Scene::reserve(const ResourceManager& manager) {
   }
 }
 
-void Scene::release(const ResourceManager& manager) {
-  manager.free(scene_buffer_device);
-  manager.free(light_buffer_device);
+void Scene::free(const ResourceManager& manager) {
+  manager.free(scene_device);
+  manager.free(lights_device);
+  manager.free(materials_device);
 
-  for (auto& tex : textures) {
+  for (auto& tex : images) {
     if (tex.on_device())
       manager.free(tex);
   }
@@ -363,25 +371,156 @@ void Scene::release(const ResourceManager& manager) {
   }
 }
 
-void Scene::upload_textures(const ResourceManager& manager) {
-  // Direct image uploading not implemented yet
+void Scene::upload_images(const ResourceManager& manager,
+                          const HotExec& hot_exec) {
+  std::vector<Buffer> stagings;
+  for (auto& img : images) {
+    uint64_t size = img.width * img.height * 4;
+    Buffer staging{
+        size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_MEMORY_USAGE_AUTO,
+    };
+    manager.alloc(staging);
+
+    void* map_ = staging.alloc_info.pMappedData;
+    memcpy(map_, img.host_data.data(), size);
+
+    stagings.emplace_back(staging);
+  }
+
+  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+    for (uint32_t i = 0; i < images.size(); i++) {
+      auto& img = images[i];
+      img.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+      img.update_layout(cmdbuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+      VkBufferImageCopy reg = {
+          .bufferOffset = 0,
+          .bufferRowLength = 0,
+          .bufferImageHeight = 0,
+          .imageSubresource =
+              {
+                  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                  .mipLevel = 0,
+                  .baseArrayLayer = 0,
+                  .layerCount = 1,
+              },
+          .imageOffset = {0, 0, 0},
+          .imageExtent =
+              {
+                  static_cast<uint32_t>(img.width),
+                  static_cast<uint32_t>(img.height),
+                  1,
+              },
+      };
+      vkCmdCopyBufferToImage(cmdbuf, stagings[i].buffer, img.image,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &reg);
+
+      img.update_layout(cmdbuf, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+  });
+
+  for (auto& staging : stagings)
+    manager.free(staging);
 }
 
-void Scene::upload_meshes(const ResourceManager& manager) {
+void Scene::upload_meshes(const ResourceManager& manager,
+                          const HotExec& hot_exec) {
   for (auto& mesh : meshes)
-    mesh.upload(manager);
+    mesh.upload(manager, hot_exec);
 }
 
-void Scene::upload_lights(const ResourceManager& manager) {
-  if (lights.empty()) return;
-  uint64_t size = lights.size() * sizeof(lights[0]);
-  manager.upload(light_buffer_device, lights.data(), 0, size);
+void Scene::upload_lights(const ResourceManager& manager,
+                          const HotExec& hot_exec) {
+  if (lights.empty())
+    return;
+
+  uint64_t size = lights.size() * sizeof(Light);
+  Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
+  manager.alloc(staging);
+
+  {
+    void* map_ = staging.alloc_info.pMappedData;
+    uint64_t offset_ = 0;
+    for (uint32_t i = 0; i < lights.size(); i++) {
+      memcpy((char*)map_ + offset_, &lights[i], sizeof(Light));
+      offset_ += sizeof(Light);
+    }
+  }
+
+  lights_device.size = size;
+  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+    const VkBufferCopy reg = {
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size = size,
+    };
+    vkCmdCopyBuffer(cmdbuf, staging.buffer, lights_device.buffer, 1, &reg);
+  });
+
+  manager.free(staging);
 }
 
-void Scene::upload(const ResourceManager& manager) {
-  upload_meshes(manager);
-  upload_textures(manager);
-  upload_lights(manager);
+void Scene::upload_materials(const ResourceManager& manager,
+                             const HotExec& hot_exec) {
+  if (materials.empty())
+    return;
+
+  uint64_t size = materials.size() * sizeof(Material);
+  Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
+  manager.alloc(staging);
+
+  {
+    void* map_ = staging.alloc_info.pMappedData;
+    uint64_t offset_ = 0;
+    for (uint32_t i = 0; i < materials.size(); i++) {
+      memcpy((char*)map_ + offset_, (void*)&materials[i], sizeof(Material));
+      offset_ += sizeof(Material);
+    }
+  }
+
+  materials_device.size = size;
+  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+    const VkBufferCopy reg = {
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size = size,
+    };
+    vkCmdCopyBuffer(cmdbuf, staging.buffer, materials_device.buffer, 1, &reg);
+  });
+
+  manager.free(staging);
+}
+
+void Scene::upload_scene(const ResourceManager& manager, const HotExec& hot_exec) {
+  uint64_t size = sizeof(SceneBuffer);
+  Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
+  manager.alloc(staging);
+
+  {
+    void* map_ = staging.alloc_info.pMappedData;
+    memcpy(map_, &scene_buffer, size);
+  }
+
+  scene_device.size = size;
+  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+    const VkBufferCopy reg = {
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size = size,
+    };
+    vkCmdCopyBuffer(cmdbuf, staging.buffer, scene_device.buffer, 1, &reg);
+  });
+
+  manager.free(staging);
+}
+
+void Scene::upload(const ResourceManager& manager, const HotExec& hot_exec) {
+  upload_meshes(manager, hot_exec);
+  upload_images(manager, hot_exec);
+  upload_lights(manager, hot_exec);
+  upload_materials(manager, hot_exec);
 }
 
 void Scene::create_test_triangle() {
@@ -408,16 +547,8 @@ void Scene::create_test_triangle() {
     std::vector<glm::uvec3> f = {
         glm::uvec3(0, 1, 2),
     };
-    std::vector<Mesh::MeshPrimitive> mp{
-        {
-            .voffset = 0,
-            .vlength = 3,
-            .foffset = 0,
-            .flength = 1,
-            .mat_idx = 0,
-        },
-    };
-    Mesh trichen("trichen", model_mat, mp, p, n, u, f);
+    uint32_t mat_id = 0;
+    Mesh trichen("trichen", model_mat, mat_id, p, n, u, f);
     meshes.emplace_back(trichen);
   }
 
@@ -429,7 +560,7 @@ void Scene::create_test_triangle() {
 }
 
 void Scene::destroy(const ResourceManager& manager) {
-  release(manager);
+  free(manager);
   meshes.clear();
 }
 

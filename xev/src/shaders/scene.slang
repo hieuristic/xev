@@ -1,9 +1,8 @@
-module scene;
+#language slang 2026
 
-import light;
+implementing mesh;
 
-
-export struct Scene {
+struct Scene {
   float4x4 view;
   float4x4 proj;
   float3 view_pos;

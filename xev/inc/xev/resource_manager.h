@@ -7,6 +7,7 @@ namespace xev {
 
 class Buffer;
 class Image;
+class HotExec;
 
 class ResourceManager {
  public:
@@ -24,7 +25,18 @@ class ResourceManager {
   void alloc(Image& img) const;
   void free(Buffer& buf) const;
   void free(Image& img) const;
-  void upload(Buffer& buf, const void* src, uint64_t offset, uint64_t size) const;
+  void upload(Buffer& buf,
+              const void* src,
+              uint64_t offset,
+              uint64_t size) const;
+  void upload(const HotExec& hot_exec,
+              const std::vector<Buffer>& dsts,
+              const std::vector<void*>& srcs,
+              const std::vector<uint64_t>& sizes) const;
+  void upload(const HotExec& hot_exec,
+              const Buffer& dst,
+              const std::vector<void*>& srcs,
+              const std::vector<uint64_t>& sizes) const;
 
   void alloc(VkSampler& sampler, SamplerType type) const;
   void free(VkSampler& sampler) const;

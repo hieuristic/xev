@@ -1,14 +1,16 @@
+#include <xev/logger.h>
+#include <xev/pipeline_manager.h>
 #include <xev/renderer3D.h>
 #include <xev/resource/scene.h>
-#include <xev/pipeline_manager.h>
-#include <xev/logger.h>
 
 namespace xev {
 
-Renderer3D::Renderer3D(PipelineManager& pipeline_manager, VkDescriptorSetLayout global_layout)
+Renderer3D::Renderer3D(PipelineManager& pipeline_manager,
+                       VkDescriptorSetLayout global_layout)
     : m_pipeline_manager(pipeline_manager) {
   m_pipeline_manager.create(m_pipeline_mesh, VK_FORMAT_B8G8R8A8_SRGB,
-                            VK_FORMAT_D32_SFLOAT, global_layout, VK_SAMPLE_COUNT_1_BIT);
+                            VK_FORMAT_D32_SFLOAT, global_layout,
+                            VK_SAMPLE_COUNT_1_BIT);
 }
 
 Renderer3D::~Renderer3D() {
@@ -92,7 +94,7 @@ void Renderer3D::draw(VkCommandBuffer cmd,
   prepare_image(cmd, image);
 
   begin_render(cmd, image, clear_color);
-  draw_mesh(cmd, scene, camera, {image.width, image.height});
+  draw_mesh(cmd, scene, camera, image.width, image.height);
   end_render(cmd);
 
   prepare_transfer(cmd, image);
@@ -101,7 +103,8 @@ void Renderer3D::draw(VkCommandBuffer cmd,
 void Renderer3D::draw_mesh(VkCommandBuffer cmd,
                            const Scene& scene,
                            const Camera& camera,
-                           VkExtent2D extent) {
+                           uint32_t width,
+                           uint32_t height) {
   m_mesh_cmds.clear();
   for (size_t i = 0; i < scene.meshes.size(); ++i) {
     auto& mesh = scene.meshes[i];
@@ -114,7 +117,7 @@ void Renderer3D::draw_mesh(VkCommandBuffer cmd,
     };
     m_mesh_cmds.push_back(m_cmd);
   }
-  m_pipeline_mesh.draw(cmd, extent, scene, camera, m_mesh_cmds);
+  m_pipeline_mesh.draw(cmd, scene, camera, m_mesh_cmds, width, height);
 }
 
 }  // namespace xev

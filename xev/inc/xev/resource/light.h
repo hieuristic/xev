@@ -13,14 +13,15 @@ enum LightType {
 
 class Light {
  public:
-  glm::vec3 position;
-  glm::vec3 direction;
-  glm::vec3 color;
+  std::string name;
+  glm::vec3 position{0.0f, 0.0f, 0.0f};
+  glm::vec3 direction{0.0f, 0.0f, 1.0f};
+  glm::vec3 color{1.0f, 1.0f, 1.0f};
 
-  float range;
-  float intensity;
-  glm::vec2 offset;
-  uint32_t shadowmap_id;
+  float range{5.0f};
+  float intensity{1.0f};
+  glm::vec2 offset{0.0f, 0.0f};
+  uint32_t shadowmap_id{0};
 };
 
 }  // namespace xev

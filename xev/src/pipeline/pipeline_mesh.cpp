@@ -1,10 +1,10 @@
 #include <SDL3/SDL_filesystem.h>
-#include <xev/pipeline/pipeline_mesh.h>
 #include <xev/logger.h>
-#include <string>
-#include <fstream>
-#include <vector>
+#include <xev/pipeline/pipeline_mesh.h>
 #include <array>
+#include <fstream>
+#include <string>
+#include <vector>
 
 namespace xev {
 
@@ -35,12 +35,11 @@ static VkShaderModule load_shader_module(VkDevice device, const char* path) {
   return mod;
 }
 
-void PipelineMesh::create(
-    VkDevice device,
-    VkFormat color_format,
-    VkFormat depth_format,
-    VkDescriptorSetLayout global_layout,
-    VkSampleCountFlagBits sample_count) {
+void PipelineMesh::create(VkDevice device,
+                          VkFormat color_format,
+                          VkFormat depth_format,
+                          VkDescriptorSetLayout global_layout,
+                          VkSampleCountFlagBits sample_count) {
   VkShaderModule shader_vert, shader_frag;
   const char* base_path = SDL_GetBasePath();
   std::string shader_path = base_path
@@ -56,17 +55,15 @@ void PipelineMesh::create(
       .size = sizeof(PipelineMesh::PushConst),
   };
 
-  std::vector<VkDescriptorSetLayout> layouts = {global_layout};
-  std::vector<VkPushConstantRange> ranges = {push_const_range};
-
   VkPipelineLayoutCreateInfo layout_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = static_cast<uint32_t>(layouts.size()),
-      .pSetLayouts = layouts.data(),
-      .pushConstantRangeCount = static_cast<uint32_t>(ranges.size()),
-      .pPushConstantRanges = ranges.data(),
+      .setLayoutCount = 1,
+      .pSetLayouts = &global_layout,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &push_const_range,
   };
-  VkResult res_ = vkCreatePipelineLayout(device, &layout_info, nullptr, &m_layout);
+  VkResult res_ =
+      vkCreatePipelineLayout(device, &layout_info, nullptr, &m_layout);
   XEV_ASSERT_VK(res_, "Failed to create pipeline layout");
 
   VkPipelineViewportStateCreateInfo viewport_state = {
@@ -77,9 +74,8 @@ void PipelineMesh::create(
 
   VkPipelineColorBlendAttachmentState blend_attachments = {
       .blendEnable = VK_FALSE,
-      .colorWriteMask =
-          VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+      .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
   };
 
   VkPipelineColorBlendStateCreateInfo blend_state = {
@@ -115,11 +111,13 @@ void PipelineMesh::create(
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
       .vertexBindingDescriptionCount = 1,
       .pVertexBindingDescriptions = &vertex_binding,
-      .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertex_attributes.size()),
+      .vertexAttributeDescriptionCount =
+          static_cast<uint32_t>(vertex_attributes.size()),
       .pVertexAttributeDescriptions = vertex_attributes.data(),
   };
-  
-  std::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+
+  std::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
+                                                  VK_DYNAMIC_STATE_SCISSOR};
 
   VkPipelineDynamicStateCreateInfo dynamic_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -198,7 +196,8 @@ void PipelineMesh::create(
       .layout = m_layout,
   };
 
-  res_ = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &m_pipeline);
+  res_ = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
+                                   &pipeline_create_info, nullptr, &m_pipeline);
   XEV_ASSERT_VK(res_, "Failed to create graphics pipeline");
 
   vkDestroyShaderModule(device, shader_vert, nullptr);
@@ -211,17 +210,18 @@ void PipelineMesh::destroy(VkDevice device) {
 }
 
 void PipelineMesh::draw(VkCommandBuffer cmdbuf,
-                        VkExtent2D ext,
                         const Scene& scene,
                         const Camera& camera,
-                        const std::vector<PipelineMesh::Command>& draw_cmds) {
+                        const std::vector<PipelineMesh::Command>& draw_cmds,
+                        uint32_t width,
+                        uint32_t height) {
   vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
   VkViewport viewport = {
       .x = 0,
       .y = 0,
-      .width = (float)ext.width,
-      .height = (float)ext.height,
+      .width = static_cast<float>(width),
+      .height = static_cast<float>(height),
       .minDepth = 0.f,
       .maxDepth = 1.f,
   };
@@ -229,42 +229,32 @@ void PipelineMesh::draw(VkCommandBuffer cmdbuf,
 
   VkRect2D scissor = {
       .offset = {},
-      .extent = ext,
+      .extent = {width, height},
   };
   vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 
-  glm::mat4 vp = camera.create_vp_mat();
+  glm::mat4 view_proj = camera.create_vp_mat();
 
   uint32_t prev_mesh_id = static_cast<uint32_t>(-1);
 
+  VkDeviceAddress vert_addr{0};
   for (const auto& cmd : draw_cmds) {
     const Mesh& mesh = scene.meshes[cmd.mesh_id];
     if (cmd.mesh_id != prev_mesh_id) {
+      mesh.bind(cmdbuf, vert_addr);
       prev_mesh_id = cmd.mesh_id;
-      vkCmdBindIndexBuffer(cmdbuf, mesh.get_face_buffer(), 0,
-                           VK_INDEX_TYPE_UINT32);
-      VkBuffer tmp_buffer = mesh.get_vert_buffer();
-      VkDeviceSize tmp_size = 0;
-      vkCmdBindVertexBuffers(cmdbuf, 0, 1, &tmp_buffer, &tmp_size);
     }
 
-    PushConst push_const = {
-        .mvp = vp * cmd.to_world,
-        .scene_uniform = 0,
-        .vertex_buffer = 0,
-        .material_id = cmd.material_id,
-        .padding = 0,
-    };
+    PushConst push_const = {.view_proj = view_proj,
+                            .scene_addr = scene.scene_device.addr,
+                            .vert_addr = mesh.get_vert_addr(),
+                            .mat_id = mesh.get_material_id()};
 
     vkCmdPushConstants(
         cmdbuf, m_layout,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
         sizeof(PushConst), &push_const);
-
-    for (const auto& pri : mesh.get_primitives()) {
-      vkCmdDrawIndexed(cmdbuf, pri.flength * 3, 1, pri.foffset * 3, pri.voffset,
-                       0);
-    }
+    vkCmdDrawIndexed(cmdbuf, mesh.get_face_count() * 3, 1, 0, 0, 0);
   }
 }
 

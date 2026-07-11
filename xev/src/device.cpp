@@ -1,11 +1,11 @@
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
 #include <xev/device.h>
 #include <xev/logger.h>
 #include <xev/volk.h>
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
-#include <vector>
-#include <string>
 #include <set>
+#include <string>
+#include <vector>
 
 namespace xev {
 
@@ -19,6 +19,7 @@ Device::Device() {
   pick_physical_device();
   find_queue_family();
   init_logical_device();
+  init_queues();
 }
 
 Device::Device(SDL_Window* window) {
@@ -27,11 +28,12 @@ Device::Device(SDL_Window* window) {
   init_surface(window);
   find_queue_family();
   init_logical_device();
+  init_queues();
 }
 
 Device::~Device() {
-  if (logical_device != VK_NULL_HANDLE)
-    vkDestroyDevice(logical_device, nullptr);
+  if (device != VK_NULL_HANDLE)
+    vkDestroyDevice(device, nullptr);
   if (surface != VK_NULL_HANDLE)
     vkDestroySurfaceKHR(instance, surface, nullptr);
   if (instance != VK_NULL_HANDLE)
@@ -224,13 +226,28 @@ void Device::init_logical_device() {
       .ppEnabledExtensionNames = ext_names.data(),
   };
 
-  res_ = vkCreateDevice(physical_device, &info, nullptr, &logical_device);
+  res_ = vkCreateDevice(physical_device, &info, nullptr, &device);
   if (res_ != VK_SUCCESS) {
     XEV_ERROR("Failed to create logical device: {}", (int)res_);
     return;
   }
 
-  volkLoadDevice(logical_device);
+  volkLoadDevice(device);
+}
+
+void Device::init_queues() {
+  VkResult res_;
+  vkGetDeviceQueue(device, queue_family.graphics.value().idx, 0,
+                   &graphics_queue);
+
+  if (surface != VK_NULL_HANDLE) {
+    if (queue_family.graphics.value().idx == queue_family.present.value().idx) {
+      present_queue = graphics_queue;
+    } else {
+      vkGetDeviceQueue(device, queue_family.present.value().idx, 0,
+                       &present_queue);
+    }
+  }
 }
 
 }  // namespace xev

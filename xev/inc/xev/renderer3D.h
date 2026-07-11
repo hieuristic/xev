@@ -1,7 +1,7 @@
 #pragma once
+#include <xev/color.h>
 #include <xev/pipeline/pipeline_mesh.h>
 #include <xev/resource/image.h>
-#include <xev/color.h>
 
 namespace xev {
 
@@ -9,7 +9,8 @@ class PipelineManager;
 
 class Renderer3D {
  public:
-  Renderer3D(PipelineManager& pipeline_manager_, VkDescriptorSetLayout global_layout);
+  Renderer3D(PipelineManager& pipeline_manager_,
+             VkDescriptorSetLayout global_layout);
   ~Renderer3D();
 
   void draw(VkCommandBuffer cmd,
@@ -17,7 +18,11 @@ class Renderer3D {
             const Scene& scene,
             const Camera& camera,
             Color4<float> clear_color);
-  void draw_mesh(VkCommandBuffer cmd, const Scene& scene, const Camera& camera, VkExtent2D extent);
+  void draw_mesh(VkCommandBuffer cmd,
+                 const Scene& scene,
+                 const Camera& camera,
+                 uint32_t width,
+                 uint32_t height);
 
  public:
   // in sync with scene.slang
@@ -45,7 +50,9 @@ class Renderer3D {
  private:
   void prepare_image(VkCommandBuffer& cmd, const Image& image);
   void prepare_transfer(VkCommandBuffer& cmd, const Image& image);
-  void begin_render(VkCommandBuffer& cmd, const Image& image, const Color4<float> clear_color);
+  void begin_render(VkCommandBuffer& cmd,
+                    const Image& image,
+                    const Color4<float> clear_color);
   void end_render(VkCommandBuffer& cmd);
 
   PipelineManager& m_pipeline_manager;

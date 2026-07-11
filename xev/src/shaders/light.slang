@@ -1,13 +1,15 @@
+#language slang 2026
 // should be in sync with inc/xev/resouce/light.h
-module light;
 
-export enum LightType {
+implementing mesh;
+
+enum LightType {
   DIRECTIONAL,
   POINT,
   SPOT,
 };
 
-export struct Light {
+struct Light {
   LightType type;
 
   float3 position;
