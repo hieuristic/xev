@@ -8,7 +8,6 @@ GlobalDescriptorSet::GlobalDescriptorSet(VkDevice device) : m_device(device) {
 
   free_textures_l1.fill(0);
   free_textures_l0.fill(0);
-  free_samplers = 0;
 
   {  // create descriptor pool
     std::array<VkDescriptorPoolSize, 2> sizes = {{
@@ -76,9 +75,65 @@ GlobalDescriptorSet::GlobalDescriptorSet(VkDevice device) : m_device(device) {
     res_ = vkAllocateDescriptorSets(m_device, &info, &m_set);
     XEV_ASSERT_VK(res_, "Failed to create descriptor set.");
   }
+
+  init_samplers();
+
+  XEV_INFO("Created descriptor set!");
+}
+
+void GlobalDescriptorSet::set(const Sampler& sampler, uint32_t id) const {
+  const VkDescriptorImageInfo info = {
+      .sampler = sampler.sampler,
+  };
+  const VkWriteDescriptorSet write_set = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = m_set,
+      .dstBinding = SAMPLER_BINDING,  // binding 1
+      .dstArrayElement = id,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+      .pImageInfo = &info,
+  };
+  vkUpdateDescriptorSets(m_device, 1, &write_set, 0, nullptr);
+}
+
+void GlobalDescriptorSet::alloc_sampler(Sampler& sampler) {
+  VkSamplerCreateInfo info = {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .anisotropyEnable = VK_TRUE,
+      .maxAnisotropy = MAX_SAMPLER_ANISOTROPY,
+  };
+
+  switch (sampler.type) {
+    case SamplerType::SAMPLER_LINEAR:
+      info.magFilter = VK_FILTER_LINEAR;
+      info.minFilter = VK_FILTER_LINEAR;
+      info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+      info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      break;
+  }
+
+  VkResult res_ = vkCreateSampler(m_device, &info, nullptr, &sampler.sampler);
+  XEV_ASSERT_VK(res_, "Failed to create sampler");
+}
+
+void GlobalDescriptorSet::free_sampler(Sampler& sampler) {
+  vkDestroySampler(m_device, sampler.sampler, nullptr);
+  sampler.sampler = VK_NULL_HANDLE;
+}
+
+void GlobalDescriptorSet::init_samplers() {
+  for (uint32_t i = 0; i < m_global_samplers.size(); i++) {
+    alloc_sampler(m_global_samplers[i]);
+    set(m_global_samplers[i], i);
+  }
 }
 
 GlobalDescriptorSet::~GlobalDescriptorSet() {
+  for (auto& sampler : m_global_samplers)
+    free_sampler(sampler);
+
   if (m_pool != VK_NULL_HANDLE) {
     vkDestroyDescriptorPool(m_device, m_pool, nullptr);
     m_pool = VK_NULL_HANDLE;
@@ -96,7 +151,7 @@ uint32_t GlobalDescriptorSet::set(const Image& image) {
   return id;
 }
 
-void GlobalDescriptorSet::set(const Image& image, uint32_t id) {
+void GlobalDescriptorSet::set(const Image& image, uint32_t id) const {
   const VkDescriptorImageInfo info = {
       .imageView = image.view,
       .imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
@@ -131,10 +186,6 @@ void GlobalDescriptorSet::unset_texture(uint32_t id) {
     free_textures_l1[idx_l1 / 64] &= ~(1ULL << free_bit_l1);
   uint32_t free_bit_l0 = id % 64;
   free_textures_l0[idx_l1] &= ~(1ULL << free_bit_l0);
-}
-
-void GlobalDescriptorSet::unset_sampler(uint32_t id) {
-  free_samplers &= ~(1ULL << id);
 }
 
 uint32_t GlobalDescriptorSet::get_free_texture_id() {

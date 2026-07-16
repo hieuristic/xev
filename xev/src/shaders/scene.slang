@@ -5,7 +5,7 @@ implementing mesh;
 struct Scene {
   float4x4 view;
   float4x4 proj;
-  float3 view_pos;
+  float3 view_xyz;
 
   // ambient
   float3 ambient_color;
@@ -16,8 +16,9 @@ struct Scene {
   float fog_density;
 
   // light
-  uint64_t light_buffer_address;
+  Light* lights;
+  uint32_t num_lights;
 
   // material
-  uint64_t material_buffer_address;
+  Material* materials;
 };

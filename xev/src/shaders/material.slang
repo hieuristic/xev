@@ -10,4 +10,4 @@ struct Material {
 
   uint32_t albedo_texid;
   uint32_t metallic_roughness_texid;
-}
+};

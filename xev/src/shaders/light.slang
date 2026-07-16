@@ -11,8 +11,7 @@ enum LightType {
 
 struct Light {
   LightType type;
-
-  float3 position;
+  float3 xyz;
   float3 direction;
   float3 color;
 

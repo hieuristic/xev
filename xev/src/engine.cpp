@@ -59,10 +59,10 @@ void Engine::init_pipeline_manager() {
 }
 
 void Engine::init_global_descriptor_set() {
-  if (global_decriptor_set != nullptr)
+  if ((global_descriptor_set != nullptr) || (resource_manager == nullptr))
     return;
 
-  global_decriptor_set =
+  global_descriptor_set =
       std::make_unique<GlobalDescriptorSet>(m_device->device);
 }
 
@@ -79,9 +79,6 @@ void Engine::init_frame_context() {
 }
 
 void Engine::leave_frame(VkCommandBuffer cmd, const Image& image) {
-  VkResult res_ = vkEndCommandBuffer(cmd);
-  XEV_ASSERT_VK(res_, "Failed to end command buffer");
-
   const auto& frame = frame_context->get_current_frame();
 
   const Image& swapchain_img = swapchain->acquire_image(frame.present_sem);
@@ -96,6 +93,9 @@ void Engine::leave_frame(VkCommandBuffer cmd, const Image& image) {
 
   const_cast<Image&>(swapchain_img)
       .update_layout(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+  VkResult res_ = vkEndCommandBuffer(cmd);
+  XEV_ASSERT_VK(res_, "Failed to end command buffer");
 
   VkSemaphoreSubmitInfo wait_info = {
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,

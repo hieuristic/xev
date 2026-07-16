@@ -13,5 +13,5 @@ struct VODEBUG {
   float3 normal;
   float2 uv;
   uint face_id : PRIMITIVE_ID;
-  float world_position;
+  float3 world_xyz;
 };

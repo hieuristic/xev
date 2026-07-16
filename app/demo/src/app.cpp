@@ -33,7 +33,7 @@ App::App() {
   m_engine->init_frame_context();
 
   m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipeline_manager,
-                                                   m_engine->global_decriptor_set->get_layout());
+                                                   m_engine->global_descriptor_set->get_layout());
 
   m_scene = std::make_unique<xev::Scene>();
   const char* base_path = SDL_GetBasePath();
@@ -46,7 +46,8 @@ App::App() {
   // m_scene->create_test_triangle();
   m_scene->alloc(*m_engine->resource_manager);
   m_scene->upload(*m_engine->resource_manager, *m_engine->hot_exec);
-  m_scene->active_cam.set_aspect(m_window->get_aspect());
+  m_scene->bind(*m_engine->global_descriptor_set);
+  // m_scene->active_cam.set_aspect(m_window->get_aspect());
 
   m_keystate = SDL_GetKeyboardState(NULL);
   m_last_time = SDL_GetTicks();

@@ -8,7 +8,17 @@ namespace xev {
 
 class ResourceManager;
 
-// this is in-sync with shaders/material.slang
+// in-sync with shaders/material.slang
+struct MaterialGPU {
+  Color4<uint8_t> albedo;
+  float metal_coef;
+  float rough_coef;
+  float emiss_coef;
+
+  uint32_t albedo_texid;
+  uint32_t metallic_roughness_texid;
+};
+
 class Material : public Resource {
  public:
   std::string name;

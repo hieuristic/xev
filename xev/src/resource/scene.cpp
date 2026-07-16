@@ -204,8 +204,7 @@ void Scene::load_gltf(std::string_view filepath) {
   for (const auto& gltf_mat : model.materials) {
     Material mat;
     mat.name = gltf_mat.name;
-    mat.albedo =
-        Color4<uint8_t>(gltf_mat.pbrMetallicRoughness.baseColorFactor);
+    mat.albedo = Color4<uint8_t>(gltf_mat.pbrMetallicRoughness.baseColorFactor);
     mat.metal_coef =
         static_cast<float>(gltf_mat.pbrMetallicRoughness.metallicFactor);
     mat.rough_coef =
@@ -436,16 +435,26 @@ void Scene::upload_lights(const ResourceManager& manager,
   if (lights.empty())
     return;
 
-  uint64_t size = lights.size() * sizeof(Light);
+  uint64_t size = lights.size() * sizeof(LightGPU);
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
 
   {
-    void* map_ = staging.alloc_info.pMappedData;
-    uint64_t offset_ = 0;
+    LightGPU* map_ = static_cast<LightGPU*>(staging.alloc_info.pMappedData);
+    // uint64_t offset_ = 0;
     for (uint32_t i = 0; i < lights.size(); i++) {
-      memcpy((char*)map_ + offset_, &lights[i], sizeof(Light));
-      offset_ += sizeof(Light);
+      map_[i] = {
+          .type = static_cast<uint32_t>(lights[i].type),
+          .position = lights[i].position,
+          .direction = lights[i].direction,
+          .color = lights[i].color,
+          .range = lights[i].range,
+          .intensity = lights[i].intensity,
+          .offset = lights[i].offset,
+          .shadowmap_id = lights[i].shadowmap_id,
+      };
+      // memcpy((char*)map_ + offset_, &lights[i], sizeof(Light));
+      // offset_ += sizeof(Light);
     }
   }
 
@@ -467,16 +476,25 @@ void Scene::upload_materials(const ResourceManager& manager,
   if (materials.empty())
     return;
 
-  uint64_t size = materials.size() * sizeof(Material);
+  uint64_t size = materials.size() * sizeof(MaterialGPU);
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
 
   {
-    void* map_ = staging.alloc_info.pMappedData;
+    MaterialGPU* map_ =
+        static_cast<MaterialGPU*>(staging.alloc_info.pMappedData);
     uint64_t offset_ = 0;
     for (uint32_t i = 0; i < materials.size(); i++) {
-      memcpy((char*)map_ + offset_, (void*)&materials[i], sizeof(Material));
-      offset_ += sizeof(Material);
+      map_[i] = {
+          .albedo = materials[i].albedo,
+          .metal_coef = materials[i].metal_coef,
+          .rough_coef = materials[i].rough_coef,
+          .emiss_coef = materials[i].emiss_coef,
+          .albedo_texid = materials[i].albedo_texid,
+          .metallic_roughness_texid = materials[i].metallic_roughness_texid,
+      };
+      // memcpy((char*)map_ + offset_, (void*)&materials[i], sizeof(Material));
+      // offset_ += sizeof(Material);
     }
   }
 
@@ -493,7 +511,8 @@ void Scene::upload_materials(const ResourceManager& manager,
   manager.free(staging);
 }
 
-void Scene::upload_scene(const ResourceManager& manager, const HotExec& hot_exec) {
+void Scene::upload_scene(const ResourceManager& manager,
+                         const HotExec& hot_exec) {
   uint64_t size = sizeof(SceneBuffer);
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
@@ -521,6 +540,13 @@ void Scene::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   upload_images(manager, hot_exec);
   upload_lights(manager, hot_exec);
   upload_materials(manager, hot_exec);
+}
+
+void Scene::bind(const GlobalDescriptorSet& desc_set) {
+  for (uint32_t i = 0; i <= images.size(); i++) {
+    desc_set.set(images[i], i);
+    XEV_INFO("ADDING IMAGE {} TO DESCRIPTOR SET", i);
+  }
 }
 
 void Scene::create_test_triangle() {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <xev/camera.h>
+#include <xev/global_descriptor_set.h>
 #include <xev/resource/image.h>
 #include <xev/resource/light.h>
 #include <xev/resource/material.h>
@@ -8,7 +9,6 @@
 #include <xev/resource/resource.h>
 #include <xev/resource/sampler.h>
 #include <xev/scene_buffer.h>
-#include <xev/global_descriptor_set.h>
 #include <glm/glm.hpp>
 #include <queue>
 #include <string>
@@ -68,7 +68,6 @@ class Scene : public Resource {
   void upload_scene(const ResourceManager& manager, const HotExec& hot_exec);
 
   void bind(const GlobalDescriptorSet& desc_set);
-
 
  private:
   void parse_mesh(std::vector<Mesh>& out_meshes,

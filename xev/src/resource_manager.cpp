@@ -25,7 +25,8 @@ void ResourceManager::init_allocator(VkInstance instance,
   VmaAllocatorCreateInfo info = {
       .flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT |
                VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT |
-               VMA_ALLOCATOR_CREATE_KHR_BIND_MEMORY2_BIT,
+               VMA_ALLOCATOR_CREATE_KHR_BIND_MEMORY2_BIT |
+               VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
       .physicalDevice = physical_device,
       .device = device,
       .instance = instance,
@@ -73,13 +74,6 @@ void ResourceManager::free(Buffer& buf) const {
   vmaDestroyBuffer(m_allocator, buf.buffer, buf.alloc);
 }
 
-void ResourceManager::upload(Buffer& buf,
-                             const void* src,
-                             uint64_t offset,
-                             uint64_t size) const {
-  // TODO: THIS IS DEPRECATED
-}
-
 void ResourceManager::upload(const HotExec& hot_exec,
                              const std::vector<Buffer>& dsts,
                              const std::vector<void*>& srcs,
@@ -94,7 +88,8 @@ void ResourceManager::upload(const HotExec& hot_exec,
   {
     uint64_t offset_ = 0;
     for (uint32_t i = 0; i < dsts.size(); i++) {
-      memcpy((char*)staging.alloc_info.pMappedData + offset_, srcs[i], sizes[i]);
+      memcpy((char*)staging.alloc_info.pMappedData + offset_, srcs[i],
+             sizes[i]);
       offset_ += sizes[i];
     }
   }
@@ -129,7 +124,8 @@ void ResourceManager::upload(const HotExec& hot_exec,
   {
     uint64_t offset_ = 0;
     for (uint32_t i = 0; i < srcs.size(); i++) {
-      memcpy((char*)staging.alloc_info.pMappedData + offset_, srcs[i], sizes[i]);
+      memcpy((char*)staging.alloc_info.pMappedData + offset_, srcs[i],
+             sizes[i]);
       offset_ += sizes[i];
     }
   }
@@ -206,31 +202,6 @@ void ResourceManager::free(Image& img) const {
     vmaDestroyImage(m_allocator, img.image, img.alloc);
     img.image = VK_NULL_HANDLE;
   }
-}
-
-void ResourceManager::alloc(VkSampler& sampler, SamplerType type) const {
-  VkSamplerCreateInfo info = {
-      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-      .anisotropyEnable = VK_TRUE,
-      .maxAnisotropy = MAX_SAMPLER_ANISOTROPY,
-  };
-
-  switch (type) {
-    case SamplerType::SAMPLER_LINEAR:
-      info.magFilter = VK_FILTER_LINEAR;
-      info.minFilter = VK_FILTER_LINEAR;
-      info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-      info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-      info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-      break;
-  }
-
-  VkResult res_ = vkCreateSampler(m_device, &info, nullptr, &sampler);
-  XEV_ASSERT_VK(res_, "Failed to create sampler");
-}
-
-void ResourceManager::free(VkSampler& sampler) const {
-  vkDestroySampler(m_device, sampler, nullptr);
 }
 
 }  // namespace xev
