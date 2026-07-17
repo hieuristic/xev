@@ -123,6 +123,12 @@ void GlobalDescriptorSet::free_sampler(Sampler& sampler) {
   sampler.sampler = VK_NULL_HANDLE;
 }
 
+void GlobalDescriptorSet::bind(VkCommandBuffer cmdbuf,
+                               VkPipelineLayout pipeline_layout) const {
+  vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipeline_layout, 0, 1, &m_set, 0, nullptr);
+}
+
 void GlobalDescriptorSet::init_samplers() {
   for (uint32_t i = 0; i < m_global_samplers.size(); i++) {
     alloc_sampler(m_global_samplers[i]);

@@ -21,6 +21,6 @@ class Controller {
               glm::quat& rot);
 
  private:
-  float m_velocity_coef = 100.0;
+  float m_velocity_coef = 10.0;
   float m_sensitivity = 0.5;
 };

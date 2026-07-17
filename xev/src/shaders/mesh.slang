@@ -1,6 +1,7 @@
 #language slang 2026
 // #define DEBUG_MESH_NORMAL
 // #define DEBUG_MESH_DEPTH
+// #define DEBUG_MESH_ALBEDO
 
 module mesh;
 __include vertex;
@@ -37,6 +38,10 @@ float4 main(VODEBUG vo): SV_TARGET {
   float g = vo.normal.y * 0.5 + 0.5;
   float b = vo.normal.z * 0.5 + 0.5;
   return float4(r, g, b, 1.0);
+#elif defined(DEBUG_MESH_ALBEDO)
+  Material mat = pc.scene_ptr->materials[pc.mat_id];
+  float3 diffuse = sample2DLinear(mat.albedo_texid, vo.uv).rgb;
+  return float4(diffuse, 1.0);
 #else
   Material mat = pc.scene_ptr->materials[pc.mat_id];
   float3 diffuse = sample2DLinear(mat.albedo_texid, vo.uv).rgb;
@@ -50,13 +55,12 @@ float4 main(VODEBUG vo): SV_TARGET {
   float3 v = normalize(cam_xyz - pix_xyz);
   float3 n = vo.normal;
   float3 color = float3(0.0);
-  // TODO: iterate over lights here
   for (int i = 0; i < pc->scene_ptr->num_lights; i++) {
     Light light = pc->scene_ptr->lights[i];
     float3 l = normalize(light.xyz - pix_xyz); // for light
     float3 h = normalize(v + l);
     float dist = length(light.xyz - pix_xyz);
-    float3 radiance = light.color * light.intensity / (dist * dist) * 1000;
+    float3 radiance = light.color * light.intensity / (dist * dist) * 100;
     color += brdf(diffuse, roughness, metallic, f0, v, n, l, h) *
              radiance * max(dot(n, l), 0.0);
   }

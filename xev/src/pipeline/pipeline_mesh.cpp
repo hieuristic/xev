@@ -63,7 +63,7 @@ void PipelineMesh::create(VkDevice device,
       .pPushConstantRanges = &push_const_range,
   };
   VkResult res_ =
-      vkCreatePipelineLayout(device, &layout_info, nullptr, &m_layout);
+      vkCreatePipelineLayout(device, &layout_info, nullptr, &layout);
   XEV_ASSERT_VK(res_, "Failed to create pipeline layout");
 
   VkPipelineViewportStateCreateInfo viewport_state = {
@@ -194,11 +194,11 @@ void PipelineMesh::create(VkDevice device,
       .pDepthStencilState = &depth_stencil_state,
       .pColorBlendState = &blend_state,
       .pDynamicState = &dynamic_info,
-      .layout = m_layout,
+      .layout = layout,
   };
 
   res_ = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
-                                   &pipeline_create_info, nullptr, &m_pipeline);
+                                   &pipeline_create_info, nullptr, &pipeline);
   XEV_ASSERT_VK(res_, "Failed to create graphics pipeline");
 
   vkDestroyShaderModule(device, shader_vert, nullptr);
@@ -206,8 +206,8 @@ void PipelineMesh::create(VkDevice device,
 }
 
 void PipelineMesh::destroy(VkDevice device) {
-  vkDestroyPipelineLayout(device, m_layout, nullptr);
-  vkDestroyPipeline(device, m_pipeline, nullptr);
+  vkDestroyPipelineLayout(device, layout, nullptr);
+  vkDestroyPipeline(device, pipeline, nullptr);
 }
 
 void PipelineMesh::draw(VkCommandBuffer cmdbuf,
@@ -216,7 +216,7 @@ void PipelineMesh::draw(VkCommandBuffer cmdbuf,
                         const std::vector<PipelineMesh::Command>& draw_cmds,
                         uint32_t width,
                         uint32_t height) {
-  vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+  vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
   VkViewport viewport = {
       .x = 0,
@@ -248,7 +248,7 @@ void PipelineMesh::draw(VkCommandBuffer cmdbuf,
 
     PushConst push_const = {
         .view_proj = view_proj,
-      .model_mat = mesh.get_model_mat(),
+        .model_mat = mesh.get_model_mat(),
         .cam_xyz = camera.pos,
         .scene_addr = scene.scene_device.addr,
         .vert_addr = mesh.get_vert_addr(),
@@ -256,7 +256,7 @@ void PipelineMesh::draw(VkCommandBuffer cmdbuf,
     };
 
     vkCmdPushConstants(
-        cmdbuf, m_layout,
+        cmdbuf, layout,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
         sizeof(PushConst), &push_const);
     vkCmdDrawIndexed(cmdbuf, mesh.get_face_count() * 3, 1, 0, 0, 0);

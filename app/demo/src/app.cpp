@@ -98,7 +98,8 @@ void App::draw() {
         m_engine->frame_context->get_current_render_target();
     const xev::Image& output_depth =
         m_engine->frame_context->get_current_render_depth();
-    m_renderer3D->draw(cmdbuf, output_color, output_depth, *m_scene,
+    m_renderer3D->draw(cmdbuf, output_color, output_depth,
+                       *m_engine->global_descriptor_set, *m_scene,
                        m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
     m_engine->submit_and_show(cmdbuf, output_color);
   }

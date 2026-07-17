@@ -16,6 +16,7 @@ class Renderer3D {
   void draw(VkCommandBuffer cmd,
             const Image& color_image,
             const Image& depth_image,
+            const GlobalDescriptorSet& desc_set,
             const Scene& scene,
             const Camera& camera,
             Color4<float> clear_color);

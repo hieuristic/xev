@@ -1,7 +1,7 @@
 #pragma once
-#include <xev/volk.h>
 #include <xev/resource/image.h>
 #include <xev/resource/sampler.h>
+#include <xev/volk.h>
 #include <array>
 
 namespace xev {
@@ -14,14 +14,15 @@ class GlobalDescriptorSet {
   ~GlobalDescriptorSet();
   static const uint32_t MAX_TEXTURE = 2 << 14;
   static const uint32_t MAX_SAMPLER = 2 << 5;
-  static const uint8_t TEXTURE_BINDING = 0;
-  static const uint8_t SAMPLER_BINDING = 1;
+  static const uint8_t SAMPLER_BINDING = 0;
+  static const uint8_t TEXTURE_BINDING = 1;
 
   uint32_t set(const Image& image);
   void set(const Image& image, uint32_t id) const;
   void unset_texture(uint32_t id);
-
   void set(const Sampler& sampler, uint32_t id) const;
+
+  void bind(VkCommandBuffer cmdbuf, VkPipelineLayout pipeline_layout) const;
 
   VkDescriptorSetLayout get_layout() const { return m_layout; }
 
@@ -34,7 +35,7 @@ class GlobalDescriptorSet {
   std::array<uint64_t, 4> free_textures_l1;
   std::array<uint64_t, 256> free_textures_l0;
 
-  std::array<Sampler, 1> m_global_samplers {Sampler{SAMPLER_LINEAR}};
+  std::array<Sampler, 1> m_global_samplers{Sampler{SAMPLER_LINEAR}};
   void alloc_sampler(Sampler& sampler);
   void free_sampler(Sampler& sampler);
   void init_samplers();

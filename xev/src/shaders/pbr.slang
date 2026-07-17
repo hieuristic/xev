@@ -29,7 +29,7 @@ public float V_Smith(float nv, float nl, float alpha) {
   float a = alpha * alpha;
   float v_ggx = nl * sqrt(nv * nv * (1 - a) + a);
   float l_ggx = nv * sqrt(nl * nl * (1 - a) + a);
-  return 0.5 / (v_ggx + l_ggx);
+  return 0.5 / max(v_ggx + l_ggx, 0.00001);
 }
 
 public float F_Schlick(float u, float f0, float f90) {
@@ -59,5 +59,5 @@ public float3 brdf(float3 diffuse, float roughness, float metallic, float3 f0,
 
   float3 fr = (G_TR(nh, alpha) * V_Smith(nv, nl, alpha)) * F_Schlick(hv, f0, 1.0);
   float fd = fd_Lambert();
-  return fd + fr;
+  return diffuse * (fd + fr);
 }

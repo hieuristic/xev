@@ -5,7 +5,7 @@
 
 namespace xev {
 
-class PipelineMesh : Pipeline {
+class PipelineMesh : public Pipeline {
  public:
   struct SceneUniform {};
   struct SceneMeshes {};

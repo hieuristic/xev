@@ -7,10 +7,8 @@ namespace xev {
 class Pipeline {
  public:
   virtual void draw() {}
-
- protected:
-  VkPipelineLayout m_layout;
-  VkPipeline m_pipeline;
+  VkPipelineLayout layout;
+  VkPipeline pipeline;
 };
 
 }  // namespace xev

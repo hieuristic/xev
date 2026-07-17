@@ -210,9 +210,13 @@ void Scene::load_gltf(std::string_view filepath) {
     mat.rough_coef =
         static_cast<float>(gltf_mat.pbrMetallicRoughness.roughnessFactor);
 
-    mat.albedo_texid = gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
+    int albedo_idx = gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
+    mat.albedo_texid =
+        (albedo_idx >= 0) ? model.textures[albedo_idx].source : -1;
+
+    int mr_idx = gltf_mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
     mat.metallic_roughness_texid =
-        gltf_mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+        (mr_idx >= 0) ? model.textures[mr_idx].source : -1;
     materials.emplace_back(mat);
   }
 
@@ -225,8 +229,21 @@ void Scene::load_gltf(std::string_view filepath) {
     Image img{static_cast<uint32_t>(gltf_img.width),
               static_cast<uint32_t>(gltf_img.height), VK_FORMAT_R8G8B8A8_SRGB,
               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT};
-    std::copy(gltf_img.image.begin(), gltf_img.image.end(),
-              std::back_inserter(img.host_data));
+
+    if (gltf_img.component == 3) {
+      img.host_data.resize(gltf_img.width * gltf_img.height * 4);
+      for (size_t i = 0; i < gltf_img.width * gltf_img.height; ++i) {
+        img.host_data[i * 4 + 0] = gltf_img.image[i * 3 + 0];  // R
+        img.host_data[i * 4 + 1] = gltf_img.image[i * 3 + 1];  // G
+        img.host_data[i * 4 + 2] = gltf_img.image[i * 3 + 2];  // B
+        img.host_data[i * 4 + 3] = 255;                        // Alpha
+      }
+    } else if (gltf_img.component == 4) {
+      std::copy(gltf_img.image.begin(), gltf_img.image.end(),
+                std::back_inserter(img.host_data));
+    } else {
+      XEV_WARN("Unsupported channel count: {}", gltf_img.component);
+    }
     images.emplace_back(img);
   }
 
@@ -286,7 +303,8 @@ void Scene::load_gltf(std::string_view filepath) {
       // active_cam =
       //     Camera(abs_rot, abs_pos,
       //            glm::degrees(static_cast<float>(camera.perspective.yfov)));
-      active_cam = Camera(abs_rot, abs_pos, 70); // TODO REMOVE HARDCODE LATER, THIS IS FOR DEBUG
+      active_cam = Camera(abs_rot, abs_pos,
+                          70);  // TODO REMOVE HARDCODE LATER, THIS IS FOR DEBUG
       XEV_INFO("Camera zfar {}, znear {}", active_cam.far, active_cam.near);
       cam_found = true;
     }
@@ -442,6 +460,7 @@ void Scene::upload_lights(const ResourceManager& manager,
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
 
+  XEV_INFO("UPLOADING {} LIGHT(S)", lights.size());
   {
     LightGPU* map_ = static_cast<LightGPU*>(staging.alloc_info.pMappedData);
     // uint64_t offset_ = 0;

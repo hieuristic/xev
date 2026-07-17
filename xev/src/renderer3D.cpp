@@ -115,16 +115,18 @@ void Renderer3D::end_render(VkCommandBuffer& cmd) {
 void Renderer3D::draw(VkCommandBuffer cmd,
                       const Image& color_image,
                       const Image& depth_image,
+                      const GlobalDescriptorSet& desc_set,
                       const Scene& scene,
                       const Camera& camera,
                       Color4<float> clear_color) {
   XEV_ASSERT(scene.on_device() && color_image.on_device() &&
              depth_image.on_device());
 
+  desc_set.bind(cmd, m_pipeline_mesh.layout);
   prepare_attachments(cmd, color_image, depth_image);
-
   begin_render(cmd, color_image, depth_image, clear_color);
-  draw_mesh(cmd, scene, camera, color_image.width, color_image.height);
+  draw_mesh(cmd, scene, camera, color_image.width,
+            color_image.height);
   end_render(cmd);
 
   prepare_transfer(cmd, color_image);
