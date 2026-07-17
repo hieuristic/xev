@@ -134,7 +134,8 @@ void PipelineMesh::create(VkDevice device,
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .polygonMode = VK_POLYGON_MODE_FILL,
       .cullMode = VK_CULL_MODE_BACK_BIT,
-      .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      // .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .frontFace = VK_FRONT_FACE_CLOCKWISE,
       .lineWidth = 1.f,
   };
   VkPipelineMultisampleStateCreateInfo multisampling_state = {
@@ -245,10 +246,14 @@ void PipelineMesh::draw(VkCommandBuffer cmdbuf,
       prev_mesh_id = cmd.mesh_id;
     }
 
-    PushConst push_const = {.view_proj = view_proj,
-                            .scene_addr = scene.scene_device.addr,
-                            .vert_addr = mesh.get_vert_addr(),
-                            .mat_id = mesh.get_material_id()};
+    PushConst push_const = {
+        .view_proj = view_proj,
+      .model_mat = mesh.get_model_mat(),
+        .cam_xyz = camera.pos,
+        .scene_addr = scene.scene_device.addr,
+        .vert_addr = mesh.get_vert_addr(),
+        .mat_id = mesh.get_material_id(),
+    };
 
     vkCmdPushConstants(
         cmdbuf, m_layout,

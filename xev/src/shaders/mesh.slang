@@ -1,5 +1,5 @@
 #language slang 2026
-#define DEBUG_MESH_NORMAL
+// #define DEBUG_MESH_NORMAL
 // #define DEBUG_MESH_DEPTH
 
 module mesh;
@@ -16,17 +16,23 @@ import pbr;
 VODEBUG main(uint vid : SV_VertexID) {
   VODEBUG vo;
   Vertex vi = pc.vert_ptr[vid];
-  vo.position = mul(pc.view_proj, float4(vi.position, 1.0));
-  vo.normal = vi.normal;
+  float4 world_pos = mul(pc.model_mat, float4(vi.position, 1.0));
+  vo.position = mul(pc.view_proj, world_pos);
+  vo.normal = normalize(mul((float3x3)pc.model_mat, vi.normal));
   vo.uv = vi.uv;
   vo.face_id = vid / 3;
-  vo.world_xyz = vi.position;
+  vo.pix_xyz = world_pos.xyz;
   return vo;
 }
 
 [shader("fragment")]
 float4 main(VODEBUG vo): SV_TARGET {
-#ifdef DEBUG_MESH_NORMAL
+#ifdef DEBUG_MESH_DEPTH
+  float r = vo.normal.z * 0.5 + 0.5;
+  float g = vo.normal.z * 0.5 + 0.5;
+  float b = vo.normal.z * 0.5 + 0.5;
+  return float4(r, g, b, 1.0);
+#elif defined(DEBUG_MESH_NORMAL)
   float r = vo.normal.x * 0.5 + 0.5;
   float g = vo.normal.y * 0.5 + 0.5;
   float b = vo.normal.z * 0.5 + 0.5;
@@ -38,8 +44,8 @@ float4 main(VODEBUG vo): SV_TARGET {
   float roughness = metallic_roughness.g * mat.rough_coef;
   float metallic = metallic_roughness.b * mat.metal_coef;
   float3 f0 = float3(0.0);
-  float3 cam_xyz = pc.scene_ptr.view_xyz;
-  float3 pix_xyz = vo.world_xyz;
+  float3 cam_xyz = pc.cam_xyz;
+  float3 pix_xyz = vo.pix_xyz;
 
   float3 v = normalize(cam_xyz - pix_xyz);
   float3 n = vo.normal;

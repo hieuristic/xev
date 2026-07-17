@@ -23,8 +23,10 @@ struct alignas(16) LightGPU {
 
   float range;
   float intensity;
+  float pad3;
   glm::vec2 offset;
   uint32_t shadowmap_id;
+  float pad4[3];
 };
 
 class Light {

@@ -16,8 +16,12 @@ class FrameContext {
     VkSemaphore present_sem{VK_NULL_HANDLE};
     VkSemaphore render_sem{VK_NULL_HANDLE};
     VkFence render_fence{VK_NULL_HANDLE};
+    Image render_depth{
+        VK_FORMAT_D32_SFLOAT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    };
     Image render_target{
-        VK_FORMAT_B8G8R8A8_SRGB,
+        VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     };
   };
@@ -39,7 +43,12 @@ class FrameContext {
   void release_frame();
 
   const Frame& get_current_frame() const { return m_frames[m_curr_idx]; }
-  const Image& get_current_render_target() const { return m_frames[m_curr_idx].render_target; }
+  const Image& get_current_render_target() const {
+    return m_frames[m_curr_idx].render_target;
+  }
+  const Image& get_current_render_depth() const {
+    return m_frames[m_curr_idx].render_depth;
+  }
 
  private:
   uint32_t m_family_idx;

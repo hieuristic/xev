@@ -37,7 +37,7 @@ class Swapchain {
   uint32_t m_present_family_idx{0};
   VkSwapchainKHR m_swapchain{VK_NULL_HANDLE};
   VkSurfaceFormatKHR m_ideal_format{
-      .format = VK_FORMAT_B8G8R8A8_SRGB,
+      .format = VK_FORMAT_B8G8R8A8_UNORM,
       .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
   };
   VkSurfaceFormatKHR m_surface_format{};

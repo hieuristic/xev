@@ -282,9 +282,12 @@ void Scene::load_gltf(std::string_view filepath) {
       // Extract position and rotation from the absolute matrix
       glm::vec3 abs_pos = glm::vec3(abs_mat[3]);
       glm::quat abs_rot = glm::quat_cast(abs_mat);
-      active_cam =
-          Camera(abs_rot, abs_pos,
-                 glm::degrees(static_cast<float>(camera.perspective.yfov)));
+      XEV_INFO("Camera yfov {}", camera.perspective.yfov);
+      // active_cam =
+      //     Camera(abs_rot, abs_pos,
+      //            glm::degrees(static_cast<float>(camera.perspective.yfov)));
+      active_cam = Camera(abs_rot, abs_pos, 70); // TODO REMOVE HARDCODE LATER, THIS IS FOR DEBUG
+      XEV_INFO("Camera zfar {}, znear {}", active_cam.far, active_cam.near);
       cam_found = true;
     }
 
@@ -335,12 +338,12 @@ void Scene::alloc(const ResourceManager& manager) {
   manager.alloc(scene_device);
 
   if (!lights.empty()) {
-    lights_device.size = sizeof(Light) * lights.size();
+    lights_device.size = sizeof(LightGPU) * lights.size();
     manager.alloc(lights_device);
   }
 
   if (!materials.empty()) {
-    materials_device.size = sizeof(Material) * materials.size();
+    materials_device.size = sizeof(MaterialGPU) * materials.size();
     manager.alloc(materials_device);
   }
 
@@ -540,10 +543,15 @@ void Scene::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   upload_images(manager, hot_exec);
   upload_lights(manager, hot_exec);
   upload_materials(manager, hot_exec);
+
+  scene_buffer.light_buffer_address = lights_device.addr;
+  scene_buffer.num_lights = lights.size();
+  scene_buffer.material_buffer_address = materials_device.addr;
+  upload_scene(manager, hot_exec);
 }
 
 void Scene::bind(const GlobalDescriptorSet& desc_set) {
-  for (uint32_t i = 0; i <= images.size(); i++) {
+  for (uint32_t i = 0; i < images.size(); i++) {
     desc_set.set(images[i], i);
     XEV_INFO("ADDING IMAGE {} TO DESCRIPTOR SET", i);
   }

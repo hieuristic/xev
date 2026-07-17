@@ -41,7 +41,7 @@ class Engine {
   void init_pipeline_manager();
   void init_global_descriptor_set();
   void init_frame_context();
-  void leave_frame(VkCommandBuffer cmd, const Image& image);
+  void submit_and_show(VkCommandBuffer cmd, const Image& image);
   void init_renderer();
 };
 

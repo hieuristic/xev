@@ -1,11 +1,11 @@
 // In app.cpp let's implement the core logic for the demo:
 
 #include "app.h"
-#include <xev/logger.h>
-#include <xev/volk.h>
-#include <xev/global_descriptor_set.h>
 #include <xev/frame_context.h>
+#include <xev/global_descriptor_set.h>
+#include <xev/logger.h>
 #include <xev/resource_manager.h>
+#include <xev/volk.h>
 
 void compute_projection(const xev::Camera& cam,
                         const std::vector<glm::vec3> pos_world) {
@@ -32,8 +32,9 @@ App::App() {
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
 
-  m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipeline_manager,
-                                                   m_engine->global_descriptor_set->get_layout());
+  m_renderer3D = std::make_unique<xev::Renderer3D>(
+      *m_engine->pipeline_manager,
+      m_engine->global_descriptor_set->get_layout());
 
   m_scene = std::make_unique<xev::Scene>();
   const char* base_path = SDL_GetBasePath();
@@ -93,9 +94,13 @@ void App::draw() {
   VkCommandBuffer cmdbuf = m_engine->frame_context->acquire_frame();
 
   if (cmdbuf != VK_NULL_HANDLE) {
-    const xev::Image& output_image = m_engine->frame_context->get_current_render_target();
-    m_renderer3D->draw(cmdbuf, output_image, *m_scene, m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
-    m_engine->leave_frame(cmdbuf, output_image);
+    const xev::Image& output_color =
+        m_engine->frame_context->get_current_render_target();
+    const xev::Image& output_depth =
+        m_engine->frame_context->get_current_render_depth();
+    m_renderer3D->draw(cmdbuf, output_color, output_depth, *m_scene,
+                       m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+    m_engine->submit_and_show(cmdbuf, output_color);
   }
 }
 

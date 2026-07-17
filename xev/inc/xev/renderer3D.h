@@ -14,7 +14,8 @@ class Renderer3D {
   ~Renderer3D();
 
   void draw(VkCommandBuffer cmd,
-            const Image& image,
+            const Image& color_image,
+            const Image& depth_image,
             const Scene& scene,
             const Camera& camera,
             Color4<float> clear_color);
@@ -24,34 +25,14 @@ class Renderer3D {
                  uint32_t width,
                  uint32_t height);
 
- public:
-  // in sync with scene.slang
-  struct RenderScene {
-    // camera
-    glm::mat4 view;
-    glm::mat4 proj;
-    glm::vec3 view_pos;
-
-    // ambient
-    glm::vec3 ambient_color;
-    float ambient_intensity;
-
-    // fog
-    glm::vec3 fog_color;
-    float fog_intensity;
-
-    // light
-    VkDeviceAddress light_ids;
-
-    // material
-    VkDeviceAddress material_ids;
-  };
-
  private:
-  void prepare_image(VkCommandBuffer& cmd, const Image& image);
-  void prepare_transfer(VkCommandBuffer& cmd, const Image& image);
+  void prepare_attachments(VkCommandBuffer& cmd,
+                           const Image& color_image,
+                           const Image& depth_image);
+  void prepare_transfer(VkCommandBuffer& cmd, const Image& color_image);
   void begin_render(VkCommandBuffer& cmd,
-                    const Image& image,
+                    const Image& color_image,
+                    const Image& depth_image,
                     const Color4<float> clear_color);
   void end_render(VkCommandBuffer& cmd);
 

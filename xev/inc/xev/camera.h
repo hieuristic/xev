@@ -34,8 +34,8 @@ class Camera {
   glm::vec3 pos;
 
   float aspect = 1.0f;
-  float fovx_rad = glm::radians(70.0);
-  float fovy_rad = glm::radians(70.0);
+  float fovx_rad = glm::radians(100.0);
+  float fovy_rad = glm::radians(100.0);
   float shift_x = 0.0;
   float shift_y = 0.0;
   float near = 0.01f;

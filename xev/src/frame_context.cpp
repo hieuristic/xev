@@ -72,6 +72,10 @@ void FrameContext::create_frame(Frame& frame) {
   frame.render_target.width = width;
   frame.render_target.height = height;
   m_manager.alloc(frame.render_target);
+
+  frame.render_depth.width = width;
+  frame.render_depth.height = height;
+  m_manager.alloc(frame.render_depth);
 }
 
 void FrameContext::destroy_frame(Frame& frame) {
@@ -79,6 +83,7 @@ void FrameContext::destroy_frame(Frame& frame) {
   vkDestroySemaphore(m_device, frame.render_sem, nullptr);
   vkDestroySemaphore(m_device, frame.present_sem, nullptr);
   vkDestroyCommandPool(m_device, frame.pool, nullptr);
+  m_manager.free(frame.render_depth);
   m_manager.free(frame.render_target);
 }
 

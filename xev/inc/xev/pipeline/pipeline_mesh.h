@@ -40,6 +40,8 @@ class PipelineMesh : Pipeline {
   // This is in-sync with shaders/mesh.slang
   struct PushConst {
     glm::mat4 view_proj;
+    glm::mat4 model_mat;
+    glm::vec3 cam_xyz;
     VkDeviceAddress scene_addr;
     VkDeviceAddress vert_addr;
     uint32_t mat_id;

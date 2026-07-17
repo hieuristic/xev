@@ -3,10 +3,6 @@
 implementing mesh;
 
 struct Scene {
-  float4x4 view;
-  float4x4 proj;
-  float3 view_xyz;
-
   // ambient
   float3 ambient_color;
   float ambient_intensity;

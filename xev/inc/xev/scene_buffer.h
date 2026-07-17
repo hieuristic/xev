@@ -15,6 +15,7 @@ struct SceneBuffer {
 
   // light
   VkDeviceAddress light_buffer_address;
+  uint32_t num_lights;
 
   // material
   VkDeviceAddress material_buffer_address;

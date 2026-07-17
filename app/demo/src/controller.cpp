@@ -27,11 +27,8 @@ void Controller::update(float dt,
   //   .pos += glm::vec3(0.0f, 1.0f, 0.0f) * speed;  // Down (positive Y)
 
   float ddeg = dt * m_sensitivity;
-  glm::quat q_yaw = glm::angleAxis(-xrel * ddeg, up);
-  glm::quat q_pitch = glm::angleAxis(-yrel * ddeg, right);
-
-  // Apply: yaw first, then pitch
-  rot = q_yaw * rot;
-  rot = q_pitch * rot;
+  glm::quat q_yaw = glm::angleAxis(-xrel * ddeg, glm::vec3(0.0f, -1.0f, 0.0f));
+  glm::quat q_pitch = glm::angleAxis(-yrel * ddeg, glm::vec3(1.0f, 0.0f, 0.0f));
+  rot = q_yaw * rot * q_pitch;
   rot = glm::normalize(rot);
 }

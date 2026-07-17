@@ -78,7 +78,7 @@ void Engine::init_frame_context() {
       *resource_manager, swapchain->width, swapchain->height);
 }
 
-void Engine::leave_frame(VkCommandBuffer cmd, const Image& image) {
+void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {
   const auto& frame = frame_context->get_current_frame();
 
   const Image& swapchain_img = swapchain->acquire_image(frame.present_sem);

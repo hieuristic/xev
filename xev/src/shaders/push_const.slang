@@ -7,6 +7,8 @@ __include vertex;
 
 struct PushConstants {
   column_major float4x4 view_proj;
+  column_major float4x4 model_mat;
+  float3 cam_xyz;
   Scene* scene_ptr;
   Vertex* vert_ptr;
   uint32_t mat_id;
