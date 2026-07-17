@@ -60,10 +60,13 @@ float4 main(VODEBUG vo): SV_TARGET {
     float3 l = normalize(light.xyz - pix_xyz); // for light
     float3 h = normalize(v + l);
     float dist = length(light.xyz - pix_xyz);
-    float3 radiance = light.color * light.intensity / (dist * dist) * 100;
+    float3 radiance = light.color * light.intensity / (dist * dist);
     color += brdf(diffuse, roughness, metallic, f0, v, n, l, h) *
              radiance * max(dot(n, l), 0.0);
   }
+
+  float exposure = 0.003;
+  color *= exposure;
   return float4(color, 1.0);
 #endif
 }

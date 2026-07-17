@@ -12,21 +12,16 @@ enum LightType {
 };
 
 // in-sync with /shaders/light.slang
-struct alignas(16) LightGPU {
+struct  LightGPU {
   uint32_t type;
-  float pad0[3];
   glm::vec3 position;
-  float pad1;
   glm::vec3 direction;
-  float pad2;
   glm::vec3 color;
 
   float range;
   float intensity;
-  float pad3;
   glm::vec2 offset;
   uint32_t shadowmap_id;
-  float pad4[3];
 };
 
 class Light {
