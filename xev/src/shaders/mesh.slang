@@ -10,6 +10,7 @@ __include scene;
 __include push_const;
 __include material;
 __include global_desc;
+__include postprocess;
 
 import pbr;
 
@@ -65,7 +66,7 @@ float4 main(VODEBUG vo): SV_TARGET {
              radiance * max(dot(n, l), 0.0);
   }
 
-  float exposure = 0.003;
+  float exposure = 0.0015;
   color *= exposure;
   return float4(color, 1.0);
 #endif
