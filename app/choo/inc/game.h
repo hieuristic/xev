@@ -1,39 +1,27 @@
 #pragma once
-#include <memory>
-#include <xev/backend.h>
-#include <xev/camera.h>
-#include <xev/logger.h>
-#include <xev/renderer.h>
-#include <xev/scene.h>
-#include <xev/window.h>
+#include "game_state.h"
 
-enum GameState {
-  INITMENU,
-  MAINMENU,
-  GAMEPLAY,
-  CUTSCENE,
-};
+namespace xev {
+class Window;
+class Engine;
+class Renderer2D;
+class Renderer3D;
+class Scene;
+}  // namespace xev
 
 class Game {
-public:
-  Game(GameState state);
+ public:
+  Game();
   ~Game();
   void run();
 
-public:
-  // game state
-  void init_initmenu();
-  void init_mainmenu();
-  void init_gameplay();
-  void exit_gameplay();
-  void init_cutscene();
-  void exit_cutscene();
-
-private:
+ private:
   bool m_running;
   GameState m_state;
+
   std::unique_ptr<xev::Window> m_window;
-  std::shared_ptr<xev::Backend> m_backend;
+  std::unique_ptr<xev::Engine> m_engine;
+  std::unique_ptr<xev::Renderer3D> m_renderer3D;
+  std::unique_ptr<xev::Renderer2D> m_renderer2D;
   std::unique_ptr<xev::Scene> m_scene;
-  std::unique_ptr<xev::Renderer> m_renderer;
 };

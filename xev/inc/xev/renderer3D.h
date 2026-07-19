@@ -1,41 +1,45 @@
 #pragma once
-#include <xev/color.h>
-#include <xev/pipeline/pipeline_mesh.h>
-#include <xev/resource/image.h>
+#include <xev/volk.h>
+#include <xev/renderer.h>
 
 namespace xev {
 
+class Image;
+class Scene;
+class Camera;
 class PipelineManager;
+class Color4;
+class PipelineMesh;
 
-class Renderer3D {
+class Renderer3D : Renderer {
  public:
   Renderer3D(PipelineManager& pipeline_manager_,
              VkDescriptorSetLayout global_layout);
   ~Renderer3D();
 
-  void draw(VkCommandBuffer cmd,
+  void draw(VkCommandBuffer cmdbuf,
             const Image& color_image,
             const Image& depth_image,
             const GlobalDescriptorSet& desc_set,
             const Scene& scene,
             const Camera& camera,
             Color4<float> clear_color);
-  void draw_mesh(VkCommandBuffer cmd,
+  void draw_mesh(VkCommandBuffer cmdbuf,
                  const Scene& scene,
                  const Camera& camera,
                  uint32_t width,
                  uint32_t height);
 
  private:
-  void prepare_attachments(VkCommandBuffer& cmd,
+  void prepare_attachments(VkCommandBuffer& cmdbuf,
                            const Image& color_image,
                            const Image& depth_image);
-  void prepare_transfer(VkCommandBuffer& cmd, const Image& color_image);
-  void begin_render(VkCommandBuffer& cmd,
+  void prepare_transfer(VkCommandBuffer& cmdbuf, const Image& color_image);
+  void begin_render(VkCommandBuffer& cmdbuf,
                     const Image& color_image,
                     const Image& depth_image,
                     const Color4<float> clear_color);
-  void end_render(VkCommandBuffer& cmd);
+  void end_render(VkCommandBuffer& cmdbuf);
 
   PipelineManager& m_pipeline_manager;
   PipelineMesh m_pipeline_mesh;

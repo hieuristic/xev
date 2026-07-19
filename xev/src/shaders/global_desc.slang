@@ -1,15 +1,15 @@
 #language slang 2026
 
-implementing mesh;
+module global_desc;
 
-struct GlobalHeap {
+public struct GlobalHeap {
   SamplerState sampler_linear;
   Texture2D textures[];
 }
 
-ParameterBlock<GlobalHeap> global_heap;
+public ParameterBlock<GlobalHeap> global_heap;
 
-float4 sample2DLinear(uint32_t tid, float2 uv) {
+public float4 sample2DLinear(uint32_t tid, float2 uv) {
   if (tid == 0xFFFFFFFF) {
     return float4(1.0);
   }

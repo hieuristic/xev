@@ -45,7 +45,7 @@ class Image : public Resource {
   VkFormat format{VK_FORMAT_UNDEFINED};
   VkImageUsageFlags flags{0};
 
-  std::vector<char> host_data;
+  std::vector<uint8_t> host_data;
 
   uint64_t size_device() const override { return alloc_info.size; }
   bool on_device() const override { return image != VK_NULL_HANDLE; }
@@ -54,15 +54,15 @@ class Image : public Resource {
 
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   void set_layout(const VkImageLayout& layout_);
-  void update_layout(const VkCommandBuffer& cmd,
+  void update_layout(const VkCommandBuffer& cmdbuf,
                      const VkImageLayout& old_layout,
                      const VkImageLayout& new_layout);
-  void update_layout(const VkCommandBuffer& cmd,
+  void update_layout(const VkCommandBuffer& cmdbuf,
                      const VkImageLayout& new_layout);
 
-  void clear(const VkCommandBuffer& cmd, Color<float, 4> color);
+  void clear(const VkCommandBuffer& cmdbuf, Color<float, 4> color);
 
-  void blit_from(const VkCommandBuffer& cmd,
+  void blit_from(const VkCommandBuffer& cmdbuf,
                  const Image& src,
                  const VkFilter& filter);
 };

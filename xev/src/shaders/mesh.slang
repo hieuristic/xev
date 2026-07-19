@@ -4,19 +4,43 @@
 // #define DEBUG_MESH_ALBEDO
 
 module mesh;
-__include vertex;
 __include light;
 __include scene;
-__include push_const;
 __include material;
-__include global_desc;
 __include postprocess;
 
+import global_desc;
 import pbr;
 
+struct Vertex {
+  float3 position;
+  float3 normal;
+  float2 uv;
+};
+
+struct VertexDebug {
+  float4 position : SV_POSITION;
+  float3 normal;
+  float2 uv;
+  uint32_t face_id : PRIMITIVE_ID;
+  float3 pix_xyz;
+};
+
+struct PushConstants {
+  column_major float4x4 view_proj;
+  column_major float4x4 model_mat;
+  float3 cam_xyz;
+  Scene* scene_ptr;
+  Vertex* vert_ptr;
+  uint32_t mat_id;
+};
+
+[[vk::push_constant]]
+uniform PushConstants pc;
+
 [shader("vertex")]
-VODEBUG main(uint vid : SV_VertexID) {
-  VODEBUG vo;
+VertexDebug main(uint32_t vid : SV_VertexID) {
+  VertexDebug vo;
   Vertex vi = pc.vert_ptr[vid];
   float4 world_pos = mul(pc.model_mat, float4(vi.position, 1.0));
   vo.position = mul(pc.view_proj, world_pos);
@@ -28,7 +52,7 @@ VODEBUG main(uint vid : SV_VertexID) {
 }
 
 [shader("fragment")]
-float4 main(VODEBUG vo): SV_TARGET {
+float4 main(VertexDebug vo): SV_TARGET {
 #ifdef DEBUG_MESH_DEPTH
   float r = vo.normal.z * 0.5 + 0.5;
   float g = vo.normal.z * 0.5 + 0.5;

@@ -1,43 +1,34 @@
 #include "game.h"
+#include <SDL3/SDL.h>
+#include <xev/engine.h>
+#include <xev/renderer2D.h>
+#include <xev/renderer3D.h>
+#include <xev/resource/scene.h>
+#include <xev/window.h>
 
-App::App() : m_running(true) {
-  xev::InitLogger();
+Game::Game() : m_running(true) {
+  m_window = std::make_unique<xev::Window>("demogame", 800, 600);
 
-  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-    XEV_ERROR("SDL_Init failed: {}", SDL_GetError());
-    m_running = false;
-    return;
-  }
+  SDL_SetWindowRelativeMouseMode(m_window->get_native(), true);
 
-  m_window = std::make_unique<Window>("test", 800, 600);
-  if (!m_window->getNativeWindow()) {
-    XEV_ERROR("Failed to create application window.");
-    m_running = false;
-  }
+  m_engine = std::make_unique<xev::Engine>(m_window->get_native());
+  m_engine->init_swapchain();
+  m_engine->init_resource_manager();
+  m_engine->init_hot_exec();
+  m_engine->init_global_descriptor_set();
+  m_engine->init_pipeline_manager();
+  m_engine->init_frame_context();
 
-  m_backend = std::make_shared<Backend>(m_window->getNativeWindow());
+  m_renderer2D = std::make_unique<xev::Renderer3D>(
+      *m_engine->pipeline_manager,
+      m_engine->global_descriptor_set->get_layout());
 
-  m_shader = std::make_unique<Shader>();
-  std::string base_path(SDL_GetBasePath());
-  m_shader->load(m_backend->get_device(), base_path + "shaders/mesh.spv",
-                 S_GRAPHICS);
-  if (m_shader->get_shader_type() == S_NULL) {
-    XEV_ERROR("FAILED TEST SHADER LOADING!");
-  } else {
-    XEV_INFO("SUCCESS TEST SHADER LOADING!");
-  }
-
-  m_scene = std::make_unique<Scene>();
-  m_scene->load_gltf(base_path + "../../assets/bunny.glb");
-
-  XEV_INFO("Scene vertices: {}, faces: {}", m_scene->m_vert_buffer.size(),
-           m_scene->m_face_buffer.size());
-
-  m_renderer =
-      std::make_unique<Renderer>(m_backend, std::move(m_shader), *m_scene);
+  m_renderer3D = std::make_unique<xev::Renderer2D>(
+      *m_engine->pipeline_manager,
+      m_engine->global_descriptor_set->get_layout());
 }
 
-App::~App() {
+Game::~Game() {
   m_renderer.reset();
   m_scene.reset();
   m_shader.reset();
@@ -46,7 +37,7 @@ App::~App() {
   SDL_Quit();
 }
 
-void App::run() {
+void Game::run() {
   if (!m_running)
     return;
 
@@ -71,4 +62,4 @@ void App::run() {
   }
 }
 
-} // namespace xev
+}  // namespace xev

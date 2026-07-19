@@ -1,7 +1,8 @@
 #include "game.h"
+#include <xev/window.h>
 
 int main(int argc, char *argv[]) {
-  xev::App app;
-  app.run();
+  Game game;
+  game.run();
   return 0;
 }

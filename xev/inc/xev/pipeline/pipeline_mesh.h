@@ -7,9 +7,6 @@ namespace xev {
 
 class PipelineMesh : public Pipeline {
  public:
-  struct SceneUniform {};
-  struct SceneMeshes {};
-  struct SceneMaterials {};
   struct Command {
     uint32_t mesh_id;
     uint32_t material_id;
