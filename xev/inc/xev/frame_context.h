@@ -33,7 +33,7 @@ class FrameContext {
                uint32_t height_);
   ~FrameContext();
 
-  inline static constexpr uint32_t max_in_flight = 2;
+  inline static constexpr uint32_t MAX_IN_FLIGHT = 2;
   std::array<float, 4> clear_color{0.5f, 0.5f, 0.5f, 1.0f};
 
   uint32_t width{0};
@@ -42,6 +42,8 @@ class FrameContext {
   VkCommandBuffer acquire_frame();
   void release_frame();
 
+  uint32_t get_num_frames()  const { return m_frames.size(); }
+  uint32_t get_current_index() const { return m_curr_idx; }
   const Frame& get_current_frame() const { return m_frames[m_curr_idx]; }
   const Image& get_current_render_target() const {
     return m_frames[m_curr_idx].render_target;
@@ -55,7 +57,7 @@ class FrameContext {
   VkDevice m_device;
   const ResourceManager& m_manager;
 
-  std::array<Frame, max_in_flight> m_frames;
+  std::array<Frame, MAX_IN_FLIGHT> m_frames;
   uint32_t m_curr_idx;
 
   void create_frame(Frame& frame);

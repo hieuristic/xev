@@ -7,9 +7,9 @@ namespace xev {
 class Image;
 class Scene;
 class Camera;
-class PipelineManager;
 class Color4;
 class PipelineMesh;
+class PipelineManager;
 
 class Renderer3D : Renderer {
  public:
@@ -30,6 +30,9 @@ class Renderer3D : Renderer {
                  uint32_t width,
                  uint32_t height);
 
+  static const uint32_t MAX_LIGHTS = 1000;
+  static const uint32_t MAX_SHADOW_LIGHTS = 3;
+
  private:
   void prepare_attachments(VkCommandBuffer& cmdbuf,
                            const Image& color_image,
@@ -44,10 +47,6 @@ class Renderer3D : Renderer {
   PipelineManager& m_pipeline_manager;
   PipelineMesh m_pipeline_mesh;
   std::vector<PipelineMesh::Command> m_mesh_cmds;
-
- public:  // scene limit
-  static const uint32_t MAX_LIGHTS = 1000;
-  static const uint32_t MAX_SHADOW_LIGHTS = 3;
 };
 
 }  // namespace xev

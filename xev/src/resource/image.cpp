@@ -2,6 +2,8 @@
 #include <xev/logger.h>
 #include <xev/resource/image.h>
 #include <xev/resource_manager.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 namespace xev {
 
@@ -112,10 +114,63 @@ void Image::blit_from(const VkCommandBuffer& cmdbuf,
   vkCmdBlitImage2(cmdbuf, &blit_info);
 }
 
+void Image::load(const char* path) {
+  int w, h, c;
+  unsigned char* data = stbi_load(path, &w, &h, &c, 4);
+  width = static_cast<uint32_t>(w);
+  height = static_cast<uint32_t>(h);
+
+  if (data) {
+    size_t size = static_cast<size_t>(w) * h * 4;
+    host_data.assign(data, data + size);
+    stbi_image_free(raw_data);
+  } else {
+    XEV_ERROR("Can't load image at {}", path);
+  }
+}
+
 void Image::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   XEV_ASSERT(host_data.size() != 0, "Trying to upload empty image!");
 
-  Image staging;
+  Buffer staging{
+      img.width * img.height * 4,
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+      VMA_MEMORY_USAGE_AUTO,
+  };
+  manager.alloc(staging);
+
+  void* map_ = staging.alloc_info.pMappedData;
+  memcpy(map_, img.host_data.data(), size);
+
+  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+    this->layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    this->update_layout(cmdbuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    VkBufferImageCopy reg = {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        .imageOffset = {0, 0, 0},
+        .imageExtent =
+            {
+                static_cast<uint32_t>(this->width),
+                static_cast<uint32_t>(this->height),
+                1,
+            },
+    };
+    vkCmdCopyBufferToImage(cmdbuf, staging.buffer, this.image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &reg);
+
+    this->update_layout(cmdbuf, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  });
+  manager.free(staging);
 }
 
 }  // namespace xev

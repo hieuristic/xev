@@ -1,5 +1,5 @@
 #include <xev/logger.h>
-#include <xev/pipeline.h>
+#include <xev/pipeline/pipeline.h>
 #include <fstream>
 #include <vector>
 
@@ -33,7 +33,7 @@ static VkShaderModule Pipeline::load_shader_module(VkDevice device,
   return mod;
 }
 
-void Pipeline::create(const PipelineInfo& pipeinfo) {
+void Pipeline::create(VkDevice device, const PipelineInfo& pipeinfo) {
   VkPushConstantRange push_const_range = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,

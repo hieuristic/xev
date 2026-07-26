@@ -1,38 +1,54 @@
 #pragma once
+#include <xev/renderer.h>
+#include <xev/volk.h>
 
 namespace xev {
 
-class Scene;
+class Image;
+class Buffer;
+class Color4;
+class PipelineRaster;
+class PipelineManager;
+class GlobalDescriptorSet;
 
 class Renderer2D : Renderer {
  public:
-  Renderer2D(PipelineManager& pipeline_manager_,
-             VkDescriptorSetLayout global_layout);
+  Renderer2D(PipelineManager& pipelineManager,
+             ResourceManager& resourceManager,
+             VkDescriptorSetLayout descSetLayout,
+             uint32_t numFrameInFlight);
   ~Renderer2D();
 
-  void draw(VkCommandBuffer cmdbuf,
-            const Image& color_image,
-            const GlobalDescriptorSet& desc_set,
-            Color4<float> clear_color);
+  void draw(VkCommandBuffer cmdBuf,
+            const Image& colorImage,
+            const GlobalDescriptorSet& descSet,
+            uint32_t currFrameIdx,
+            Color4<float> clearColor);
+  void draw_text(Font font,
+                 std::string text,
+                 glm::mat4 transform,
+                 uint32_t lineWidth);
+  void draw_image(uint32_t tex_id,
+                  glm::mat4 transform,
+                  glm::vec2 uv_topLeft,
+                  glm::vec2 uv_botRight);
+
+  static const uint32_t MAX_DRAW_CALLS = 1000;
 
  private:
-  void begin_render(VkCommandBuffer& cmdbuf,
-                    const Image& color_image,
-                    const Image& depth_image,
-                    const Color4<float> clear_color);
-  void end_render(VkCommandBuffer& cmdbuf);
+  void begin_render(VkCommandBuffer& cmdBuf,
+                    const Image& colorImage,
+                    const Image& depthImage,
+                    const Color4<float> clearColor);
+  void end_render(VkCommandBuffer& cmdBuf);
 
-  PipelineManager& m_pipeline_manager;
-  PipelineMesh m_pipeline_2D;
+  ResourceManager& m_resourceManager;
+  PipelineManager& m_pipelineManager;
+  PipelineRaster m_pipelineRaster;
+  VkDescriptorSetLayout m_descSetLayout;
 
-  // This is in-sync with shaders/raster.slang
-  struct PushConst {
-    glm::mat4 transform;
-    glm::vec2 uv_topleft;
-    glm::vec2 uv_botright;
-    uint32_t tex_id;
-    uint32_t is_msdf;
-  };
+  std::vector<Buffer> m_drawInfoBuffers;
+  std::vector<PipelineRaster::DrawInfo> m_drawInfos;
 };
 
 }  // namespace xev

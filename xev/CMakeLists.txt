@@ -11,6 +11,7 @@ target_link_libraries(xev_core PUBLIC imgui
   volk::volk
   glm::glm
   VulkanMemoryAllocator
+  GameNetworkingSockets::static
 )
 target_compile_definitions(xev_core PUBLIC VK_NO_PROTOTYPES)
 

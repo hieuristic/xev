@@ -29,11 +29,11 @@ class Engine {
 
  public:
   std::unique_ptr<Swapchain> swapchain;
-  std::unique_ptr<ResourceManager> resource_manager;
-  std::unique_ptr<PipelineManager> pipeline_manager;
-  std::unique_ptr<GlobalDescriptorSet> global_descriptor_set;
-  std::unique_ptr<FrameContext> frame_context;
-  std::unique_ptr<HotExec> hot_exec;
+  std::unique_ptr<ResourceManager> resourceManager;
+  std::unique_ptr<PipelineManager> pipelineManager;
+  std::unique_ptr<GlobalDescriptorSet> globalDescriptorSet;
+  std::unique_ptr<FrameContext> frameContext;
+  std::unique_ptr<HotExec> hotExec;
 
   void init_swapchain();
   void init_hot_exec();

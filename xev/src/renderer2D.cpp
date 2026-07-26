@@ -2,56 +2,114 @@
 
 namespace xev {
 
-Renderer2D::Renderer2D(PipelineManager& manager,
-                       VkDescriptorSetLayout global_layout)
-    : m_pipeline_manager(manager) {
-  m_pipeline_manager.create(m_pipeline_2D, VK_FORMAT_R8G8B8A8_UNORM,
-                            VK_FORMAT_D32_SFLOAT, global_layout,
-                            VK_SAMPLE_COUNT_1_BIT);
+Rederer2D::Renderer2D(PipelineManager& pipelineManager,
+                      ResourceManager& resourceManager,
+                      VkDescriptorSetLayout descSetLayout,
+                      uint32_t numFrameInFlight)
+    : m_pipelineManager(pipelineManager),
+      m_resourceManager(resourceManager),
+      m_descSetLayout(descSetLayout) {
+  m_pipelineManager.create(m_pipelineRaster, VK_FORMAT_R8G8B8A8_UNORM,
+                           VK_FORMAT_D32_SFLOAT, m_descSetLayout,
+                           VK_SAMPLE_COUNT_1_BIT);
+
+  while (numFrameInFlight--) {
+    Buffer infoBuf{MAX_DRAW_CALLS * sizeof(PipelineRaster::DrawInfo),
+                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                   VMA_MEMORY_USAGE_AUTO};
+    m_resourceManager.alloc(infoBuf);
+    m_drawInfoBuffers.push_back(infoBuf);
+  }
 }
 
 Renderer2D::~Renderer2D() {
-  m_pipeline_manager.destroy(m_pipeline_2D);
+  m_pipelineManager.destroy(m_pipeline_2D);
+  for (auto& infoBuf : m_drawInfoBuffers) {
+    m_resourceManager.free(infoBuf);
+  }
 }
 
 void Renderer2D::begin_render(VkCommandBuffer cmdbuf,
-                              const Image& color_image,
-                              const Color4& clear_color) {
+                              const Image& colorImage,
+                              const Color4& clearColor) {
   VkRenderingAttachmentInfo color_attachment = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = color_image.view,
+      .imageView = colorImage.view,
       .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
       .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .clearValue = {clear_color.r, clear_color.g, clear_color.b,
-                     clear_color.a},
+      .clearValue = {clearColor.r, clearColor.g, clearColor.b, clearColor.a},
   };
-  VkRenderingInfo render_info = {
+  VkRenderingInfo info = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      .renderArea = {{0, 0}, {color_image.width, color_image.height}},
+      .renderArea = {{0, 0}, {colorImage.width, colorImage.height}},
       .layerCount = 1,
       .colorAttachmentCount = 1,
       .pColorAttachments = &color_attachment,
   };
-  vkCmdBeginRendering(cmdbuf, &render_info);
+  vkCmdBeginRendering(cmdbuf, &info);
 }
 
 void Renderer2D::draw(VkCommandBuffer cmdbuf,
-                      const Image& color_image,
-                      const GlobalDescriptorSet& desc_set,
-                      const std::vector<std::pair<Raster, uint32_t>>& rasters,
-                      Color4<float> clear_color) {
-  XEV_ASSERT(color_image.on_device() && depth_image.on_device());
+                      const Image& colorImage,
+                      const GlobalDescriptorSet& descSet,
+                      Color4<float> clearColor) {
+  XEV_ASSERT(colorImage.on_device() && depth_image.on_device());
 
-  desc_set.bind(cmdbuf, m_pipeline_raster.layout);
-  prepare_attachment(cmdbuf, color_image);
+  descSet.bind(cmdbuf, m_pipelineRaster.layout);
+  prepare_attachment(cmdbuf, colorImage);
 
-  begin_render(cmdbuf, color_image, clear_color);
-  m_pipeline_raster.draw(cmdbuf, rasters, color_image.width,
-                         color_image.height);
+  memcpy(m_drawInfoBuffers[0].alloc_info.pMappedData, m_drawInfos.data(),
+         m_drawInfos.size() * sizeof(m_drawInfos[0]));
+  begin_render(cmdbuf, colorImage, clearColor);
+  m_pipelineRaster.draw(cmdbuf, m_drawInfoBuffers[0].addr, m_drawInfos.size(),
+                        colorImage.width, colorImage.height);
   vkCmdEndRendering(cmdbuf);
 
-  prepare_transfer(cmdbuf, color_image);
+  prepare_transfer(cmdbuf, colorImage);
+  m_drawInfos.clear();
+}
+
+void Renderer2D::draw_text(Font font,
+                           std::string text,
+                           glm::mat4 transform,
+                           uint32_t lineWidth) {
+  glm::vec2 offset = 0;
+  for (const char c : text) {
+    if (c == '\n') {
+      offset += glm::vec2(0, lineWidth);
+      continue;
+    }
+
+    // TODO: maybe move the transform to the GPU and just
+    // add another field called offset ?
+    glm::mat4 charTran = transform * font.transform(offset);
+    glm::vec2 charUVTL = font.top_left(c);
+    glm::vec2 charUVBR = font.bot_right(c);
+    offset += glm::vec2(font.width(c), 0);
+
+    m_drawInfos.emplace_back({
+        .transform = charTran,
+        .uvTopLeft = charUVTL,
+        .uvBotRight = charUVBR,
+        .texID = font.texID,
+        .isMSDF = 1,
+    });
+  }
+}
+
+void Renderer2D::draw_image(glm::mat4 transform,
+                            glm::vec2 uvTopLeft,
+                            glm::vec2 uvBotRight,
+                            uint32_t texID) {
+  m_drawInfos.emplace_back({
+      .transform = transform,
+      .uvTopLeft = uvTopLeft,
+      .uvBotRight = uvBotRight,
+      .texID = texID,
+      .isMSDF = 1,
+  });
 }
 
 }  // namespace xev

@@ -1,11 +1,11 @@
 #include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
-#include <xev/frame_context.h>
-#include <xev/global_descriptor_set.h>
+#include <xev/frameContext.h>
+#include <xev/globalDescriptorSet.h>
 #include <xev/logger.h>
-#include <xev/pipeline_manager.h>
-#include <xev/resource_manager.h>
+#include <xev/pipelineManager.h>
+#include <xev/resourceManager.h>
 #include <xev/swapchain.h>
 
 namespace xev {
@@ -44,42 +44,42 @@ void Engine::init_hot_exec() {
 }
 
 void Engine::init_resource_manager() {
-  if (resource_manager != nullptr)
+  if (resourceManager != nullptr)
     return;
 
-  resource_manager = std::make_unique<ResourceManager>(
+  resourceManager = std::make_unique<ResourceManager>(
       m_device->instance, m_device->physical_device, m_device->device);
 }
 
 void Engine::init_pipeline_manager() {
-  if (pipeline_manager != nullptr)
+  if (pipelineManager != nullptr || (globalDescriptorSet != nullptr))
     return;
 
-  pipeline_manager = std::make_unique<PipelineManager>(m_device->device);
+  pipelineManager =
+      std::make_unique<PipelineManager>(m_device->device, globalDescriptorSet->get_layout());
 }
 
 void Engine::init_global_descriptor_set() {
-  if ((global_descriptor_set != nullptr) || (resource_manager == nullptr))
+  if ((globalDescriptorSet != nullptr) || (resourceManager == nullptr))
     return;
 
-  global_descriptor_set =
-      std::make_unique<GlobalDescriptorSet>(m_device->device);
+  globalDescriptorSet = std::make_unique<GlobalDescriptorSet>(m_device->device);
 }
 
 void Engine::init_frame_context() {
-  if (resource_manager == nullptr)
+  if (resourceManager == nullptr)
     init_resource_manager();
 
   if (swapchain == nullptr)
     init_swapchain();
 
-  frame_context = std::make_unique<FrameContext>(
+  frameContext = std::make_unique<FrameContext>(
       m_device->device, m_device->queue_family.graphics.value().idx,
-      *resource_manager, swapchain->width, swapchain->height);
+      *resourceManager, swapchain->width, swapchain->height);
 }
 
 void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {
-  const auto& frame = frame_context->get_current_frame();
+  const auto& frame = frameContext->get_current_frame();
 
   const Image& swapchain_img = swapchain->acquire_image(frame.present_sem);
 
@@ -133,7 +133,7 @@ void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {
 
   swapchain->present(graphics_queue, frame.render_sem);
 
-  frame_context->release_frame();
+  frameContext->release_frame();
 }
 
 void Engine::init_renderer() {}

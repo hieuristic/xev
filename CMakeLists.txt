@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(xev LANGUAGES CXX)
+project(xev LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -42,6 +42,13 @@ include(cmake/xev_app.cmake)
 add_subdirectory(ext/volk EXCLUDE_FROM_ALL)
 add_subdirectory(ext/glm EXCLUDE_FROM_ALL)
 add_subdirectory(ext/vma EXCLUDE_FROM_ALL)
+
+# GameNetworkingSockets
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+add_subdirectory(ext/gamenetworkingsockets EXCLUDE_FROM_ALL)
+
 
 # Engine
 add_subdirectory(xev)
