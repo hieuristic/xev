@@ -1,6 +1,7 @@
 #include <xev/common.h>
 #include <xev/logger.h>
 #include <xev/resource/image.h>
+#include <xev/resource/buffer.h>
 #include <xev/resource_manager.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -112,21 +113,6 @@ void Image::blit_from(const VkCommandBuffer& cmdbuf,
   };
 
   vkCmdBlitImage2(cmdbuf, &blit_info);
-}
-
-void Image::load(const char* path) {
-  int w, h, c;
-  unsigned char* data = stbi_load(path, &w, &h, &c, 4);
-  width = static_cast<uint32_t>(w);
-  height = static_cast<uint32_t>(h);
-
-  if (data) {
-    size_t size = static_cast<size_t>(w) * h * 4;
-    host_data.assign(data, data + size);
-    stbi_image_free(raw_data);
-  } else {
-    XEV_ERROR("Can't load image at {}", path);
-  }
 }
 
 void Image::upload(const ResourceManager& manager, const HotExec& hot_exec) {

@@ -1,6 +1,8 @@
 #include <xev/renderer.h>
 #include <xev/resource/image.h>
 
+namespace xev {
+
 void Renderer::prepare_attachments(VkCommandBuffer& cmdbuf,
                                    const Image& color_image) {
   VkImageMemoryBarrier2 barrier = {
@@ -79,3 +81,5 @@ void Renderer::prepare_transfer(VkCommandBuffer& cmdbuf,
   };
   vkCmdPipelineBarrier2(cmdbuf, &info);
 }
+
+}  // namespace xev

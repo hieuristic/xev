@@ -1,11 +1,11 @@
 #include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
-#include <xev/frameContext.h>
-#include <xev/globalDescriptorSet.h>
+#include <xev/frame_context.h>
+#include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
-#include <xev/pipelineManager.h>
-#include <xev/resourceManager.h>
+#include <xev/pipeline_manager.h>
+#include <xev/resource_manager.h>
 #include <xev/swapchain.h>
 
 namespace xev {
@@ -35,10 +35,10 @@ void Engine::init_swapchain() {
 }
 
 void Engine::init_hot_exec() {
-  if (hot_exec != nullptr)
+  if (hotExec != nullptr)
     return;
 
-  hot_exec =
+  hotExec =
       std::make_unique<HotExec>(m_device->device, m_device->graphics_queue,
                                 m_device->queue_family.graphics.value().idx);
 }
@@ -55,8 +55,8 @@ void Engine::init_pipeline_manager() {
   if (pipelineManager != nullptr || (globalDescriptorSet != nullptr))
     return;
 
-  pipelineManager =
-      std::make_unique<PipelineManager>(m_device->device, globalDescriptorSet->get_layout());
+  pipelineManager = std::make_unique<PipelineManager>(
+      m_device->device, globalDescriptorSet->get_layout());
 }
 
 void Engine::init_global_descriptor_set() {

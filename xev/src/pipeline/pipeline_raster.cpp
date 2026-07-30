@@ -1,6 +1,8 @@
 #include <xev/logger.h>
 #include <xev/pipeline_raster.h>
 
+namespace xev {
+
 void PipelineRaster::draw(VkCommandBuffer cmdbuf,
                           VkDeviceAddress infoAddr,
                           uint32_t numDraw,
@@ -31,3 +33,5 @@ void PipelineRaster::draw(VkCommandBuffer cmdbuf,
 
   vkCmdDraw(cmdbuf, 3, numDraw, 0, 0);
 }
+
+}  // namespace xev

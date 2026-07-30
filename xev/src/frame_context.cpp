@@ -105,7 +105,7 @@ VkCommandBuffer FrameContext::acquire_frame() {
 }
 
 void FrameContext::release_frame() {
-  m_curr_idx = (m_curr_idx + 1) % max_in_flight;
+  m_curr_idx = (m_curr_idx + 1) % MAX_IN_FLIGHT;
 }
 
 }  // namespace xev

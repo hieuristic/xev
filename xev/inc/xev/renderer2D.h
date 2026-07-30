@@ -1,9 +1,12 @@
 #pragma once
 #include <xev/renderer.h>
 #include <xev/volk.h>
+#include <glm/glm.hpp>
+#include <string>
 
 namespace xev {
 
+class Font;
 class Image;
 class Buffer;
 class Color4;

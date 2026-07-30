@@ -204,4 +204,8 @@ void ResourceManager::free(Image& img) const {
   }
 }
 
+void ResourceManager::load(Image& img, std::string path) const {
+  alloc(img);
+}
+
 }  // namespace xev

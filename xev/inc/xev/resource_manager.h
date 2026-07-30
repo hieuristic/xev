@@ -2,6 +2,7 @@
 #include <xev/vma.h>
 #include <xev/volk.h>
 #include <xev/resource/sampler.h>
+#include <string>
 
 namespace xev {
 
@@ -21,19 +22,16 @@ class ResourceManager {
   ResourceManager(ResourceManager&&) = default;
   ResourceManager& operator=(ResourceManager&&) = default;
 
-  void alloc(Buffer& buf) const;
+  void alloc(Image& img) const;
   void free(Image& img) const;
+  void load(Image& img, std::string path);
   void upload(const HotExec& hot_exec,
               const std::vector<Buffer>& dsts,
               const std::vector<void*>& srcs,
               const std::vector<uint64_t>& sizes) const;
 
-  void alloc(Image& img) const;
+  void alloc(Buffer& buf) const;
   void free(Buffer& buf) const;
-  void upload(const HotExec& hot_exec,
-              const Buffer& dst,
-              const std::vector<void*>& srcs,
-              const std::vector<uint64_t>& sizes) const;
 
   void alloc(Sampler& sampler) const;
   void free(Sampler& sampler) const;

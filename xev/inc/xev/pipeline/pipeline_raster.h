@@ -23,8 +23,7 @@ class PipelineRaster : Pipeline {
 
   struct DrawInfo {
     glm::mat4 transform;
-    glm::vec2 uvTopLeft;;
-    glm::vec2 uvBotRight;
+    glm::vec4 uvBounds;;
     uint32_t texID;
     uint32_t isMSDF;
   };

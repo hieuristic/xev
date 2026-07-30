@@ -1,4 +1,5 @@
 #include <xev/logger.h>
+#include <xev/pipeline.h>
 #include <xev/pipeline/pipeline_mesh.h>
 #include <xev/pipeline_manager.h>
 #include <fstream>
@@ -12,7 +13,7 @@ void PipelineManager::create(Pipeline& pipe) {
   VkPushConstantRange pushConstRange = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,
-      .size = pipeInfo.push_const_size,
+      .size = pipeInfo.pushConstSize,
   };
   VkPipelineLayoutCreateInfo layoutInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -31,24 +32,26 @@ void PipelineManager::create(Pipeline& pipe) {
       .scissorCount = 1,
   };
 
-  VkPipelineColorBlendAttachmentState blendAttachments =
-      pipeInfo.enable_blending
-      ? {
-            .blendEnable = VK_FALSE,
-            .colorWriteMask =
-                VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-        } : {
-    .blendEnable = VK_TRUE,
-    .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-    .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-    .colorBlendOp = VK_BLEND_OP_ADD,
-    .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-    .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-    .alphaBlendOp = VK_BLEND_OP_ADD,
-  };
+  VkPipelineColorBlendAttachmentState blendAttachments;
+  if (pipeInfo.enableBlending) {
+    blendAttachments = {
+        .blendEnable = VK_FALSE,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+    };
+  } else {
+    blendAttachments = {
+        .blendEnable = VK_TRUE,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .colorBlendOp = VK_BLEND_OP_ADD,
+        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .alphaBlendOp = VK_BLEND_OP_ADD,
+    };
+  }
 
   VkPipelineColorBlendStateCreateInfo blendState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
@@ -65,7 +68,7 @@ void PipelineManager::create(Pipeline& pipe) {
   std::vector<VkDynamicState> dynamicStates{VK_DYNAMIC_STATE_VIEWPORT,
                                             VK_DYNAMIC_STATE_SCISSOR};
   if (pipeInfo.dynamicDepth) {
-    dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH);
+    dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
   }
 
   VkPipelineDynamicStateCreateInfo dynamicInfo{
@@ -80,15 +83,15 @@ void PipelineManager::create(Pipeline& pipe) {
   };
   VkPipelineRasterizationStateCreateInfo rasterizerState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .polygonMode = pipeInfo.polygon_mode,
-      .cullMode = pipeInfo.cull_mode,
-      .frontFace = pipeInfo.front_face,
+      .polygonMode = pipeInfo.polygonMode,
+      .cullMode = pipeInfo.cullMode,
+      .frontFace = pipeInfo.frontFace,
       .lineWidth = 1.f,
   };
   VkPipelineMultisampleStateCreateInfo multisamplingState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .sampleShadingEnable = VK_FALSE,
-      .rasterizationSamples = pipeInfo.multisample_count,
+      .rasterizationSamples = pipeInfo.multisampleCount,
       .minSampleShading = 1.0f,
   };
   VkPipelineDepthStencilStateCreateInfo depthStencilState = {
@@ -101,16 +104,16 @@ void PipelineManager::create(Pipeline& pipe) {
       .minDepthBounds = 0.f,
       .maxDepthBounds = 1.f,
   };
-  if (pipeInfo.enable_depth == false) {
-    depthStencil.depthTestEnable = VK_FALSE;
-    depthStencil.depthWriteEnable = VK_FALSE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+  if (pipeInfo.enableDepth == false) {
+    depthStencilState.depthTestEnable = VK_FALSE;
+    depthStencilState.depthWriteEnable = VK_FALSE;
+    depthStencilState.depthCompareOp = VK_COMPARE_OP_NEVER;
   }
   VkPipelineRenderingCreateInfo renderInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
       .colorAttachmentCount = 1,
-      .pColorAttachmentFormats = &pipeInfo.color_format,
-      .depthAttachmentFormat = pipeInfo.depth_format,
+      .pColorAttachmentFormats = &pipeInfo.colorFormat,
+      .depthAttachmentFormat = pipeInfo.depthFormat,
   };
 
   VkShaderModule shaderVert, shaderFrag;

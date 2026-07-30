@@ -6,7 +6,7 @@ namespace xev {
 void PipelineMesh::draw(VkCommandBuffer cmdbuf,
                         const Scene& scene,
                         const Camera& camera,
-                        const std::vector<PipelineMesh::DrawInfos>& drawInfos,
+                        const std::vector<PipelineMesh::DrawInfo>& drawInfos,
                         uint32_t width,
                         uint32_t height) {
   vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
