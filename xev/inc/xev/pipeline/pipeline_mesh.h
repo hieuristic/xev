@@ -18,21 +18,6 @@ class PipelineMesh : public Pipeline {
     uint32_t padding;
   };
 
-  PipelineInfo pipeInfo{
-      .shaderVertSrc = "mesh.spv",
-      .shaderFragSrc = "mesh.spv",
-      .push_const_size = sizeof(PipelineMesh::PushConst),
-      .enable_blending = false,
-      .topology = VK_PRIMITIV_TOPOLOGY_TRIANGLE_LIST,
-      .polygon_mode = VK_POLYGON_MODE_FULL,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .front_face = VK_FRONT_FACE_CLOCKWISE,
-      .colorFormat = colorFormat,
-      .depthFormat = depthFormat,
-      .multisample_count = VK_SAMPLE_COUNT_1_BIT,
-      .enable_depth = true,
-  };
-
   struct DrawInfo {
     uint32_t mesh_id;
     uint32_t material_id;
@@ -44,6 +29,21 @@ class PipelineMesh : public Pipeline {
       return material_id < other.material_id;
     };
   };
+
+  PipelineMesh() {
+    {
+      pipeInfo.shaderVertSrc = "mesh.spv";
+      pipeInfo.shaderFragSrc = "mesh.spv";
+      pipeInfo.pushConstSize = sizeof(PipelineMesh::PushConst);
+      pipeInfo.enableBlending = false;
+      pipeInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+      pipeInfo.polygonMode = VK_POLYGON_MODE_FILL;
+      pipeInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+      pipeInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+      pipeInfo.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
+      pipeInfo.enableDepth = true;
+    };
+  }
 
   void draw(VkCommandBuffer cmdbuf,
             const Scene& scene,

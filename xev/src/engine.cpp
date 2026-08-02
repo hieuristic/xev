@@ -52,8 +52,10 @@ void Engine::init_resource_manager() {
 }
 
 void Engine::init_pipeline_manager() {
-  if (pipelineManager != nullptr || (globalDescriptorSet != nullptr))
+  if (pipelineManager != nullptr)
     return;
+
+  XEV_ASSERT(globalDescriptorSet != nullptr, "Invalid global desc set!");
 
   pipelineManager = std::make_unique<PipelineManager>(
       m_device->device, globalDescriptorSet->get_layout());

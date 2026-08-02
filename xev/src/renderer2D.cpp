@@ -1,17 +1,22 @@
+#include <xev/global_descriptor_set.h>
+#include <xev/logger.h>
+#include <xev/pipeline/pipeline_raster.h>
+#include <xev/pipeline_manager.h>
 #include <xev/renderer2D.h>
+#include <xev/resource/buffer.h>
+#include <xev/resource/image.h>
+#include <xev/resource_manager.h>
+#include <xev/ui/font.h>
 
 namespace xev {
 
-Rederer2D::Renderer2D(PipelineManager& pipelineManager,
-                      ResourceManager& resourceManager,
-                      VkDescriptorSetLayout descSetLayout,
-                      uint32_t numFrameInFlight)
-    : m_pipelineManager(pipelineManager),
-      m_resourceManager(resourceManager),
-      m_descSetLayout(descSetLayout) {
-  m_pipelineManager.create(m_pipelineRaster, VK_FORMAT_R8G8B8A8_UNORM,
-                           VK_FORMAT_D32_SFLOAT, m_descSetLayout,
-                           VK_SAMPLE_COUNT_1_BIT);
+Renderer2D::Renderer2D(PipelineManager& pipelineManager,
+                       ResourceManager& resourceManager,
+                       uint32_t numFrameInFlight)
+    : m_pipelineManager(pipelineManager), m_resourceManager(resourceManager) {
+  m_pipelineRaster.pipeInfo.colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+  m_pipelineRaster.pipeInfo.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
+  m_pipelineManager.create(m_pipelineRaster);
 
   while (numFrameInFlight--) {
     Buffer infoBuf{MAX_DRAW_CALLS * sizeof(PipelineRaster::DrawInfo),
@@ -24,7 +29,7 @@ Rederer2D::Renderer2D(PipelineManager& pipelineManager,
 }
 
 Renderer2D::~Renderer2D() {
-  m_pipelineManager.destroy(m_pipeline_2D);
+  m_pipelineManager.destroy(m_pipelineRaster);
   for (auto& infoBuf : m_drawInfoBuffers) {
     m_resourceManager.free(infoBuf);
   }
@@ -32,12 +37,12 @@ Renderer2D::~Renderer2D() {
 
 void Renderer2D::begin_render(VkCommandBuffer cmdbuf,
                               const Image& colorImage,
-                              const Color4& clearColor) {
+                              const Color4<float>& clearColor) {
   VkRenderingAttachmentInfo color_attachment = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
       .imageView = colorImage.view,
       .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
       .clearValue = {clearColor.r, clearColor.g, clearColor.b, clearColor.a},
   };
@@ -54,11 +59,12 @@ void Renderer2D::begin_render(VkCommandBuffer cmdbuf,
 void Renderer2D::draw(VkCommandBuffer cmdbuf,
                       const Image& colorImage,
                       const GlobalDescriptorSet& descSet,
-                      Color4<float> clearColor) {
-  XEV_ASSERT(colorImage.on_device() && depth_image.on_device());
+                      uint32_t currFrameIdx,
+                      const Color4<float>& clearColor) {
+  XEV_ASSERT(colorImage.on_device());
 
   descSet.bind(cmdbuf, m_pipelineRaster.layout);
-  prepare_attachment(cmdbuf, colorImage);
+  prepare_attachments(cmdbuf, colorImage);
 
   memcpy(m_drawInfoBuffers[0].alloc_info.pMappedData, m_drawInfos.data(),
          m_drawInfos.size() * sizeof(m_drawInfos[0]));
@@ -71,42 +77,35 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
   m_drawInfos.clear();
 }
 
-void Renderer2D::draw_text(Font font,
+void Renderer2D::draw_text(const Font& font,
                            std::string text,
                            glm::mat4 transform,
-                           uint32_t lineWidth) {
-  glm::vec2 offset = 0;
+                           float lineWidth) {
+  glm::vec2 offset{-1.0f, -1.0f};
   for (const char c : text) {
     if (c == '\n') {
-      offset += glm::vec2(0, lineWidth);
+      offset += glm::vec2(0.0f, lineWidth);
       continue;
     }
 
     // TODO: maybe move the transform to the GPU and just
     // add another field called offset ?
-    glm::mat4 charTran = transform * font.transform(offset);
-    glm::vec2 charUVTL = font.top_left(c);
-    glm::vec2 charUVBR = font.bot_right(c);
-    offset += glm::vec2(font.width(c), 0);
-
-    m_drawInfos.emplace_back({
-        .transform = charTran,
-        .uvTopLeft = charUVTL,
-        .uvBotRight = charUVBR,
-        .texID = font.texID,
+    m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
+        .transform = transform * font.transform(offset, c),
+        .uvBounds = font.atlas_bounds(c),
+        .texID = font.tex_id(),
         .isMSDF = 1,
     });
+    offset += glm::vec2(font.advance(c), 0);
   }
 }
 
 void Renderer2D::draw_image(glm::mat4 transform,
-                            glm::vec2 uvTopLeft,
-                            glm::vec2 uvBotRight,
+                            glm::vec4 uvBounds,
                             uint32_t texID) {
-  m_drawInfos.emplace_back({
+  m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
       .transform = transform,
-      .uvTopLeft = uvTopLeft,
-      .uvBotRight = uvBotRight,
+      .uvBounds = uvBounds,
       .texID = texID,
       .isMSDF = 1,
   });

@@ -22,6 +22,7 @@ class App {
  private:
   void handle_inputs();
   bool m_running = true;
+  bool m_mouse_captured = true;
 
   uint64_t m_last_time = 0;
   const bool* m_keystate = nullptr;
@@ -31,5 +32,6 @@ class App {
   std::unique_ptr<xev::Renderer3D> m_renderer3D;
   std::unique_ptr<xev::Renderer2D> m_renderer2D;
   std::unique_ptr<xev::Scene> m_scene;
+  std::unique_ptr<xev::Font> m_font;
   Controller m_controller;
 };

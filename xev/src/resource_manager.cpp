@@ -74,7 +74,7 @@ void ResourceManager::free(Buffer& buf) const {
   vmaDestroyBuffer(m_allocator, buf.buffer, buf.alloc);
 }
 
-void ResourceManager::upload(const HotExec& hot_exec,
+void ResourceManager::upload(const HotExec& hotExec,
                              const std::vector<Buffer>& dsts,
                              const std::vector<void*>& srcs,
                              const std::vector<uint64_t>& sizes) const {
@@ -94,7 +94,7 @@ void ResourceManager::upload(const HotExec& hot_exec,
     }
   }
 
-  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+  hotExec.run([&](const VkCommandBuffer cmdbuf) {
     uint64_t offset_ = 0;
     for (uint32_t i = 0; i < dsts.size(); i++) {
       const VkBufferCopy reg = {
@@ -105,38 +105,6 @@ void ResourceManager::upload(const HotExec& hot_exec,
       vkCmdCopyBuffer(cmdbuf, staging.buffer, dsts[i].buffer, 1, &reg);
       offset_ += sizes[i];
     }
-  });
-
-  free(staging);
-}
-
-void ResourceManager::upload(const HotExec& hot_exec,
-                             const Buffer& dst,
-                             const std::vector<void*>& srcs,
-                             const std::vector<uint64_t>& sizes) const {
-  uint64_t sum_size = 0;
-  for (uint32_t i = 0; i < sizes.size(); i++)
-    sum_size += sizes[i];
-  Buffer staging{sum_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VMA_MEMORY_USAGE_AUTO};
-  alloc(staging);
-
-  {
-    uint64_t offset_ = 0;
-    for (uint32_t i = 0; i < srcs.size(); i++) {
-      memcpy((char*)staging.alloc_info.pMappedData + offset_, srcs[i],
-             sizes[i]);
-      offset_ += sizes[i];
-    }
-  }
-
-  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
-    const VkBufferCopy reg = {
-        .srcOffset = 0,
-        .dstOffset = 0,
-        .size = sum_size,
-    };
-    vkCmdCopyBuffer(cmdbuf, staging.buffer, dst.buffer, 1, &reg);
   });
 
   free(staging);
@@ -206,6 +174,7 @@ void ResourceManager::free(Image& img) const {
 
 void ResourceManager::load(Image& img, std::string path) const {
   alloc(img);
+  // TODO loading the image from source path
 }
 
 }  // namespace xev

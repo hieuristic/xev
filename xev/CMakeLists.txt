@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
 
 add_library(xev_core STATIC ${SOURCE_FILES})
-target_include_directories(xev_core PUBLIC inc ../ext/tinygltf)
+target_include_directories(xev_core PUBLIC inc ../ext/tinygltf ../ext/json/include)
 target_link_libraries(xev_core PUBLIC imgui
   SDL3::SDL3-shared
   Vulkan::Vulkan

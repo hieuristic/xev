@@ -1,20 +1,19 @@
 #pragma once
-#include <xev/volk.h>
+#include <xev/color.h>
 #include <xev/renderer.h>
+#include <xev/pipeline/pipeline_mesh.h>
+#include <xev/volk.h>
 
 namespace xev {
 
 class Image;
 class Scene;
 class Camera;
-class Color4;
-class PipelineMesh;
 class PipelineManager;
 
-class Renderer3D : Renderer {
+class Renderer3D : public Renderer {
  public:
-  Renderer3D(PipelineManager& pipeline_manager_,
-             VkDescriptorSetLayout global_layout);
+  Renderer3D(PipelineManager& manager);
   ~Renderer3D();
 
   void draw(VkCommandBuffer cmdbuf,
@@ -44,9 +43,9 @@ class Renderer3D : Renderer {
                     const Color4<float> clear_color);
   void end_render(VkCommandBuffer& cmdbuf);
 
-  PipelineManager& m_pipeline_manager;
-  PipelineMesh m_pipeline_mesh;
-  std::vector<PipelineMesh::Command> m_mesh_cmds;
+  PipelineManager& m_pipelineManager;
+  PipelineMesh m_pipelineMesh;
+  std::vector<PipelineMesh::DrawInfo> m_mesh_cmds;
 };
 
 }  // namespace xev

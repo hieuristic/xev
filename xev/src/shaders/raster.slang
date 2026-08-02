@@ -1,4 +1,5 @@
 #language slang 2026
+// #define DEBUG_FONT_ATLAS
 
 module raster;
 import global_desc;
@@ -24,8 +25,9 @@ struct VertexIn {
 
 struct VertexOut {
   uint32_t instID : SV_InstanceID;
-  out float4 pos  : SV_Position;
-  out float2 uv   : TEXCOORD0;
+  float4 pos  : SV_Position;
+  float2 uv   : TEXCOORD0;
+  float2 uv1  : TEXCOORD1;
 };
 
 static const float2 billboardCorners[3] = {
@@ -35,7 +37,7 @@ static const float2 billboardCorners[3] = {
 };
 
 [shader("vertex")]
-void main(VertexIn vi) {
+VertexOut main(VertexIn vi) {
   // constructing a isoscles right triangle with right angle at top right
   // (-1,-1) ---- (-1,3)
   //   | draw |  /
@@ -47,9 +49,12 @@ void main(VertexIn vi) {
   DrawInfo info = pc.infoBuffer[vi.instID];
 
   VertexOut vo;
-  vo.instID = vi.instID
-  vert.pos = info.transform * float4(pos, 0.0f, 1.0f);
-  vert.uv = (pos * 0.5f + 0.5f) * (info.uvBounds.zw - info.uvBounds.xy) + info.uvBounds.xy;;
+  vo.instID = vi.instID;
+  vo.pos = mul(info.transform, float4(pos, 0.0f, 1.0f));
+  float2 normalized_uv = pos * 0.5f + 0.5f; // DO NOT CLAMP
+  vo.uv = normalized_uv * (info.uvBounds.zw - info.uvBounds.xy) + info.uvBounds.xy;
+  vo.uv1 = pos;
+  return vo;
 }
 
 float median(float r, float g, float b) {
@@ -61,21 +66,27 @@ float median(float r, float g, float b) {
 #define EMTHRESHOLD 0.2
 
 [shader("fragment")]
-float4 main(VertexOut vo) {
+float4 main(VertexOut vo) : SV_Target {
   float4 frag_out;
   DrawInfo info = pc.infoBuffer[vo.instID];
 
-  float4 texel = sample2DLinear(pc.texid, vert.uv);
+  float4 texel = sample2DLinear(info.texID, vo.uv);
 
-  if (is_msdf) {
-    float distMix = median3(texel.r, texel.g, texel.b);
-    float distEM = mix(EMRANGE_MIN, EMRANGE_MAX, distMix);
-    float inverse_width = u_screen_px_scale * u_antialias_per_em;
-    float opacity = clamp((u_threshold_em - distance_em) * inverse_width + 0.5, 0.0, 1.0);
-    frag_out = float4(float3(opacity), 1.0);
+#ifdef DEBUG_FONT_ATLAS
+  frag_out = texel;
+#else
+  if (info.isMSDF != 0) {
+    float signDist = median3(texel.r, texel.g, texel.b);
+    float w = fwidth(signDist);
+    float opacity = smoothstep(0.5 - w, 0.5 + w, signDist);
+    frag_out = float4(float3(1.0), opacity);
   } else {
     frag_out = texel;
   }
+#endif
+
+  float2 inBound = step(abs(vo.uv1), float2(1.0));
+  frag_out.a *= inBound.x * inBound.y;
 
   return frag_out;
 }

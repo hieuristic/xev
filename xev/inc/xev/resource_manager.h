@@ -3,6 +3,7 @@
 #include <xev/volk.h>
 #include <xev/resource/sampler.h>
 #include <string>
+#include <vector>
 
 namespace xev {
 
@@ -24,8 +25,8 @@ class ResourceManager {
 
   void alloc(Image& img) const;
   void free(Image& img) const;
-  void load(Image& img, std::string path);
-  void upload(const HotExec& hot_exec,
+  void load(Image& img, std::string path) const;
+  void upload(const HotExec& hotExec,
               const std::vector<Buffer>& dsts,
               const std::vector<void*>& srcs,
               const std::vector<uint64_t>& sizes) const;

@@ -3,8 +3,6 @@
 #include <xev/resource/image.h>
 #include <xev/resource/buffer.h>
 #include <xev/resource_manager.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 namespace xev {
 
@@ -119,14 +117,14 @@ void Image::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   XEV_ASSERT(host_data.size() != 0, "Trying to upload empty image!");
 
   Buffer staging{
-      img.width * img.height * 4,
+      width * height * 4,
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VMA_MEMORY_USAGE_AUTO,
   };
   manager.alloc(staging);
 
   void* map_ = staging.alloc_info.pMappedData;
-  memcpy(map_, img.host_data.data(), size);
+  memcpy(map_, host_data.data(), host_data.size());
 
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
     this->layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -151,7 +149,7 @@ void Image::upload(const ResourceManager& manager, const HotExec& hot_exec) {
                 1,
             },
     };
-    vkCmdCopyBufferToImage(cmdbuf, staging.buffer, this.image,
+    vkCmdCopyBufferToImage(cmdbuf, staging.buffer, this->image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &reg);
 
     this->update_layout(cmdbuf, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

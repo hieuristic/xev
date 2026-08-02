@@ -17,14 +17,14 @@ class PipelineManager {
   PipelineManager(PipelineManager&&) = default;
   PipelineManager& operator=(PipelineManager&&) = default;
 
-  VkShaderModule load_shader(std::string src) const;
+  void load_shader(VkShaderModule& mod, std::string path) const;
 
   void create(Pipeline& pipe);
   void destroy(Pipeline& pipe) const;
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};
-  VkDescriptorSetLayout m_destSetLayout{VK_NULL_HANDLE};
+  VkDescriptorSetLayout m_descSetLayout{VK_NULL_HANDLE};
 };
 
 }  // namespace xev

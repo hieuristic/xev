@@ -4,9 +4,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <limits>
 
+#include <xev/resource/image.h>
 #define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <tiny_gltf.h>
 
 namespace xev {
@@ -236,7 +235,7 @@ void Scene::load_gltf(std::string_view filepath) {
         img.host_data[i * 4 + 0] = gltf_img.image[i * 3 + 0];  // R
         img.host_data[i * 4 + 1] = gltf_img.image[i * 3 + 1];  // G
         img.host_data[i * 4 + 2] = gltf_img.image[i * 3 + 2];  // B
-        img.host_data[i * 4 + 3] = 255;    // Alpha
+        img.host_data[i * 4 + 3] = 255;                        // Alpha
       }
     } else if (gltf_img.component == 4) {
       std::copy(gltf_img.image.begin(), gltf_img.image.end(),

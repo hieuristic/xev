@@ -1,5 +1,5 @@
 #include <xev/logger.h>
-#include <xev/pipeline_raster.h>
+#include <xev/pipeline/pipeline_raster.h>
 
 namespace xev {
 
@@ -26,10 +26,10 @@ void PipelineRaster::draw(VkCommandBuffer cmdbuf,
   };
   vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 
-  PustConst push_const{.infoBuffer = infoAddr};
+  PushConst pushConst{.infoBuffer = infoAddr};
   vkCmdPushConstants(cmdbuf, layout,
                      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                     0, sizeof(PushConst), &push_const);
+                     0, sizeof(PushConst), &pushConst);
 
   vkCmdDraw(cmdbuf, 3, numDraw, 0, 0);
 }

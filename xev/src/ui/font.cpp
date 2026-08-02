@@ -1,5 +1,13 @@
+#include <xev/global_descriptor_set.h>
+#include <xev/hot_exec.h>
+#include <xev/logger.h>
+#include <xev/resource/buffer.h>
+#include <xev/resource/image.h>
+#include <xev/resource_manager.h>
 #include <xev/ui/font.h>
+
 #include <fstream>
+#include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
 
 namespace xev {
@@ -9,8 +17,6 @@ Font::Font(const ResourceManager& manager,
            const std::string& atlasPath,
            const std::string& configPath)
     : m_manager(manager) {
-  using json = nlohmann::json;
-
   // 1. load in atlas data from .bin and .json file
   std::ifstream atlasFile(atlasPath, std::ios::binary);
   if (!atlasFile.is_open()) {
@@ -20,19 +26,23 @@ Font::Font(const ResourceManager& manager,
   if (!configFile.is_open()) {
     XEV_ERROR("Can't open font config file at %s!", configPath);
   }
-  json configData = json::parse(configFile);
-  m_atlas.width = json["atlas"]["width"];
-  m_atlas.height = json["atlas"]["height"];
+
+  XEV_INFO("Parsing json from {}", configPath);
+  XEV_INFO("Parsing atlas from {}", atlasPath);
+
+  nlohmann::json configData = nlohmann::json::parse(configFile);
+  m_atlas.width = configData["atlas"]["width"];
+  m_atlas.height = configData["atlas"]["height"];
   m_manager.alloc(m_atlas);
   uint64_t atlasArea = m_atlas.width * m_atlas.height;
   std::vector<uint8_t> rgb_data(atlasArea * 3);
   atlasFile.read(reinterpret_cast<char*>(rgb_data.data()), atlasArea * 3);
   m_atlas.host_data.resize(atlasArea * 4);
   for (uint64_t i = 0; i < atlasArea; ++i) {
-    m_atlas.host_area[i * 4 + 0] = rgb_data[i * 3 + 0];  // R
-    m_atlas.host_area[i * 4 + 1] = rgb_data[i * 3 + 1];  // G
-    m_atlas.host_area[i * 4 + 2] = rgb_data[i * 3 + 2];  // B
-    m_atlas.host_area[i * 4 + 3] = 255;                  // A (Opaque)
+    m_atlas.host_data[i * 4 + 0] = rgb_data[i * 3 + 0];  // R
+    m_atlas.host_data[i * 4 + 1] = rgb_data[i * 3 + 1];  // G
+    m_atlas.host_data[i * 4 + 2] = rgb_data[i * 3 + 2];  // B
+    m_atlas.host_data[i * 4 + 3] = 255;                  // A (Opaque)
   }
 
   // 2. upload data to GPU
@@ -43,8 +53,8 @@ Font::Font(const ResourceManager& manager,
   };
   manager.alloc(staging);
   void* map_ = staging.alloc_info.pMappedData;
-  memcpy(map_, img.host_data.data(), size);
-  hot_exec.run([&](const VkCommandBuffer cmdbuf) {
+  memcpy(map_, m_atlas.host_data.data(), m_atlas.host_data.size());
+  hotExec.run([&](const VkCommandBuffer cmdbuf) {
     m_atlas.layout = VK_IMAGE_LAYOUT_UNDEFINED;
     m_atlas.update_layout(cmdbuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     VkBufferImageCopy reg = {
@@ -77,30 +87,32 @@ Font::Font(const ResourceManager& manager,
   float w = static_cast<float>(m_atlas.width);
   float h = static_cast<float>(m_atlas.height);
   for (const auto& glyphData : configData["glyphs"]) {
-    float left = glyphData["atlasBounds"]["left"];
-    float bottom = glyphData["atlasBounds"]["bottom"];
-    float right = glyphData["atlasBounds"]["right"];
-    float top = glyphData["atlasBounds"]["top"];
+    Glyph g{};
+    g.advance = glyphData["advance"];
 
-    m_glyphs[glyphData["unicode"]] = {
-        .advance = glyphData["advance"],
-        .planeBounds =
-            {
-                glyphData["advance"]["planeBounds"]["top"],
-                glyphData["advance"]["planeBounds"]["left"],
-                glyphData["advance"]["planeBounds"]["right"],
-                glyphData["advance"]["planeBounds"]["bottom"],
-            },
-        .atlasBounds =
-            {
-                left / w,
-                (h - top) / h,
-                right / w,
-                (h - bottom) / h,
-            },
-        .advance = glyphData["advance"],
-    };
-  }
+    if (glyphData.contains("planeBounds")) {
+      g.planeBounds = {
+          glyphData["planeBounds"]["left"],
+          glyphData["planeBounds"]["top"],
+          glyphData["planeBounds"]["right"],
+          glyphData["planeBounds"]["bottom"],
+      };
+    }
+
+    if (glyphData.contains("atlasBounds")) {
+      float left = glyphData["atlasBounds"]["left"];
+      float bottom = glyphData["atlasBounds"]["bottom"];
+      float right = glyphData["atlasBounds"]["right"];
+      float top = glyphData["atlasBounds"]["top"];
+      g.atlasBounds = {
+          left / w,
+          bottom / h,
+          right / w,
+          top / h,
+      };
+    }
+    m_glyphs[glyphData["unicode"]] = g;
+  };
 
   // parse extra metadata
   m_emSize = configData["metrics"]["emSize"];
@@ -111,12 +123,39 @@ Font::~Font() {
   m_manager.free(m_atlas);
 }
 
-void Font::bind(const GlobalDescriptorSet& desc_set) {
-  m_texID = desc_set.set(m_atlas);
+glm::mat4 Font::transform(const glm::vec2& offset, uint32_t c) const {
+  glm::vec4 bounds = plane_bounds(c);
+  float w = (bounds.z - bounds.x) * 0.5f;
+  float h = (bounds.w - bounds.y) * 0.5f;
+  glm::vec2 origin = offset + glm::vec2(bounds.x + w, bounds.w + h);
+
+  glm::mat4 t(1.0f);
+  t = glm::translate(t, glm::vec3(origin, 0.0f));
+  t = glm::scale(t, glm::vec3(w, h, 1.0f));
+  return t;
 }
 
-glm::vec4 atlas_bounds(uint32_t c) {
-  return m_glyphs[c].atlasBounds;
+void Font::bind(GlobalDescriptorSet& descSet) {
+  m_texID = descSet.set(m_atlas);
+}
+
+float Font::advance(uint32_t c) const {
+  auto it = m_glyphs.find(c);
+  return (it != m_glyphs.end()) ? it->second.advance : 0.0f;
+}
+
+uint32_t Font::tex_id() const {
+  return m_texID;
+}
+
+glm::vec4 Font::plane_bounds(uint32_t c) const {
+  auto it = m_glyphs.find(c);
+  return (it != m_glyphs.end()) ? it->second.planeBounds : glm::vec4(0.0f);
+}
+
+glm::vec4 Font::atlas_bounds(uint32_t c) const {
+  auto it = m_glyphs.find(c);
+  return (it != m_glyphs.end()) ? it->second.atlasBounds : glm::vec4(0.0f);
 }
 
 }  // namespace xev

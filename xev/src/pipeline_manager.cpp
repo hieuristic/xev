@@ -1,5 +1,5 @@
 #include <xev/logger.h>
-#include <xev/pipeline.h>
+#include <xev/pipeline/pipeline.h>
 #include <xev/pipeline/pipeline_mesh.h>
 #include <xev/pipeline_manager.h>
 #include <fstream>
@@ -8,12 +8,10 @@
 namespace xev {
 
 void PipelineManager::create(Pipeline& pipe) {
-  PipelineInfo pipeInfo = pipe.pipeInfo;
-
   VkPushConstantRange pushConstRange = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,
-      .size = pipeInfo.pushConstSize,
+      .size = pipe.pipeInfo.pushConstSize,
   };
   VkPipelineLayoutCreateInfo layoutInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -33,7 +31,7 @@ void PipelineManager::create(Pipeline& pipe) {
   };
 
   VkPipelineColorBlendAttachmentState blendAttachments;
-  if (pipeInfo.enableBlending) {
+  if (!pipe.pipeInfo.enableBlending) {
     blendAttachments = {
         .blendEnable = VK_FALSE,
         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -67,7 +65,7 @@ void PipelineManager::create(Pipeline& pipe) {
 
   std::vector<VkDynamicState> dynamicStates{VK_DYNAMIC_STATE_VIEWPORT,
                                             VK_DYNAMIC_STATE_SCISSOR};
-  if (pipeInfo.dynamicDepth) {
+  if (pipe.pipeInfo.dynamicDepth) {
     dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
   }
 
@@ -78,20 +76,20 @@ void PipelineManager::create(Pipeline& pipe) {
   };
   VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-      .topology = pipeInfo.topology,
+      .topology = pipe.pipeInfo.topology,
       .primitiveRestartEnable = VK_FALSE,
   };
   VkPipelineRasterizationStateCreateInfo rasterizerState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .polygonMode = pipeInfo.polygonMode,
-      .cullMode = pipeInfo.cullMode,
-      .frontFace = pipeInfo.frontFace,
+      .polygonMode = pipe.pipeInfo.polygonMode,
+      .cullMode = pipe.pipeInfo.cullMode,
+      .frontFace = pipe.pipeInfo.frontFace,
       .lineWidth = 1.f,
   };
   VkPipelineMultisampleStateCreateInfo multisamplingState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .sampleShadingEnable = VK_FALSE,
-      .rasterizationSamples = pipeInfo.multisampleCount,
+      .rasterizationSamples = pipe.pipeInfo.multisampleCount,
       .minSampleShading = 1.0f,
   };
   VkPipelineDepthStencilStateCreateInfo depthStencilState = {
@@ -104,7 +102,7 @@ void PipelineManager::create(Pipeline& pipe) {
       .minDepthBounds = 0.f,
       .maxDepthBounds = 1.f,
   };
-  if (pipeInfo.enableDepth == false) {
+  if (pipe.pipeInfo.enableDepth == false) {
     depthStencilState.depthTestEnable = VK_FALSE;
     depthStencilState.depthWriteEnable = VK_FALSE;
     depthStencilState.depthCompareOp = VK_COMPARE_OP_NEVER;
@@ -112,13 +110,15 @@ void PipelineManager::create(Pipeline& pipe) {
   VkPipelineRenderingCreateInfo renderInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
       .colorAttachmentCount = 1,
-      .pColorAttachmentFormats = &pipeInfo.colorFormat,
-      .depthAttachmentFormat = pipeInfo.depthFormat,
+      .pColorAttachmentFormats = &pipe.pipeInfo.colorFormat,
+      .depthAttachmentFormat = pipe.pipeInfo.depthFormat,
   };
 
   VkShaderModule shaderVert, shaderFrag;
-  load_shader(shaderVert, pipeInfo.shaderVertSrc);
-  load_shader(shaderFrag, pipeInfo.shaderFragSrc);
+  XEV_INFO("pipe vert src: {}", pipe.pipeInfo.shaderVertSrc);
+  XEV_INFO("enable depth: {}", pipe.pipeInfo.enableDepth);
+  load_shader(shaderVert, pipe.pipeInfo.shaderVertSrc);
+  load_shader(shaderFrag, pipe.pipeInfo.shaderFragSrc);
   VkPipelineShaderStageCreateInfo vertStage = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -168,6 +168,7 @@ void PipelineManager::destroy(Pipeline& pipe) const {
 }
 
 void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
+  XEV_INFO("Input path: {}", path);
   const char* base_path = SDL_GetBasePath();
   path = base_path ? std::string(base_path) + "../shaders/" + path
                    : "shaders/" + path;
@@ -176,6 +177,8 @@ void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
   if (!file.is_open()) {
     XEV_ERROR("Failed to read {}", path);
   }
+
+  XEV_INFO("Reading shader file at {}", path);
 
   std::vector<char> m_shader_src;
   auto size = file.tellg();
@@ -194,13 +197,6 @@ void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
 
   res_ = vkCreateShaderModule(m_device, &info, nullptr, &mod);
   XEV_ASSERT_VK(res_, "Failed to load shader module");
-}
-
-void PipelineManager::destroy(VkShaderModule& mod) const {
-  if (mod != VK_NULL_HANDLE) {
-    vkDestroyShaderModule(m_device, mod, nullptr);
-    mod = VK_NULL_HANDLE;
-  }
 }
 
 }  // namespace xev

@@ -1,4 +1,6 @@
 #pragma once
+#include <xev/color.h>
+#include <xev/pipeline/pipeline_raster.h>
 #include <xev/renderer.h>
 #include <xev/volk.h>
 #include <glm/glm.hpp>
@@ -9,16 +11,13 @@ namespace xev {
 class Font;
 class Image;
 class Buffer;
-class Color4;
-class PipelineRaster;
 class PipelineManager;
 class GlobalDescriptorSet;
 
-class Renderer2D : Renderer {
+class Renderer2D : public Renderer {
  public:
   Renderer2D(PipelineManager& pipelineManager,
              ResourceManager& resourceManager,
-             VkDescriptorSetLayout descSetLayout,
              uint32_t numFrameInFlight);
   ~Renderer2D();
 
@@ -26,29 +25,25 @@ class Renderer2D : Renderer {
             const Image& colorImage,
             const GlobalDescriptorSet& descSet,
             uint32_t currFrameIdx,
-            Color4<float> clearColor);
-  void draw_text(Font font,
+            const Color4<float>& clearColor);
+  void draw_text(const Font& font,
                  std::string text,
                  glm::mat4 transform,
-                 uint32_t lineWidth);
-  void draw_image(uint32_t tex_id,
-                  glm::mat4 transform,
-                  glm::vec2 uv_topLeft,
-                  glm::vec2 uv_botRight);
+                 float lineWidth);
+  void draw_image(glm::mat4 transform,
+                  glm::vec4 uvBounds,
+                  uint32_t texID);
 
   static const uint32_t MAX_DRAW_CALLS = 1000;
 
  private:
-  void begin_render(VkCommandBuffer& cmdBuf,
+  void begin_render(VkCommandBuffer cmdBuf,
                     const Image& colorImage,
-                    const Image& depthImage,
-                    const Color4<float> clearColor);
-  void end_render(VkCommandBuffer& cmdBuf);
+                    const Color4<float>& clearColor);
 
   ResourceManager& m_resourceManager;
   PipelineManager& m_pipelineManager;
   PipelineRaster m_pipelineRaster;
-  VkDescriptorSetLayout m_descSetLayout;
 
   std::vector<Buffer> m_drawInfoBuffers;
   std::vector<PipelineRaster::DrawInfo> m_drawInfos;

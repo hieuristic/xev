@@ -6,7 +6,7 @@ namespace xev {
 class Image;
 
 class Renderer {
- private:
+ protected:
   void prepare_attachments(VkCommandBuffer& cmdbuf,
                            const Image& color_image);
   void prepare_attachments(VkCommandBuffer& cmdbuf,

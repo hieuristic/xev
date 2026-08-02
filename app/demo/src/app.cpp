@@ -2,9 +2,10 @@
 
 #include "app.h"
 #include <xev/frame_context.h>
-#include <xev/globalDescriptorSet.h>
+#include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
-#include <xev/resourceManager.h>
+#include <xev/resource_manager.h>
+#include <xev/ui/font.h>
 #include <xev/volk.h>
 
 void compute_projection(const xev::Camera& cam,
@@ -32,11 +33,9 @@ App::App() {
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
 
-  m_renderer3D = std::make_unique<xev::Renderer3D>(
-      *m_engine->pipelineManager, m_engine->globalDescriptorSet->get_layout());
+  m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
 
   m_scene = std::make_unique<xev::Scene>();
-  const char* base_path = SDL_GetBasePath();
   std::string base_path =
       SDL_GetBasePath() ? std::string(SDL_GetBasePath()) + "../" : "";
   std::string scene_path = base_path + "assets/models/sponza_full.glb";
@@ -54,16 +53,13 @@ App::App() {
 
   m_renderer2D = std::make_unique<xev::Renderer2D>(
       *m_engine->pipelineManager, *m_engine->resourceManager,
-      m_engine->globalDescriptorSet->get_layout(),
       m_engine->frameContext->get_num_frames());
 
-  m_font = std::make_unique<xev::Font>();
-  {
-    std::string atlas_path = base_path + "assets/fonts/akkurat.bin";
-    std::string config_path = base_path + "assets/fonts/akkurat.bin";
-    m_font.load(*m_engine->resourceManager, atlas_path, config_path);
-    m_font.bind(*m_engine->globalDescriptorSet);
-  }
+  m_font = std::make_unique<xev::Font>(*m_engine->resourceManager,
+                                       *m_engine->hotExec,
+                                       base_path + "assets/fonts/akkurat.bin",
+                                       base_path + "assets/fonts/akkurat.json");
+  m_font->bind(*m_engine->globalDescriptorSet);
 }
 
 App::~App() {
@@ -85,10 +81,17 @@ void App::handle_inputs() {
       case SDL_EVENT_KEY_DOWN:
         if (e.key.key == SDLK_ESCAPE)
           m_running = false;
+        if (e.key.key == SDLK_Q) {
+          m_mouse_captured = !m_mouse_captured;
+          SDL_SetWindowRelativeMouseMode(m_window->get_native(),
+                                         m_mouse_captured);
+        }
         break;
       case SDL_EVENT_MOUSE_MOTION:
-        xrel = e.motion.xrel;
-        yrel = e.motion.yrel;
+        if (m_mouse_captured) {
+          xrel = e.motion.xrel;
+          yrel = e.motion.yrel;
+        }
         break;
     }
   }
@@ -103,20 +106,21 @@ void App::handle_inputs() {
 }
 
 void App::draw() {
-  VkCommandBuffer cmdbuf = m_engine->frame_context->acquire_frame();
+  VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
 
   if (cmdbuf != VK_NULL_HANDLE) {
     const xev::Image& output_color =
-        m_engine->frame_context->get_current_render_target();
+        m_engine->frameContext->get_current_render_target();
     const xev::Image& output_depth =
-        m_engine->frame_context->get_current_render_depth();
+        m_engine->frameContext->get_current_render_depth();
     m_renderer3D->draw(cmdbuf, output_color, output_depth,
                        *m_engine->globalDescriptorSet, *m_scene,
                        m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
 
-    glm::mat4 transform = glm::scale(glm::mat4(1.0f), glm::vec3(2.0, 2.0, 2.0));
-    m_renderer2D->draw_text(m_font, "hello world", transform, 0.1);
+    glm::mat4 transform = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+    m_renderer2D->draw_text(*m_font, "hello world :)", transform, 1.2);
     m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
+                       m_engine->frameContext->get_current_index(),
                        {0.1f, 0.1f, 0.1f, 1.0f});
 
     m_engine->submit_and_show(cmdbuf, output_color);

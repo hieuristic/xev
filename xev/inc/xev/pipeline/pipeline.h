@@ -24,9 +24,9 @@ struct PipelineInfo {
 class Pipeline {
  public:
   virtual void draw() {}
-  virtual void get_pipeline_info(PipelineInfo& pipeInfo) const;
   VkPipelineLayout layout;
   VkPipeline pipeline;
+  PipelineInfo pipeInfo;
 };
 
 }  // namespace xev

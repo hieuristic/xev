@@ -1,8 +1,13 @@
 #pragma once
+#include <glm/glm.hpp>
 #include <unordered_map>
 #include <vector>
 
 namespace xev {
+
+class HotExec;
+class ResourceManager;
+class GlobalDescriptorSet;
 
 class Font {
  public:
@@ -17,10 +22,12 @@ class Font {
        const std::string& atlas_path,
        const std::string& config_path);
   ~Font();
-  void bind(const GlobalDescriptorSet& desc_set);
-  glm::vec4 plane_bounds(uint32_t c); // return left top right bottom
-  glm::vec4 atlas_bounds(uint32_t c); // return left top right bottom
-  glm::mat4 transform(const glm::vec2& offset);
+  void bind(GlobalDescriptorSet& desc_set);
+  glm::vec4 plane_bounds(uint32_t c) const;  // return left top right bottom
+  glm::vec4 atlas_bounds(uint32_t c) const;  // return left top right bottom
+  glm::mat4 transform(const glm::vec2& offset, uint32_t c) const;
+  float advance(uint32_t c) const;
+  uint32_t tex_id() const;
 
  private:
   float m_emSize = 1;
