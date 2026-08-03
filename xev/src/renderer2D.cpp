@@ -84,7 +84,7 @@ void Renderer2D::draw_text(const Font& font,
   glm::vec2 offset{-1.0f, -1.0f};
   for (const char c : text) {
     if (c == '\n') {
-      offset += glm::vec2(0.0f, lineWidth);
+      offset = glm::vec2(0.0f, offset.y + lineWidth);
       continue;
     }
 

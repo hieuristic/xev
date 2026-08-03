@@ -34,4 +34,5 @@ class App {
   std::unique_ptr<xev::Scene> m_scene;
   std::unique_ptr<xev::Font> m_font;
   Controller m_controller;
+  float m_dt;
 };

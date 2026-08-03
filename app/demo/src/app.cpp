@@ -97,15 +97,16 @@ void App::handle_inputs() {
   }
 
   uint64_t current_time = SDL_GetTicks();
-  float dt = (current_time - m_last_time) / 1000.0f;
+  float m_dt = (current_time - m_last_time) / 1000.0f;
   m_last_time = current_time;
 
   xev::Camera& cam = m_scene->active_cam;
-  m_controller.update(dt, xrel, yrel, m_keystate, cam.pos, cam.rot);
+  m_controller.update(m_dt, xrel, yrel, m_keystate, cam.pos, cam.rot);
   return;
 }
 
 void App::draw() {
+
   VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
 
   if (cmdbuf != VK_NULL_HANDLE) {
@@ -117,8 +118,9 @@ void App::draw() {
                        *m_engine->globalDescriptorSet, *m_scene,
                        m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
 
-    glm::mat4 transform = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
-    m_renderer2D->draw_text(*m_font, "hello world :)", transform, 1.2);
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-0.9f, -0.9f, 0.0));
+    transform = glm::scale(transform, glm::vec3(0.1f));
+    m_renderer2D->draw_text(*m_font, "hello world\n" + std::to_string(1.0f / m_dt), transform, 1.2);
     m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
                        m_engine->frameContext->get_current_index(),
                        {0.1f, 0.1f, 0.1f, 1.0f});

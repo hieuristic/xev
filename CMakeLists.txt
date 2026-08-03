@@ -43,11 +43,11 @@ add_subdirectory(ext/volk EXCLUDE_FROM_ALL)
 add_subdirectory(ext/glm EXCLUDE_FROM_ALL)
 add_subdirectory(ext/vma EXCLUDE_FROM_ALL)
 
-# GameNetworkingSockets
+# GameNetworkingSockets (valvesockets)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-add_subdirectory(ext/gamenetworkingsockets EXCLUDE_FROM_ALL)
+add_subdirectory(ext/valvesockets EXCLUDE_FROM_ALL)
 
 
 # Engine

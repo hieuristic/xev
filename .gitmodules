@@ -19,6 +19,6 @@
 [submodule "ext/vma"]
 	path = ext/vma
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-[submodule "ext/gamenetworkingsockets"]
-	path = ext/gamenetworkingsockets
+[submodule "ext/valvesockets"]
+	path = ext/valvesockets
 	url = https://github.com/valvesoftware/gamenetworkingsockets
