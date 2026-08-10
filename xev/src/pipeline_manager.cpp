@@ -4,10 +4,11 @@
 #include <xev/pipeline_manager.h>
 #include <fstream>
 #include <vector>
+#include <xev/vfs.h>
 
 namespace xev {
 
-void PipelineManager::create(Pipeline& pipe) {
+void PipelineManager::create(Pipeline& pipe, VirtualFileSystem vfs) {
   VkPushConstantRange pushConstRange = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,
@@ -169,30 +170,15 @@ void PipelineManager::destroy(Pipeline& pipe) const {
 
 void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
   XEV_INFO("Input path: {}", path);
-  const char* base_path = SDL_GetBasePath();
-  path = base_path ? std::string(base_path) + "../shaders/" + path
-                   : "shaders/" + path;
 
-  std::ifstream file(path, std::ios::ate | std::ios::binary);
-  if (!file.is_open()) {
-    XEV_ERROR("Failed to read {}", path);
-  }
 
-  XEV_INFO("Reading shader file at {}", path);
-
-  std::vector<char> m_shader_src;
-  auto size = file.tellg();
-  m_shader_src.resize(size);
-  file.seekg(0, std::ios::beg);
-  file.read(m_shader_src.data(), static_cast<std::streamsize>(size));
-  file.close();
+  std::vector<char> shader_src_ = m_VFS.read(path);
 
   VkResult res_;
-
   VkShaderModuleCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = static_cast<size_t>(size),
-      .pCode = reinterpret_cast<const uint32_t*>(m_shader_src.data()),
+      .pCode = reinterpret_cast<const uint32_t*>(shader_src_.data()),
   };
 
   res_ = vkCreateShaderModule(m_device, &info, nullptr, &mod);

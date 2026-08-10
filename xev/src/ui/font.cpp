@@ -5,6 +5,7 @@
 #include <xev/resource/image.h>
 #include <xev/resource_manager.h>
 #include <xev/ui/font.h>
+#include <xev/vfs.h>
 
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
@@ -14,6 +15,7 @@ namespace xev {
 
 Font::Font(const ResourceManager& manager,
            const HotExec& hotExec,
+           const VirtualFileSystem& vfs,
            const std::string& atlasPath,
            const std::string& configPath)
     : m_manager(manager) {
@@ -35,8 +37,9 @@ Font::Font(const ResourceManager& manager,
   m_atlas.height = configData["atlas"]["height"];
   m_manager.alloc(m_atlas);
   uint64_t atlasArea = m_atlas.width * m_atlas.height;
-  std::vector<uint8_t> rgb_data(atlasArea * 3);
+  std::vector<uint8_t> rgb_data = (atlasArea * 3);
   atlasFile.read(reinterpret_cast<char*>(rgb_data.data()), atlasArea * 3);
+
   m_atlas.host_data.resize(atlasArea * 4);
   for (uint64_t i = 0; i < atlasArea; ++i) {
     m_atlas.host_data[i * 4 + 0] = rgb_data[i * 3 + 0];  // R

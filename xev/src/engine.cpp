@@ -1,6 +1,7 @@
 #include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
+#include <xev/filesystem/fs.h>
 #include <xev/frame_context.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
@@ -80,6 +81,11 @@ void Engine::init_frame_context() {
       *resourceManager, swapchain->width, swapchain->height);
 }
 
+void Engine::init_file_system() {
+  fileSystem = std::make_unique<FileSystem>();
+  fileSystem->init_thread_pool();
+}
+
 void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {
   const auto& frame = frameContext->get_current_frame();
 
@@ -137,8 +143,6 @@ void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {
 
   frameContext->release_frame();
 }
-
-void Engine::init_renderer() {}
 
 Engine::~Engine() = default;
 Engine::Engine(Engine&&) = default;

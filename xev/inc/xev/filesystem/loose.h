@@ -4,9 +4,9 @@
 namespace xev {
 
 struct LooseSource : public FileSource {
-  LooseSource(std::string_view path_);
+  LooseSource(std::string_view dirPath);
   std::unorderred_map<std::string, > locator;
-  void read() override;
+  void read(std::string_view path, ) override;
   void index() override;
 }
 

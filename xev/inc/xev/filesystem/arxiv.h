@@ -16,6 +16,8 @@ struct ArxivSource : public FileSource {
   std::unordered_map<std::string> directive;
 
   void index() override;
+private:
+  mutable
 };
 
 }  // namespace xev

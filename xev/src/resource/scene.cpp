@@ -151,20 +151,23 @@ void Scene::parse_mesh(std::vector<Mesh>& meshes,
   }
 }
 
-void Scene::load_gltf(std::string_view filepath) {
+void Scene::load_gltf(const std::vector<uint8_t>& gltfData) {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
   std::string warn;
 
-  std::string path(filepath);
+  // TODO change this to use the VFS
   bool ret = false;
-
   if (path.length() >= 4 && path.substr(path.length() - 4) == ".glb") {
-    ret = loader.LoadBinaryFromFile(&model, &err, &warn, path);
+    ret = loader.LoadBinaryFromMemory(&model, &err, &warn, gltfData.data(),
+                                      gltfData.size());
   } else {
-    ret = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+    ret = loader.LoadASCIIFromMemory(
+        &model, &err, &warn, reinterpret_cast<const char*>(gltfData.data()),
+        gltfData.size());
   }
+  // TODO
 
   if (!warn.empty()) {
     XEV_WARN("glTF Warning: {}", warn);
