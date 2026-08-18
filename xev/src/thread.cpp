@@ -1,7 +1,9 @@
 #include <xev/thread.h>
 
+namespace xev {
+
 ThreadPool::ThreadPool(uint32_t numThreads) {
-  for (uint32 i = 0; i < numThreads; ++i) {
+  for (uint32_t i = 0; i < numThreads; ++i) {
     workers.emplace_back([this] {
       while (true) {
         taskSem.acquire();
@@ -25,7 +27,7 @@ ThreadPool::ThreadPool(uint32_t numThreads) {
 
 ThreadPool::~ThreadPool() {
   shouldDie.store(true);
-  taskSemaphore.release(workers.size());
+  taskSem.release(workers.size());
   for (auto& worker : workers) {
     if (worker.joinable())
       worker.join();
@@ -40,15 +42,7 @@ void ThreadPool::run(std::function<void()> task) {
     tasks.push(std::move(task));
   }
 
-  taskSemaphore.release();
+  taskSem.release();
 }
 
-template <typename F, typename... Args>
-auto ThreadPool::submit(F&& f, Args&&... args) {
-  using return_type = std::invoke_result_t<F, Args...>;
-  auto task = std::make_shared<std::packaged_task<return_type()>>(
-      std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-  auto fut = task->get_future();
-  this->run([task]() { (*task)(); });
-  return fut;
-}
+}  // namespace xev

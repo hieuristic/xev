@@ -172,7 +172,7 @@ void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
   XEV_INFO("Input path: {}", path);
 
 
-  std::vector<char> shader_src_ = m_fileSys.read(path);
+  std::vector<uint8_t> shader_src_ = m_fileSys.read(path);
 
   VkResult res_;
   VkShaderModuleCreateInfo info = {

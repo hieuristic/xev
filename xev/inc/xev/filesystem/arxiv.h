@@ -1,5 +1,6 @@
 #pragma once
-#include <xev/filesystem/source.h>
+#include <xev/filesystem/mount.h>
+#include <filesystem>
 
 namespace xev {
 
@@ -9,15 +10,17 @@ struct ArxivLocation {
   uint64_t sizeUncompressed;
 };
 
-struct ArxivSource : public FileSource {
-  ArxivSource(std::string_view path_);
-
-  ARX arx;
-  std::unordered_map<std::string> directive;
-
+struct ArxivMount : public Mount {
+  explicit ArxivMount(std::filesystem::path arxPath_);
   void index() override;
-private:
-  mutable
+  std::vector<uint8_t> read(std::string_view path,
+                            uint64_t offset,
+                            uint64_t count) override;
+
+  std::filesystem::path arxPath;
+
+ private:
+  // mutable
 };
 
 }  // namespace xev

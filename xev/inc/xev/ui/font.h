@@ -6,6 +6,7 @@
 namespace xev {
 
 struct HotExec;
+struct FileSystem;
 struct ResourceManager;
 struct GlobalDescriptorSet;
 
@@ -18,6 +19,7 @@ struct Font {
 
   Font(const ResourceManager& manager,
        const HotExec& hotExec,
+       const FileSystem& fileSys,
        const std::string& atlas_path,
        const std::string& config_path);
   ~Font();

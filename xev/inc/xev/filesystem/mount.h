@@ -7,6 +7,7 @@
 namespace xev {
 
 struct Mount {
+  virtual ~Mount() = default;
   virtual std::vector<uint8_t> read(std::string_view path,
                                     uint64_t offset,
                                     uint64_t count) = 0;

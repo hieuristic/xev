@@ -14,12 +14,12 @@ namespace xev {
 
 Font::Font(const ResourceManager& manager,
            const HotExec& hotExec,
-           const FileSystem& fs,
+           const FileSystem& fileSys,
            const std::string& atlasPath,
            const std::string& configPath)
     : m_manager(manager) {
-  std::vector<uint8_t> configBuffer = fs.read(configPath);
-  std::vector<uint8_t> atlasBuffer = fs.read(atlasPath);
+  std::vector<uint8_t> configBuffer = fileSys.read(configPath);
+  std::vector<uint8_t> atlasBuffer = fileSys.read(atlasPath);
 
   nlohmann::json configData =
       nlohmann::json::parse(configBuffer.begin(), configBuffer.end());

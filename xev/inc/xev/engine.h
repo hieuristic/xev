@@ -31,7 +31,7 @@ struct Engine {
   std::unique_ptr<GlobalDescriptorSet> globalDescriptorSet;
   std::unique_ptr<FrameContext> frameContext;
   std::unique_ptr<HotExec> hotExec;
-  std::unique_ptr<FileSystem> fileSystem;
+  std::unique_ptr<FileSystem> fileSys;
 
   void init_swapchain();
   void init_resource_manager();

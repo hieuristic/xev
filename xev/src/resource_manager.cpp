@@ -4,13 +4,16 @@
 #include <xev/resource/image.h>
 #include <xev/resource/sampler.h>
 #include <xev/resource_manager.h>
+#include <stb_image.h>
+#include <xev/filesystem/fs.h>
 
 namespace xev {
 
 ResourceManager::ResourceManager(VkInstance instance,
                                  VkPhysicalDevice physical_device,
-                                 VkDevice device)
-    : m_device(device) {
+                                 VkDevice device,
+                                 const FileSystem& fileSys)
+    : m_device(device), m_fileSys(fileSys) {
   init_allocator(instance, physical_device, device);
 }
 
@@ -175,7 +178,7 @@ void ResourceManager::free(Image& img) const {
 void ResourceManager::load(Image& img, std::string path) const {
   alloc(img);
 
-  std::vector<uint8_t> memory = m_fs.read(path);
+  std::vector<uint8_t> memory = m_fileSys.read(path);
   int w, h, c;
   stbi_uc* data = stbi_load_from_memory(
       memory.data(), static_cast<int>(memory.size()), &w, &h, &c, 4);

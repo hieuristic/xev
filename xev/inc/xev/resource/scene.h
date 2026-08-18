@@ -25,12 +25,13 @@ struct Image;
 namespace xev {
 
 struct Backend;
+struct FileSystem;
 
 struct Scene : public Resource {
   Scene();
   void destroy(const ResourceManager& manager);
 
-  void load_gltf(std::string_view filepath);
+  void load_gltf(const FileSystem& fileSys, std::string_view filepath);
   void create_test_triangle();
 
   uint64_t size_device() const override;

@@ -1,13 +1,16 @@
 #include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
+#include <xev/filesystem/arxiv.h>
 #include <xev/filesystem/fs.h>
+#include <xev/filesystem/loose.h>
 #include <xev/frame_context.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
 #include <xev/pipeline_manager.h>
 #include <xev/resource_manager.h>
 #include <xev/swapchain.h>
+#include <filesystem>
 
 namespace xev {
 
@@ -49,7 +52,8 @@ void Engine::init_resource_manager() {
     return;
 
   resourceManager = std::make_unique<ResourceManager>(
-      m_device->instance, m_device->physical_device, m_device->device);
+      m_device->instance, m_device->physical_device, m_device->device,
+      *fileSys);
 }
 
 void Engine::init_pipeline_manager() {
@@ -58,11 +62,24 @@ void Engine::init_pipeline_manager() {
 
   XEV_ASSERT(globalDescriptorSet != nullptr, "Invalid global desc set!");
 
-  if (fileSystem == nullptr)
+  if (fileSys == nullptr)
     init_file_system();
 
+  std::filesystem::path arxPath = "f0.arx";
+  if (std::filesystem::exists(arxPath)) {
+    XEV_WARN("[PipelineManager] Found shader archive: {}. Mounting...",
+             arxPath.generic_string());
+    fileSys->mount(ArxivMount{arxPath});
+  } else {
+    XEV_WARN(
+        "[PipelineManager] '{}' not found. Falling back to loose 'shaders/' "
+        "folder.",
+        arxPath.generic_string());
+    fileSys->mount(LooseMount{"shaders"});
+  }
+
   pipelineManager = std::make_unique<PipelineManager>(
-      m_device->device, globalDescriptorSet->get_layout(), *fileSystem);
+      m_device->device, globalDescriptorSet->get_layout(), *fileSys);
 }
 
 void Engine::init_global_descriptor_set() {
@@ -85,8 +102,8 @@ void Engine::init_frame_context() {
 }
 
 void Engine::init_file_system() {
-  fileSystem = std::make_unique<FileSystem>();
-  fileSystem->init_thread_pool();
+  fileSys = std::make_unique<FileSystem>();
+  fileSys->init_thread_pool();
 }
 
 void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {

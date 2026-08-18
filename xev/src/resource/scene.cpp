@@ -5,6 +5,7 @@
 #include <limits>
 
 #include <tiny_gltf.h>
+#include <xev/filesystem/fs.h>
 #include <xev/resource/image.h>
 
 namespace xev {
@@ -156,17 +157,19 @@ void Scene::load_gltf(const FileSystem& fileSys, std::string_view filepath) {
   std::string err;
   std::string warn;
 
-  fileSys.augment(loader);
+  std::vector<uint8_t> gltfData = fileSys.read(filepath);
+  fileSys.attach(loader);
 
   bool ret = false;
-  if (path.length() >= 4 && path.substr(path.length() - 4) == ".glb") {
+  if (filepath.length() >= 4 &&
+      filepath.substr(filepath.length() - 4) == ".glb") {
     ret = loader.LoadBinaryFromMemory(
         &model, &err, &warn, gltfData.data(),
         static_cast<unsigned int>(gltfData.size()), "");
   } else {
     ret = loader.LoadASCIIFromString(
         &model, &err, &warn, reinterpret_cast<const char*>(gltfData.data()),
-        static_cast<unsigned int>gltfData.size()), "");
+        static_cast<unsigned int>(gltfData.size()), "");
   }
 
   if (!warn.empty())

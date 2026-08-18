@@ -1,5 +1,3 @@
-// In app.cpp let's implement the core logic for the demo:
-
 #include "app.h"
 #include <xev/frame_context.h>
 #include <xev/global_descriptor_set.h>
@@ -7,6 +5,7 @@
 #include <xev/resource_manager.h>
 #include <xev/ui/font.h>
 #include <xev/volk.h>
+#include <xev/filesystem/loose.h>
 
 void compute_projection(const xev::Camera& cam,
                         const std::vector<glm::vec3> pos_world) {
@@ -26,6 +25,8 @@ App::App() {
   SDL_SetWindowRelativeMouseMode(m_window->get_native(), true);
 
   m_engine = std::make_unique<xev::Engine>(m_window->get_native());
+  m_engine->init_file_system();
+
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
   m_engine->init_hot_exec();
@@ -41,7 +42,7 @@ App::App() {
   std::string scene_path = base_path + "assets/models/sponza_full.glb";
 
   XEV_INFO("Loading Sponza...");
-  m_scene->load_gltf(scene_path);
+  m_scene->load_gltf(*m_engine->fileSys, scene_path);
   // m_scene->create_test_triangle();
   m_scene->alloc(*m_engine->resourceManager);
   m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
@@ -57,6 +58,7 @@ App::App() {
 
   m_font = std::make_unique<xev::Font>(*m_engine->resourceManager,
                                        *m_engine->hotExec,
+                                       *m_engine->fileSys,
                                        base_path + "assets/fonts/akkurat.bin",
                                        base_path + "assets/fonts/akkurat.json");
   m_font->bind(*m_engine->globalDescriptorSet);

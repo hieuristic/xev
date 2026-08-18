@@ -10,17 +10,19 @@ namespace xev {
 struct Buffer;
 struct Image;
 struct HotExec;
+struct FileSystem;
 
 struct ResourceManager {
   ResourceManager(VkInstance instance,
                   VkPhysicalDevice physical_device,
-                  VkDevice device);
+                  VkDevice device,
+                  const FileSystem& fileSys);
   ~ResourceManager();
 
   ResourceManager(const ResourceManager&) = delete;
   ResourceManager& operator=(const ResourceManager&) = delete;
   ResourceManager(ResourceManager&&) = default;
-  ResourceManager& operator=(ResourceManager&&) = default;
+  ResourceManager& operator=(ResourceManager&&) = delete;
 
   void alloc(Image& img) const;
   void free(Image& img) const;
@@ -39,6 +41,8 @@ struct ResourceManager {
  private:
   VkDevice m_device{VK_NULL_HANDLE};
   VmaAllocator m_allocator{nullptr};
+
+  const FileSystem& m_fileSys;
 
   void init_allocator(VkInstance instance,
                       VkPhysicalDevice physical_device,
