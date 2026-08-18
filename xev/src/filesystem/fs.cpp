@@ -31,9 +31,11 @@ std::vector<uint8_t> FileSystem::read(std::string_view filepath,
                                       uint64_t offset,
                                       uint64_t count) const {
   uint32_t idx = find_mnt(filepath);
-  if (idx == fs::INVALID_MOUNT)
-    XEV_ERROR("Failed to find file");
-  return mnts[idx - 1]->read(filepath, offset, count);
+  if (idx == fs::INVALID_MOUNT || idx >= mnts.size()) {
+    XEV_ERROR("Failed to find file {}", filepath);
+    return {};
+  }
+  return mnts[idx]->read(filepath, offset, count);
 }
 
 std::future<std::vector<uint8_t>> FileSystem::read_async(

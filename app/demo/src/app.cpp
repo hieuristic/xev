@@ -6,6 +6,8 @@
 #include <xev/ui/font.h>
 #include <xev/volk.h>
 #include <xev/filesystem/loose.h>
+#include <xev/filesystem/fs.h>
+#include <filesystem>
 
 void compute_projection(const xev::Camera& cam,
                         const std::vector<glm::vec3> pos_world) {
@@ -27,6 +29,11 @@ App::App() {
   m_engine = std::make_unique<xev::Engine>(m_window->get_native());
   m_engine->init_file_system();
 
+  const char* base = SDL_GetBasePath();
+  std::filesystem::path basePath =
+      base ? std::filesystem::path(base) / ".." : std::filesystem::current_path();
+  m_engine->fileSys->mount(xev::LooseMount{basePath / "assets"});
+
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
   m_engine->init_hot_exec();
@@ -37,9 +44,7 @@ App::App() {
   m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
 
   m_scene = std::make_unique<xev::Scene>();
-  std::string base_path =
-      SDL_GetBasePath() ? std::string(SDL_GetBasePath()) + "../" : "";
-  std::string scene_path = base_path + "assets/models/sponza_full.glb";
+  std::string scene_path = "models/sponza_full.glb";
 
   XEV_INFO("Loading Sponza...");
   m_scene->load_gltf(*m_engine->fileSys, scene_path);
@@ -59,8 +64,8 @@ App::App() {
   m_font = std::make_unique<xev::Font>(*m_engine->resourceManager,
                                        *m_engine->hotExec,
                                        *m_engine->fileSys,
-                                       base_path + "assets/fonts/akkurat.bin",
-                                       base_path + "assets/fonts/akkurat.json");
+                                       "fonts/akkurat.bin",
+                                       "fonts/akkurat.json");
   m_font->bind(*m_engine->globalDescriptorSet);
 }
 

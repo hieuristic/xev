@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>
 #include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
@@ -65,7 +66,11 @@ void Engine::init_pipeline_manager() {
   if (fileSys == nullptr)
     init_file_system();
 
-  std::filesystem::path arxPath = "f0.arx";
+  const char* base = SDL_GetBasePath();
+  std::filesystem::path basePath =
+      base ? std::filesystem::path(base) / ".." : std::filesystem::current_path();
+
+  std::filesystem::path arxPath = basePath / "f0.arx";
   if (std::filesystem::exists(arxPath)) {
     XEV_WARN("[PipelineManager] Found shader archive: {}. Mounting...",
              arxPath.generic_string());
@@ -75,7 +80,7 @@ void Engine::init_pipeline_manager() {
         "[PipelineManager] '{}' not found. Falling back to loose 'shaders/' "
         "folder.",
         arxPath.generic_string());
-    fileSys->mount(LooseMount{"shaders"});
+    fileSys->mount(LooseMount{basePath / "shaders"});
   }
 
   pipelineManager = std::make_unique<PipelineManager>(
