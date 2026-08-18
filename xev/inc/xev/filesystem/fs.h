@@ -3,6 +3,7 @@
 // Since this struct manage its own thread for concurency,
 // it is NOT thread-safe. TODO: make it thread safe
 #include <atomic>
+#include <concepts>
 #include <future>
 #include <memory>
 #include <queue>
@@ -45,13 +46,15 @@ struct FileSystem {
   std::unordered_map<std::string, uint32_t> directive;
   std::vector<std::unique_ptr<Mount>> mnts;
 
-  void init_thread_pool(uint32_t numThreads = 4);
+  void init_thread_pool(uint32_t numThreads = 4) const;
   void destroy_thread_pool();
 
-  void mount(Mount&& mnt);
+  template <std::derived_from<Mount> T>
+  void mount(T&& mnt);
+
   void index();
   void index(uint32_t mntIdx);
-  void find_mnt(std::string_view filepath);
+  uint32_t find_mnt(std::string_view filepath) const;
 
   bool exists(std::string_view path) const;
   std::vector<uint8_t> read(std::string_view path,

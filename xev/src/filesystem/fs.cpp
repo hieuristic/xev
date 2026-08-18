@@ -1,6 +1,8 @@
 #include <tiny_gltf.h>
 #include <xev/filesystem/fs.h>
+#include <xev/filesystem/mount.h>
 #include <xev/thread.h>
+#include <xev/logger.h>
 
 namespace xev {
 
@@ -8,7 +10,7 @@ FileSystem::FileSystem() {}
 
 FileSystem::~FileSystem() {}
 
-void FileSystem::init_thread_pool(uint32_t numThreads) {
+void FileSystem::init_thread_pool(uint32_t numThreads) const {
   m_threadPool = std::make_unique<ThreadPool>(numThreads);
 }
 
@@ -16,46 +18,50 @@ void FileSystem::destroy_thread_pool() {
   m_threadPool.reset();
 }
 
-void FileSystem::mount(Mount mnt) {
-  mnts.push_back(mnt);
-  XEV_ASSERT(mnts.isIndexed());
-  for (auto& index : mnt.directive) {
-    directive[index.first]
+// sorry for the ugly template code...
+template <std::derived_from<Mount> T>
+void FileSystem::mount(T&& mnt) {
+  uint32_t mnt_idx = static_cast<uint32_t>(mnts.size());
+  for (const auto& [path, _] : mnt.directive) {
+    directive[path] = mnt_idx;
   }
+  mnts.push_back(std::make_unique<std::remove_cvref_t<T>>(std::forward<T>(mnt)));
 }
 
-uint32_t FileSystem::find_src(std::string_view filepath) {
+uint32_t FileSystem::find_mnt(std::string_view filepath) const {
   // search for indexed sources
-  auto it = directive.find(filepath);
+  auto it = directive.find(std::string(filepath));
   if (it != directive.end())
-    return it->second.advance + 1;
+    return it->second.advance;
 
   return 0;
 }
 
 std::vector<uint8_t> FileSystem::read(std::string_view filepath,
                                       uint64_t offset,
-                                      uint64_t count) {
-  uint32_t src_idx = find_src(filepath);
-  return mnts[src_idx]->read(filepath, offset, count);
+                                      uint64_t count) const {
+  uint32_t idx = find_mnt(filepath);
+  if (idx == 0)
+    XEV_ERROR("Failed to find file");
+  return mnts[idx - 1]->read(filepath, offset, count);
 }
 
-std::future<std::vector<uint8_t>> VGS::read_async(std::string_view fliepath,
-                                                  uint64_t offset,
-                                                  uint64_t count) {
-  auto& src = find_src(file_path);
+std::future<std::vector<uint8_t>> FileSystem::read_async(
+    std::string_view filepath,
+    uint64_t offset,
+    uint64_t count) const {
+  uint32_t idx = find_mnt(filepath);
+  if (idx == 0)
+    XEV_ERROR("Failed to find file");
+
   if (m_threadPool == nullptr)
     init_thread_pool();
 
-  auto task = std::make_shared<std::packaged_task<std::vector<uint8_t>()>>(
-      [this, p = std::string(path), offset, count]() {
-        return this->read(p, offset, count);
-      });
-
-  std::future<std::vector<uint8_t>> fut = task->get_future();
-  m_threadPool->run([task]() { (*task)(); });
-
-  return fut;
+  return m_threadPool->submit(
+    [this, p = std::string(filepath), offset, count]() {
+      return this->read(p, offset, count);
+    }
+  );
 }
 
 void FileSystem::augment(tinygltf::TinyGLTF& loader) const {

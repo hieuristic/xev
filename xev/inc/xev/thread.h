@@ -13,6 +13,9 @@ struct ThreadPool {
   std::atomic<bool> shouldDie;
 
   void run(std::function<void()> task);
+
+  template <typename F, typename... Args>
+  auto submit(F&& f, Args&&... args);
 };
 
 }  // namespace xev

@@ -42,3 +42,13 @@ void ThreadPool::run(std::function<void()> task) {
 
   taskSemaphore.release();
 }
+
+template <typename F, typename... Args>
+auto ThreadPool::submit(F&& f, Args&&... args) {
+  using return_type = std::invoke_result_t<F, Args...>;
+  auto task = std::make_shared<std::packaged_task<return_type()>>(
+      std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+  auto fut = task->get_future();
+  this->run([task]() { (*task)(); });
+  return fut;
+}
