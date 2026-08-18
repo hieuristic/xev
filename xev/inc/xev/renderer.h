@@ -3,9 +3,9 @@
 
 namespace xev {
 
-class Image;
+struct Image;
 
-class Renderer {
+struct Renderer {
  protected:
   void prepare_attachments(VkCommandBuffer& cmdbuf,
                            const Image& color_image);

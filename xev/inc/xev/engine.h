@@ -1,21 +1,22 @@
 #pragma once
 #include <xev/volk.h>
+#include <memory>
 
 struct SDL_Window;
 
 namespace xev {
 
-class Image;
-class Device;
-class Swapchain;
-class ResourceManager;
-class PipelineManager;
-class GlobalDescriptorSet;
-class FrameContext;
-class FileSystem;
+struct Image;
+struct Device;
+struct Swapchain;
+struct ResourceManager;
+struct PipelineManager;
+struct GlobalDescriptorSet;
+struct FrameContext;
+struct FileSystem;
+struct HotExec;
 
-class Engine {
- public:
+struct Engine {
   Engine();
   Engine(SDL_Window* window);
   ~Engine();
@@ -24,10 +25,6 @@ class Engine {
   Engine(Engine&&);
   Engine& operator=(Engine&&);
 
- private:
-  std::unique_ptr<Device> m_device;
-
- public:
   std::unique_ptr<Swapchain> swapchain;
   std::unique_ptr<ResourceManager> resourceManager;
   std::unique_ptr<PipelineManager> pipelineManager;
@@ -44,6 +41,9 @@ class Engine {
   void init_hot_exec();
   void init_file_system();
   void submit_and_show(VkCommandBuffer cmd, const Image& image);
+
+ private:
+  std::unique_ptr<Device> m_device;
 };
 
 }  // namespace xev

@@ -6,8 +6,7 @@
 
 namespace xev {
 
-class Window {
- public:
+struct Window {
   Window(std::string name);
   Window(std::string name, uint32_t width, uint32_t height);
   ~Window();

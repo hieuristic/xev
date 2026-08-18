@@ -4,8 +4,7 @@ enum GameStateType {
   CUTSCENE,
 };
 
-class GameState {
-public:
+struct GameState {
   GameState();
 
   GameStateType type;

@@ -7,15 +7,13 @@
 #include <xev/window.h>
 #include "controller.h"
 
-class App {
- public:
+struct App {
   App();
   ~App();
 
   void draw();
   void run();
 
- public:
   enum ACTION { QUIT };
   std::unordered_map<ACTION, SDL_EventType> keymap;
 

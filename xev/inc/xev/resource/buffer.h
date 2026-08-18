@@ -5,10 +5,9 @@
 
 namespace xev {
 
-class Backend;
+struct Backend;
 
-class Buffer : Resource {
- public:
+struct Buffer : Resource {
   Buffer(VkBufferUsageFlags flags_) : flags(flags_) {}
   Buffer(VkBufferUsageFlags flags_, VmaMemoryUsage usage_)
       : flags(flags_), usage(usage_) {}

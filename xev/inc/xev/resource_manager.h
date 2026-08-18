@@ -7,12 +7,11 @@
 
 namespace xev {
 
-class Buffer;
-class Image;
-class HotExec;
+struct Buffer;
+struct Image;
+struct HotExec;
 
-class ResourceManager {
- public:
+struct ResourceManager {
   ResourceManager(VkInstance instance,
                   VkPhysicalDevice physical_device,
                   VkDevice device);

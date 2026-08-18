@@ -5,8 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-class Controller {
- public:
+struct Controller {
   Controller() = default;
   SDL_Scancode k_front = SDL_SCANCODE_W;
   SDL_Scancode k_back = SDL_SCANCODE_S;

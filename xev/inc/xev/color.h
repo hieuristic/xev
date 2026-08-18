@@ -20,8 +20,7 @@ concept ColorDim = (N == 3 || N == 4);
 // N defaults to 4 if not specified
 template <ColorType T, size_t N = 4>
   requires ColorDim<N>
-class Color {
- public:
+struct Color {
   T r, g, b;
 
   struct Empty {};

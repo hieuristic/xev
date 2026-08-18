@@ -4,18 +4,20 @@
 
 namespace xev {
 
-class Pipeline;
-class PipelineMesh;
+struct Pipeline;
+struct PipelineMesh;
+struct FileSystem;
 
-class PipelineManager {
- public:
-  PipelineManager(VkDevice device, VkDescriptorSetLayout descSetLayout)
-      : m_device(device), m_descSetLayout(descSetLayout) {}
+struct PipelineManager {
+  PipelineManager(VkDevice device,
+                  VkDescriptorSetLayout descSetLayout,
+                  FileSystem& fileSys)
+      : m_device(device), m_descSetLayout(descSetLayout), m_fileSys(fileSys) {}
 
   PipelineManager(const PipelineManager&) = delete;
   PipelineManager& operator=(const PipelineManager&) = delete;
   PipelineManager(PipelineManager&&) = default;
-  PipelineManager& operator=(PipelineManager&&) = default;
+  PipelineManager& operator=(PipelineManager&&) = delete;
 
   void load_shader(VkShaderModule& mod, std::string path) const;
 
@@ -25,6 +27,7 @@ class PipelineManager {
  private:
   VkDevice m_device{VK_NULL_HANDLE};
   VkDescriptorSetLayout m_descSetLayout{VK_NULL_HANDLE};
+  FileSystem& m_fileSys;
 };
 
 }  // namespace xev

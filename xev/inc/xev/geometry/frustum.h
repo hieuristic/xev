@@ -4,8 +4,7 @@
 
 namespace xev {
 
-class Frustum {
-public:
+struct Frustum {
   Frustum(const Camera& camera);
   ~Frustum();
   bool contains(const Sphere& sphere);

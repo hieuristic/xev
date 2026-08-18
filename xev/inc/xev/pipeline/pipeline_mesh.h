@@ -5,8 +5,7 @@
 
 namespace xev {
 
-class PipelineMesh : public Pipeline {
- public:
+struct PipelineMesh : public Pipeline {
   // This is in-sync with shaders/mesh.slang
   struct PushConst {
     glm::mat4 viewProj;

@@ -6,10 +6,9 @@
 
 namespace xev {
 
-class ResourceManager;
+struct ResourceManager;
 
-class FrameContext {
- public:
+struct FrameContext {
   struct Frame {
     VkCommandPool pool{VK_NULL_HANDLE};
     VkCommandBuffer render_cmdbuf{VK_NULL_HANDLE};

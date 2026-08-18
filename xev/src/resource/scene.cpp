@@ -4,9 +4,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <limits>
 
-#include <xev/resource/image.h>
-#define TINYGLTF_IMPLEMENTATION
 #include <tiny_gltf.h>
+#include <xev/resource/image.h>
 
 namespace xev {
 
@@ -151,35 +150,32 @@ void Scene::parse_mesh(std::vector<Mesh>& meshes,
   }
 }
 
-void Scene::load_gltf(const std::vector<uint8_t>& gltfData) {
+void Scene::load_gltf(const FileSystem& fileSys, std::string_view filepath) {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
   std::string warn;
 
-  // TODO change this to use the VFS
+  fileSys.augment(loader);
+
   bool ret = false;
   if (path.length() >= 4 && path.substr(path.length() - 4) == ".glb") {
-    ret = loader.LoadBinaryFromMemory(&model, &err, &warn, gltfData.data(),
-                                      gltfData.size());
+    ret = loader.LoadBinaryFromMemory(
+        &model, &err, &warn, gltfData.data(),
+        static_cast<unsigned int>(gltfData.size()), "");
   } else {
-    ret = loader.LoadASCIIFromMemory(
+    ret = loader.LoadASCIIFromString(
         &model, &err, &warn, reinterpret_cast<const char*>(gltfData.data()),
-        gltfData.size());
+        static_cast<unsigned int>gltfData.size()), "");
   }
-  // TODO
 
-  if (!warn.empty()) {
+  if (!warn.empty())
     XEV_WARN("glTF Warning: {}", warn);
-  }
-  if (!err.empty()) {
+  if (!err.empty())
     XEV_ERROR("glTF Error: {}", err);
+  if (!ret)
     return;
-  }
-  if (!ret) {
-    XEV_ERROR("Failed to load glTF: {}", path);
-    return;
-  }
+
   if (on_device()) {
     XEV_ERROR("Loading glTF into an active scene. Please call .release().");
     return;

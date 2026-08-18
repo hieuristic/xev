@@ -8,12 +8,11 @@
 
 namespace xev {
 
-class ResourceManager;
+struct ResourceManager;
 
 typedef uint32_t ImageId;
 
-class Image : public Resource {
- public:
+struct Image : public Resource {
   Image() = default;
   Image(VkFormat format_, VkImageUsageFlags flags_)
       : format(format_), flags(flags_) {}

@@ -11,8 +11,7 @@ enum CAMERA_TYPE {
   CAM_OTHOGRAPHIC,
 };
 
-class Camera {
- public:
+struct Camera {
   Camera();
   Camera(glm::quat rot_, glm::vec3 pos_, float fov_deg);
   Camera(glm::quat rot_, glm::vec3 pos_, float fovx_deg, float fovy_deg);

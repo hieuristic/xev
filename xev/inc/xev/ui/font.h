@@ -5,12 +5,11 @@
 
 namespace xev {
 
-class HotExec;
-class ResourceManager;
-class GlobalDescriptorSet;
+struct HotExec;
+struct ResourceManager;
+struct GlobalDescriptorSet;
 
-class Font {
- public:
+struct Font {
   struct Glyph {
     float advance{0.0f};
     glm::vec4 planeBounds{0, 0, 0, 0};

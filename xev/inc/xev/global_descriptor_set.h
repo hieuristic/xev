@@ -6,10 +6,9 @@
 
 namespace xev {
 
-class Backend;
+struct Backend;
 
-class GlobalDescriptorSet {
- public:
+struct GlobalDescriptorSet {
   GlobalDescriptorSet(VkDevice device);
   ~GlobalDescriptorSet();
   static const uint32_t MAX_TEXTURE = 2 << 14;

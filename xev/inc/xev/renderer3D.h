@@ -6,13 +6,12 @@
 
 namespace xev {
 
-class Image;
-class Scene;
-class Camera;
-class PipelineManager;
+struct Image;
+struct Scene;
+struct Camera;
+struct PipelineManager;
 
-class Renderer3D : public Renderer {
- public:
+struct Renderer3D : public Renderer {
   Renderer3D(PipelineManager& manager);
   ~Renderer3D();
 

@@ -5,8 +5,7 @@
 
 namespace xev {
 
-class Swapchain {
- public:
+struct Swapchain {
   Swapchain(VkPhysicalDevice physical_device,
             VkSurfaceKHR surface,
             VkDevice device,

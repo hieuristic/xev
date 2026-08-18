@@ -174,7 +174,18 @@ void ResourceManager::free(Image& img) const {
 
 void ResourceManager::load(Image& img, std::string path) const {
   alloc(img);
-  // TODO loading the image from source path
+
+  std::vector<uint8_t> memory = m_fs.read(path);
+  int w, h, c;
+  stbi_uc* data = stbi_load_from_memory(
+      memory.data(), static_cast<int>(memory.size()), &w, &h, &c, 4);
+
+  if (data) {
+    img.width = w;
+    img.height = h;
+    img.host_data.assign(data, data + (w * h * 4));
+    stbi_image_free(data);
+  };
 }
 
 }  // namespace xev

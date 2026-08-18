@@ -24,10 +24,9 @@ struct Image;
 
 namespace xev {
 
-class Backend;
+struct Backend;
 
-class Scene : public Resource {
- public:
+struct Scene : public Resource {
   Scene();
   void destroy(const ResourceManager& manager);
 

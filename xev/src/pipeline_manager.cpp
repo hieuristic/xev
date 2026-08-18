@@ -4,11 +4,11 @@
 #include <xev/pipeline_manager.h>
 #include <fstream>
 #include <vector>
-#include <xev/vfs.h>
+#include <xev/filesystem/fs.h>
 
 namespace xev {
 
-void PipelineManager::create(Pipeline& pipe, VirtualFileSystem vfs) {
+void PipelineManager::create(Pipeline& pipe) {
   VkPushConstantRange pushConstRange = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,
@@ -172,12 +172,12 @@ void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
   XEV_INFO("Input path: {}", path);
 
 
-  std::vector<char> shader_src_ = m_VFS.read(path);
+  std::vector<char> shader_src_ = m_fileSys.read(path);
 
   VkResult res_;
   VkShaderModuleCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .codeSize = static_cast<size_t>(size),
+      .codeSize = shader_src_.size(),
       .pCode = reinterpret_cast<const uint32_t*>(shader_src_.data()),
   };
 

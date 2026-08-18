@@ -2,7 +2,8 @@
 
 namespace xev {
 
-class Texture {
+struct Texture {
+ private:
   int sampler{-1};
   int source{-1};
 };

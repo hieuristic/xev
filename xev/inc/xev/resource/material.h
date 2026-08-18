@@ -6,7 +6,7 @@
 
 namespace xev {
 
-class ResourceManager;
+struct ResourceManager;
 
 // in-sync with shaders/material.slang
 struct MaterialGPU {
@@ -19,8 +19,7 @@ struct MaterialGPU {
   uint32_t metallic_roughness_texid;
 };
 
-class Material : public Resource {
- public:
+struct Material : public Resource {
   std::string name;
 
   Color4<uint8_t> albedo{};

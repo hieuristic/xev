@@ -3,7 +3,8 @@
 
 namespace xev {
 
-class Controller {
+struct Controller {
+ private:
   Camera camera;
   // TODO: keyboard_mapping
 };

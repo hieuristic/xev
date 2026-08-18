@@ -24,8 +24,7 @@ struct  LightGPU {
   uint32_t shadowmap_id;
 };
 
-class Light {
- public:
+struct Light {
   std::string name;
   LightType type{LightType::POINT};
   glm::vec3 position{0.0f, 0.0f, 0.0f};

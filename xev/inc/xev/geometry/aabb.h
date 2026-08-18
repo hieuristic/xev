@@ -3,8 +3,7 @@
 
 namespace xev {
 
-class AABB {
-public:
+struct AABB {
   AABB() = default;
   AABB(glm::vec3 pmin_, glm::vec3 pmax_) : pmin(pmin_), pmax(pmax_) {};
   float volume();

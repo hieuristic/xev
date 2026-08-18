@@ -5,8 +5,7 @@
 
 namespace xev {
 
-class PipelineRaster : public Pipeline {
- public:
+struct PipelineRaster : public Pipeline {
   struct PushConst {
     VkDeviceAddress infoBuffer;
   };

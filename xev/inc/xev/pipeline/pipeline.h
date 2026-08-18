@@ -21,8 +21,7 @@ struct PipelineInfo {
   bool enableDepth{false};
 };
 
-class Pipeline {
- public:
+struct Pipeline {
   virtual void draw() {}
   VkPipelineLayout layout;
   VkPipeline pipeline;

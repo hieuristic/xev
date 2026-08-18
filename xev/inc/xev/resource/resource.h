@@ -3,10 +3,9 @@
 
 namespace xev {
 
-class Backend;
+struct Backend;
 
-class Resource {
- public:
+struct Resource {
   virtual uint64_t size_device() const = 0;
   virtual bool on_device() const = 0;
 };

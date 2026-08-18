@@ -11,18 +11,16 @@
 
 namespace xev {
 
-class ResourceManager;
-class HotExec;
+struct ResourceManager;
+struct HotExec;
 
-class Mesh : public Resource {
- public:
+struct Mesh : public Resource {
   struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 uv;
   };
 
- public:
   Mesh() = default;
   Mesh(std::string name,
        glm::mat4 model_mat,
@@ -47,7 +45,6 @@ class Mesh : public Resource {
   void bind(const VkCommandBuffer& cmdbuf, VkDeviceAddress& address) const;
 
   // bounding structure queries
- public:
   bool has_bs() const { return m_has_bs; }
   void get_bs(Sphere& sphere) const;
   void compute_bs();
@@ -55,16 +52,13 @@ class Mesh : public Resource {
   void get_aabb(AABB& aabb) const;
   void compute_aabb();
 
+  bool has_skeleton = false;
+
  private:
   bool m_has_bs = false;
   bool m_has_aabb = false;
   Sphere m_bs;
   AABB m_aabb;
-
- public:
-  bool has_skeleton = false;
-
- private:
   bool m_on_device = false;
   std::string m_name;
   glm::mat4 m_model_mat{1.0f};

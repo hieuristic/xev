@@ -8,14 +8,13 @@
 
 namespace xev {
 
-class Font;
-class Image;
-class Buffer;
-class PipelineManager;
-class GlobalDescriptorSet;
+struct Font;
+struct Image;
+struct Buffer;
+struct PipelineManager;
+struct GlobalDescriptorSet;
 
-class Renderer2D : public Renderer {
- public:
+struct Renderer2D : public Renderer {
   Renderer2D(PipelineManager& pipelineManager,
              ResourceManager& resourceManager,
              uint32_t numFrameInFlight);

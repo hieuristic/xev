@@ -1,3 +1,4 @@
+#include <xev/filesystem/fs.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/hot_exec.h>
 #include <xev/logger.h>
@@ -5,9 +6,7 @@
 #include <xev/resource/image.h>
 #include <xev/resource_manager.h>
 #include <xev/ui/font.h>
-#include <xev/vfs.h>
 
-#include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
 
@@ -15,36 +14,25 @@ namespace xev {
 
 Font::Font(const ResourceManager& manager,
            const HotExec& hotExec,
-           const VirtualFileSystem& vfs,
+           const FileSystem& fs,
            const std::string& atlasPath,
            const std::string& configPath)
     : m_manager(manager) {
-  // 1. load in atlas data from .bin and .json file
-  std::ifstream atlasFile(atlasPath, std::ios::binary);
-  if (!atlasFile.is_open()) {
-    XEV_ERROR("Can't open font atlas file at %s!", configPath);
-  }
-  std::ifstream configFile(configPath);
-  if (!configFile.is_open()) {
-    XEV_ERROR("Can't open font config file at %s!", configPath);
-  }
+  std::vector<uint8_t> configBuffer = fs.read(configPath);
+  std::vector<uint8_t> atlasBuffer = fs.read(atlasPath);
 
-  XEV_INFO("Parsing json from {}", configPath);
-  XEV_INFO("Parsing atlas from {}", atlasPath);
-
-  nlohmann::json configData = nlohmann::json::parse(configFile);
+  nlohmann::json configData =
+      nlohmann::json::parse(configBuffer.begin(), configBuffer.end());
   m_atlas.width = configData["atlas"]["width"];
   m_atlas.height = configData["atlas"]["height"];
   m_manager.alloc(m_atlas);
   uint64_t atlasArea = m_atlas.width * m_atlas.height;
-  std::vector<uint8_t> rgb_data = (atlasArea * 3);
-  atlasFile.read(reinterpret_cast<char*>(rgb_data.data()), atlasArea * 3);
 
   m_atlas.host_data.resize(atlasArea * 4);
   for (uint64_t i = 0; i < atlasArea; ++i) {
-    m_atlas.host_data[i * 4 + 0] = rgb_data[i * 3 + 0];  // R
-    m_atlas.host_data[i * 4 + 1] = rgb_data[i * 3 + 1];  // G
-    m_atlas.host_data[i * 4 + 2] = rgb_data[i * 3 + 2];  // B
+    m_atlas.host_data[i * 4 + 0] = atlasBuffer[i * 3 + 0];  // R
+    m_atlas.host_data[i * 4 + 1] = atlasBuffer[i * 3 + 1];  // G
+    m_atlas.host_data[i * 4 + 2] = atlasBuffer[i * 3 + 2];  // B
     m_atlas.host_data[i * 4 + 3] = 255;                  // A (Opaque)
   }
 

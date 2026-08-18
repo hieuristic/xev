@@ -26,8 +26,7 @@ struct QueueFamily {
   bool isComplete() { return graphics.has_value() && present.has_value(); }
 };
 
-class Device {
- public:
+struct Device {
   Device();
   Device(SDL_Window* window);
   ~Device();

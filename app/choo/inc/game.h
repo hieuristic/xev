@@ -2,15 +2,14 @@
 #include "game_state.h"
 
 namespace xev {
-class Window;
-class Engine;
-class Renderer2D;
-class Renderer3D;
-class Scene;
+struct Window;
+struct Engine;
+struct Renderer2D;
+struct Renderer3D;
+struct Scene;
 }  // namespace xev
 
-class Game {
- public:
+struct Game {
   Game();
   ~Game();
   void run();

@@ -9,8 +9,7 @@ enum SamplerType {
 
 constexpr float MAX_SAMPLER_ANISOTROPY = 1.0;
 
-class Sampler : public Resource {
- public:
+struct Sampler : public Resource {
   uint64_t size_device() const override { return 0; }
   bool on_device() const override { return sampler != VK_NULL_HANDLE; }
 

@@ -4,8 +4,7 @@
 
 namespace xev {
 
-class HotExec {
- public:
+struct HotExec {
   HotExec(VkDevice device, VkQueue graphics_queue, uint32_t graphics_idx);
   ~HotExec();
 
