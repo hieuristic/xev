@@ -1,12 +1,13 @@
 #include "app.h"
+#include <xev/filesystem/arxiv.h>
+#include <xev/filesystem/fs.h>
+#include <xev/filesystem/loose.h>
 #include <xev/frame_context.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
 #include <xev/resource_manager.h>
 #include <xev/ui/font.h>
 #include <xev/volk.h>
-#include <xev/filesystem/loose.h>
-#include <xev/filesystem/fs.h>
 #include <filesystem>
 
 void compute_projection(const xev::Camera& cam,
@@ -30,9 +31,11 @@ App::App() {
   m_engine->init_file_system();
 
   const char* base = SDL_GetBasePath();
-  std::filesystem::path basePath =
-      base ? std::filesystem::path(base) / ".." : std::filesystem::current_path();
-  m_engine->fileSys->mount(xev::LooseMount{basePath / "assets"});
+  std::filesystem::path basePath = base ? std::filesystem::path(base) / ".."
+                                        : std::filesystem::current_path();
+
+  // m_engine->fileSys->mount(xev::LooseMount{basePath / "assets"});
+  m_engine->fileSys->mount(xev::ArxivMount{basePath / "f0.arx"});
 
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
@@ -61,11 +64,9 @@ App::App() {
       *m_engine->pipelineManager, *m_engine->resourceManager,
       m_engine->frameContext->get_num_frames());
 
-  m_font = std::make_unique<xev::Font>(*m_engine->resourceManager,
-                                       *m_engine->hotExec,
-                                       *m_engine->fileSys,
-                                       "fonts/akkurat.bin",
-                                       "fonts/akkurat.json");
+  m_font = std::make_unique<xev::Font>(
+      *m_engine->resourceManager, *m_engine->hotExec, *m_engine->fileSys,
+      "fonts/akkurat.bin", "fonts/akkurat.json");
   m_font->bind(*m_engine->globalDescriptorSet);
 }
 
@@ -113,7 +114,6 @@ void App::handle_inputs() {
 }
 
 void App::draw() {
-
   VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
 
   if (cmdbuf != VK_NULL_HANDLE) {
@@ -125,9 +125,11 @@ void App::draw() {
                        *m_engine->globalDescriptorSet, *m_scene,
                        m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
 
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-0.9f, -0.9f, 0.0));
+    glm::mat4 transform =
+        glm::translate(glm::mat4(1.0f), glm::vec3(-0.9f, -0.9f, 0.0));
     transform = glm::scale(transform, glm::vec3(0.1f));
-    m_renderer2D->draw_text(*m_font, "hello world\n" + std::to_string(1.0f / m_dt), transform, 1.2);
+    m_renderer2D->draw_text(
+        *m_font, "hello world\n" + std::to_string(1.0f / m_dt), transform, 1.2);
     m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
                        m_engine->frameContext->get_current_index(),
                        {0.1f, 0.1f, 0.1f, 1.0f});

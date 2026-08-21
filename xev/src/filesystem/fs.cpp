@@ -21,7 +21,8 @@ void FileSystem::destroy_thread_pool() {
 // IMPORTANT: This always return idx + 1
 // since
 uint32_t FileSystem::find_mnt(std::string_view filepath) const {
-  if (auto it = directive.find(filepath); it != directive.end()) {
+  auto it = directive.find(filepath);
+  if (it != directive.end()) {
     return it->second;
   }
   return fs::INVALID_MOUNT;
