@@ -12,8 +12,10 @@ enum ARXEntryFlag {};
 struct ARXHeader {
   char magic[4]{'A', 'R', 'X', 'I'};
   uint32_t version{1};
-  uint32_t numEntrys{0};
-  uint64_t dirOffset{0};
+  uint32_t numEntry{0};
+  uint64_t offsetEntry{0};
+  uint64_t sizeTranslation{0};
+  uint64_t offsetTranslation{0};
 };
 struct ARXEntry {
   uint64_t pathHash{0};
@@ -27,6 +29,13 @@ struct ARXEntry {
 struct ArxivMount : public Mount {
   explicit ArxivMount(std::filesystem::path arxPath_);
   ~ArxivMount() override;
+
+  // we have to define custom move operator to keep
+  // the mmap open while move-ing
+  ArxivMount(ArxivMount&& other) noexcept;
+  ArxivMount& operator=(ArxivMount&& other) noexcept;
+  ArxivMount(const ArxivMount&) = delete;
+  ArxivMount& operator=(const ArxivMount&) = delete;
 
   void index() override;
 
@@ -47,8 +56,9 @@ struct ArxivMount : public Mount {
 
  private:
   uint64_t m_fileSize{0};
-  const uint8_t* m_mmapData{nullptr};
-  std::unordered_map<uint64_t, const ARXEntry*> m_entries;
+  const uint8_t* m_mmap{nullptr};
+  std::unordered_map<uint64_t, ARXEntry> m_entries;
+  ARXHeader m_header;
 };
 
 }  // namespace xev

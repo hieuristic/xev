@@ -14,7 +14,7 @@ struct Mount {
   virtual void index() = 0;
   std::unordered_map<std::string, uint32_t> directive;
   std::string mntPath;
-  bool isWritable;
+  bool isWritable{false};
 };
 
 }  // namespace xev
