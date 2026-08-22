@@ -15,11 +15,11 @@ struct ThreadPool {
   ThreadPool(uint32_t numThreads);
   ~ThreadPool();
 
-  std::vector<std::thread> workers;
   std::queue<std::function<void()>> tasks;
   std::counting_semaphore<> taskSem{0};
   std::mutex queueMutex;
-  std::atomic<bool> shouldDie;
+  std::atomic<bool> shouldDie{false};
+  std::vector<std::thread> workers;
 
   void run(std::function<void()> task);
 

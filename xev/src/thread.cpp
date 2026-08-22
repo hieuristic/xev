@@ -3,10 +3,13 @@
 namespace xev {
 
 ThreadPool::ThreadPool(uint32_t numThreads) {
+  shouldDie.store(false);
   for (uint32_t i = 0; i < numThreads; ++i) {
     workers.emplace_back([this] {
       while (true) {
         taskSem.acquire();
+        if (shouldDie.load())
+          return;
 
         std::function<void()> task;
         {
@@ -19,7 +22,8 @@ ThreadPool::ThreadPool(uint32_t numThreads) {
           task = std::move(tasks.front());
           tasks.pop();
         }
-        task();
+        if (task)
+          task();
       }
     });
   }

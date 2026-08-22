@@ -34,7 +34,7 @@ App::App() {
   std::filesystem::path basePath = base ? std::filesystem::path(base) / ".."
                                         : std::filesystem::current_path();
 
-  // m_engine->fileSys->mount(xev::LooseMount{basePath / "assets"});
+  // m_engine->fileSys->mount(xev::LooseMount{basePath});
   m_engine->fileSys->mount(xev::ArxivMount{basePath / "f0.arx"});
 
   m_engine->init_swapchain();
@@ -47,7 +47,7 @@ App::App() {
   m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
 
   m_scene = std::make_unique<xev::Scene>();
-  std::string scene_path = "models/sponza_full.glb";
+  std::string scene_path = "assets/models/sponza_full.glb";
 
   XEV_INFO("Loading Sponza...");
   m_scene->load_gltf(*m_engine->fileSys, scene_path);
@@ -66,7 +66,7 @@ App::App() {
 
   m_font = std::make_unique<xev::Font>(
       *m_engine->resourceManager, *m_engine->hotExec, *m_engine->fileSys,
-      "fonts/akkurat.bin", "fonts/akkurat.json");
+      "assets/fonts/akkurat.bin", "assets/fonts/akkurat.json");
   m_font->bind(*m_engine->globalDescriptorSet);
 }
 
