@@ -1,12 +1,14 @@
+#include <xev/filesystem/fs.h>
 #include <xev/logger.h>
+#include <xev/resource/image.h>
 #include <xev/resource/scene.h>
 #include <xev/resource_manager.h>
-#include <glm/gtc/type_ptr.hpp>
-#include <limits>
 
 #include <tiny_gltf.h>
-#include <xev/filesystem/fs.h>
-#include <xev/resource/image.h>
+#include <filesystem>
+#include <fstream>
+#include <glm/gtc/type_ptr.hpp>
+#include <limits>
 
 namespace xev {
 
@@ -616,6 +618,17 @@ void Scene::create_test_triangle() {
 void Scene::destroy(const ResourceManager& manager) {
   free(manager);
   meshes.clear();
+}
+
+void save_bin(std::filesystem::path& outFile) {
+  XEV_ASSERT(!std::filesystem::exists(outFile), "Writing to an existing file!");
+  std::ofstream out(outFile, std::ios::binary);
+  XEV_ASSERT(out.is_open());
+
+  out.write(reinterpret_cast<const char*>(&active_cam), sizeof(active_cam));
+  out.write(reinterpret_cast<const char*>(&scene_buffer), sizeof(scene_buffer));
+  for (auto& mesh : meshes)
+    mesh.write(out);
 }
 
 }  // namespace xev

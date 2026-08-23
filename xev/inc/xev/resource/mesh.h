@@ -1,8 +1,9 @@
 #pragma once
 #include <xev/geometry/aabb.h>
 #include <xev/geometry/sphere.h>
-#include <xev/resource/resource.h>
 #include <xev/resource/buffer.h>
+#include <xev/resource/resource.h>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -41,6 +42,7 @@ struct Mesh : public Resource {
   void alloc(const ResourceManager& manager);
   void free(const ResourceManager& manager);
   void upload(const ResourceManager& manager, const HotExec& hot_exec);
+  void write(std::ofstream& out);
 
   void bind(const VkCommandBuffer& cmdbuf, VkDeviceAddress& address) const;
 

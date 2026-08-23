@@ -1,17 +1,26 @@
-#include "game.h"
 #include <SDL3/SDL.h>
+
 #include <xev/engine.h>
 #include <xev/renderer2D.h>
 #include <xev/renderer3D.h>
 #include <xev/resource/scene.h>
+#include <xev/ui/font.h>
 #include <xev/window.h>
+
+#include "game.h"
+#include "gui.h"
 
 Game::Game() : m_running(true) {
   m_window = std::make_unique<xev::Window>("demogame", 800, 600);
 
   SDL_SetWindowRelativeMouseMode(m_window->get_native(), true);
 
+  const char* base = SDL_GetBasePath();
+  std::filesystem::path basePath = base ? std::filesystem::path(base) / ".."
+                                        : std::filesystem::current_path();
+
   m_engine = std::make_unique<xev::Engine>(m_window->get_native());
+  m_engine->fileSys->mount(xev::LooseFile{basePath});
   m_engine->init_swapchain();
   m_engine->init_resource_manager();
   m_engine->init_hot_exec();
@@ -19,13 +28,17 @@ Game::Game() : m_running(true) {
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
 
-  m_renderer2D = std::make_unique<xev::Renderer3D>(
-      *m_engine->pipeline_manager,
-      m_engine->global_descriptor_set->get_layout());
+  m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
+  m_renderer2D = std::make_unique<xev::Renderer2D>(
+      *m_engine->pipeline_manager, *m_engine->resourceManager,
+      m_engine->frameContext->get_num_frames());
 
-  m_renderer3D = std::make_unique<xev::Renderer2D>(
-      *m_engine->pipeline_manager,
-      m_engine->global_descriptor_set->get_layout());
+  m_font = std::make_unique<xev::Font>(
+      *m_engine->resourceManager, *m_engine->hotExec, *m_engine->fileSys,
+      "assets/fonts/akkurat.bin", "assets/fonts/akkurat.json");
+  m_font->bind(*m_engine->globalDescriptorSet);
+
+  m_gui = std::make_unique<GUI>(*m_renderer2D, *m_font);
 }
 
 Game::~Game() {
@@ -41,8 +54,6 @@ void Game::run() {
   if (!m_running)
     return;
 
-  XEV_INFO("TestApp loop started.");
-
   while (m_running) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -56,10 +67,23 @@ void Game::run() {
       }
     }
 
-    if (m_renderer) {
-      m_renderer->draw();
+    switch (m_state) {
+      case STATE_HAUPTMENU:
+        draw_hauptmenu();
+        break;
+      case STATE_GAMEPLAY:
+        draw_gameplay();
+        break;
     }
   }
+}
+
+void Game::draw_hauptmenu() {
+  m_renderer2D->draw_text(*m_font, ;
+}
+
+void Game::draw_gameplay() {
+  ;
 }
 
 }  // namespace xev

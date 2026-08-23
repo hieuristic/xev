@@ -25,12 +25,13 @@ struct App {
   uint64_t m_last_time = 0;
   const bool* m_keystate = nullptr;
 
+
   std::unique_ptr<xev::Window> m_window;
   std::unique_ptr<xev::Engine> m_engine;
   std::unique_ptr<xev::Renderer3D> m_renderer3D;
   std::unique_ptr<xev::Renderer2D> m_renderer2D;
-  std::unique_ptr<xev::Scene> m_scene;
   std::unique_ptr<xev::Font> m_font;
+  xev::Scene m_scene{};
   Controller m_controller;
   float m_dt;
 };

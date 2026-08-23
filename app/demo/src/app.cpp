@@ -46,16 +46,27 @@ App::App() {
 
   m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
 
-  m_scene = std::make_unique<xev::Scene>();
-  std::string scene_path = "assets/models/sponza_full.glb";
-
   XEV_INFO("Loading Sponza...");
-  m_scene->load_gltf(*m_engine->fileSys, scene_path);
-  // m_scene->create_test_triangle();
-  m_scene->alloc(*m_engine->resourceManager);
-  m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
-  m_scene->bind(*m_engine->globalDescriptorSet);
-  // m_scene->active_cam.set_aspect(m_window->get_aspect());
+  std::filesystem::path scene_path = basePath / "assets/models/sponza.bin";
+  std::filesystem::path scene_path_glb =
+      basePath / "assets/models/sponza_full.glb";
+
+  if (std::filesystem::exists(scene_path)) {
+    m_scene.load_mmap_bin(scene_path);
+  } else {
+    XEV_ASSERT(std::filesystem::exists(scene_path_glb),
+               "Missing sponza.glb or sponza.bin");
+    m_scene.load_gltf(*m_engine->fileSys, scene_path.generic_string());
+    // m_scene.save_bin(scene_path);
+    XEV_INFO(
+        "This only happen when you first open the demo: Saved scene binary to "
+        "{}",
+        scene_path.string());
+  }
+
+  m_scene.alloc(*m_engine->resourceManager);
+  m_scene.upload(*m_engine->resourceManager, *m_engine->hotExec);
+  m_scene.bind(*m_engine->globalDescriptorSet);
 
   m_keystate = SDL_GetKeyboardState(NULL);
   m_last_time = SDL_GetTicks();
@@ -71,9 +82,7 @@ App::App() {
 }
 
 App::~App() {
-  if (m_scene && m_engine->resourceManager) {
-    m_scene->destroy(*m_engine->resourceManager);
-  }
+  m_scene.destroy(*m_engine->resourceManager);
 }
 
 void App::handle_inputs() {
@@ -108,7 +117,7 @@ void App::handle_inputs() {
   float m_dt = (current_time - m_last_time) / 1000.0f;
   m_last_time = current_time;
 
-  xev::Camera& cam = m_scene->active_cam;
+  xev::Camera& cam = m_scene.active_cam;
   m_controller.update(m_dt, xrel, yrel, m_keystate, cam.pos, cam.rot);
   return;
 }
@@ -122,8 +131,8 @@ void App::draw() {
     const xev::Image& output_depth =
         m_engine->frameContext->get_current_render_depth();
     m_renderer3D->draw(cmdbuf, output_color, output_depth,
-                       *m_engine->globalDescriptorSet, *m_scene,
-                       m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+                       *m_engine->globalDescriptorSet, m_scene,
+                       m_scene.active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
 
     glm::mat4 transform =
         glm::translate(glm::mat4(1.0f), glm::vec3(-0.9f, -0.9f, 0.0));

@@ -32,6 +32,7 @@ struct Scene : public Resource {
   void destroy(const ResourceManager& manager);
 
   void load_gltf(const FileSystem& fileSys, std::string_view filepath);
+  void save_bin(std::filesystem::path& outFile);
   void create_test_triangle();
 
   uint64_t size_device() const override;
