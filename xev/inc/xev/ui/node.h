@@ -18,10 +18,7 @@ struct Node {
   template <typename T>
     requires std::derived_from<T, Node>
   T* add_child(std::unique_ptr<T> child) {
-    if (!child) {
-      return nullptr;
-    }
-
+    if (!child) return nullptr;
     child->parent = this;
     T* ptr = child.get();
     children.push_back(std::move(child));
@@ -48,4 +45,3 @@ struct Node {
 
 }  // namespace ui
 }  // namespace xev
-

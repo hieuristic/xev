@@ -4,8 +4,7 @@ namespace xev {
 namespace ui {
 
 void Node::compute() {
-  if (!visible)
-    return;
+  if (!visible) return;
   measure();
   arrange();
   dirty = false;
@@ -13,8 +12,7 @@ void Node::compute() {
 
 void Node::measure() {
   for (auto& child : children) {
-    if (child->visible)
-      child->measure();
+    if (child->visible) child->measure();
   }
 
   Bound2 selfBound = measure_self();
