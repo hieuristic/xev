@@ -1,10 +1,10 @@
 # XEV - Xarlie's Express Visualization
-## A Graphics Engine for Building Games, Visualizations, and Interactive Arts.
+A Graphics Engine for Building Games, Visualizations, and Interactive Arts.
 
 ----------------------------------
 
 ### Licensed under Apache 2.0
-### Copyright © Nguyen Minh Hieu, 2026
+Copyright © Nguyen Minh Hieu, 2026
 
 ----------------------------------
 
