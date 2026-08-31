@@ -7,9 +7,7 @@ struct Engine;
 struct Renderer2D;
 struct Renderer3D;
 struct Scene;
-namespace ui {
 struct Font;
-}  // namespace ui
 }  // namespace xev
 
 enum GameState {

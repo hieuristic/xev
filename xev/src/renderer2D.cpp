@@ -77,14 +77,16 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
   m_drawInfos.clear();
 }
 
+void Renderer2D::inject_draw_infos(std::vector<PipelineRaster::DrawInfo>&& drawInfos) {
+}
+
 void Renderer2D::draw_text(const Font& font,
-                           std::string text,
-                           glm::mat4 transform,
-                           float lineWidth) {
+                           std::string_view text,
+                           glm::mat4 transform) {
   glm::vec2 offset{-1.0f, -1.0f};
   for (const char c : text) {
     if (c == '\n') {
-      offset = glm::vec2(0.0f, offset.y + lineWidth);
+      offset = glm::vec2(0.0f, offset.y + font.lineHeight);
       continue;
     }
 
@@ -110,5 +112,7 @@ void Renderer2D::draw_image(glm::mat4 transform,
       .isMSDF = 1,
   });
 }
+
+void Renderer2D::draw_rect(glm::mat4 transform) {}
 
 }  // namespace xev

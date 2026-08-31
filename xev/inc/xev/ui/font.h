@@ -30,9 +30,10 @@ struct Font {
   float advance(uint32_t c) const;
   uint32_t tex_id() const;
 
+  float emSize = 1;
+  float lineHeight = 1.25;
+
  private:
-  float m_emSize = 1;
-  float m_lineHeight = 1.25;
   const ResourceManager& m_manager;
   uint32_t m_texID;
   Image m_atlas{

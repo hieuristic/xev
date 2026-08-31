@@ -6,7 +6,7 @@ Licensed under Apache 2.0
 Copyright © Nguyen Minh Hieu, 2026
 ```
 
-AI Usage Disclaimer: AI is strictly forbidden. All code are written, designed,
+AI Usage Disclaimer: AI is strictly forbidden. All code are designed, written
 and maintained by Charlie.
 
 1. Installation
@@ -25,10 +25,10 @@ And you should see the following image
  - headless renderering
  - clustered forward renderer
  - bindless descriptor set, dynamic rendering
- - virtual file system support archival format or loose files
- - support animations
+ - virtual file system support archival format, loose files, etc.
+ - support animations, physics
  - MSDF font rendering
- - intermediate mode UI system
+ - custom intermediate mode UI layout system
 
 3. Note
  - Local object frame uses right-handed RDF system (+x - Right, +y - Down, +z - Front).
