@@ -106,8 +106,8 @@ Font::Font(const ResourceManager& manager,
   };
 
   // parse extra metadata
-  m_emSize = configData["metrics"]["emSize"];
-  m_lineHeight = configData["metrics"]["lineHeight"];
+  emSize = configData["metrics"]["emSize"];
+  lineHeight = configData["metrics"]["lineHeight"];
 }
 
 Font::~Font() {

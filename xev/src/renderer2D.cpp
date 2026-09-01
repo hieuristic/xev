@@ -77,9 +77,6 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
   m_drawInfos.clear();
 }
 
-void Renderer2D::inject_draw_infos(std::vector<PipelineRaster::DrawInfo>&& drawInfos) {
-}
-
 void Renderer2D::draw_text(const Font& font,
                            std::string_view text,
                            glm::mat4 transform) {

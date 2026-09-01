@@ -620,7 +620,7 @@ void Scene::destroy(const ResourceManager& manager) {
   meshes.clear();
 }
 
-void save_bin(std::filesystem::path& outFile) {
+void Scene::save_bin(std::filesystem::path& outFile) {
   XEV_ASSERT(!std::filesystem::exists(outFile), "Writing to an existing file!");
   std::ofstream out(outFile, std::ios::binary);
   XEV_ASSERT(out.is_open());

@@ -26,10 +26,11 @@ struct Element {
   ElementType type{ElementType::Container};
   Style style{};
   Bound2 bound{};
+  glm::vec2 size{};
+  glm::vec2 cursor{};
 
-  uint32_t upIdx{NULLIDX};    // to parents
-  uint32_t downIdx{NULLIDX};  // to first child
-  uint32_t sideIdx{NULLIDX};  // to sibling
+  uint32_t parentIdx{NULLIDX};  // to parents
+  uint32_t numChildren = 0;
 
   std::string_view textData{};
   float fontSize{1.0f};
@@ -42,9 +43,9 @@ struct Context {
 
   template <typename F>
     requires std::invocable<F>
-  void container(Element e, F&& cb) {
+  void container(Element&& e, F&& cb) {
     e.type = ElementType::Container;
-    uint32_t idx = push(e);
+    uint32_t idx = push(std::move(e));
     m_bfs.push_back(idx);
     cb();
     pop();
@@ -77,11 +78,11 @@ struct Context {
   void solve();
   void render()
 
-  void text(std::string_view label, float fontSize);
+      void text(std::string_view label, float fontSize);
   bool button(std::string_view label, float fontSize);
 
  private:
-  uint32_t push(const Element& e);
+  uint32_t push(Element&& e);
   void pop();
 
   glm::vec2 m_mousePos;
