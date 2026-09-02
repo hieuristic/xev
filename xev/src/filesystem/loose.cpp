@@ -19,14 +19,16 @@ void LooseMount::index() {
 
   directive.clear();
 
-  for (const auto& entry :
-       std::filesystem::recursive_directory_iterator(rootPath)) {
-    if (entry.is_regular_file()) {
-      std::string relPath =
-          std::filesystem::relative(entry.path(), rootPath).generic_string();
-      directive[relPath] = 0;  // directive value doesn't matter in loose files.
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(
+           rootPath,
+           std::filesystem::directory_options::follow_directory_symlink)) {
+      if (entry.is_regular_file()) {
+        std::string relPath =
+            std::filesystem::relative(entry.path(), rootPath).generic_string();
+        directive[relPath] =
+            0;  // directive value doesn't matter in loose files.
+      }
     }
-  }
 }
 
 std::vector<uint8_t> LooseMount::read(std::string_view path,

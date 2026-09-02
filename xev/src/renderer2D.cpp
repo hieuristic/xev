@@ -110,6 +110,14 @@ void Renderer2D::draw_image(glm::mat4 transform,
   });
 }
 
-void Renderer2D::draw_rect(glm::mat4 transform) {}
+void Renderer2D::draw_rect(glm::mat4 transform, glm::vec3 color) {
+  m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
+    .transform = transform,
+    .uvBounds = glm::vec4(0.0,0.0,1.0,1.0),
+    .color = color,
+    .texID = 0,
+    .isMSDF = 0,
+  });
+}
 
 }  // namespace xev

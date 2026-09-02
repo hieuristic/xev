@@ -28,6 +28,7 @@ struct Element {
   Bound2 bound{};
   glm::vec2 size{};
   glm::vec2 cursor{};
+  glm::vec3 color{};
 
   uint32_t parentIdx{NULLIDX};  // to parents
   uint32_t numChildren = 0;
@@ -37,16 +38,15 @@ struct Element {
 };
 
 struct Context {
-  Context(Renderer2D& r2D, Font& font);
-  void measure();
+  Context(Renderer2D& r2D, Font& font) : m_r2D(r2D), m_font(font) {}
   void solve();
+  void render();
 
   template <typename F>
     requires std::invocable<F>
   void container(Element&& e, F&& cb) {
     e.type = ElementType::Container;
     uint32_t idx = push(std::move(e));
-    m_bfs.push_back(idx);
     cb();
     pop();
   }
@@ -75,11 +75,8 @@ struct Context {
     render();
   }
 
-  void solve();
-  void render()
-
-      void text(std::string_view label, float fontSize);
-  bool button(std::string_view label, float fontSize);
+  void text(std::string_view label, float fontSize);
+  bool button(std::string_view label, float fontSize, glm::vec3& color);
 
  private:
   uint32_t push(Element&& e);

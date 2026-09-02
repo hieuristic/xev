@@ -52,7 +52,8 @@ App::App() {
       basePath / "assets/models/sponza_full.glb";
 
   if (std::filesystem::exists(scene_path)) {
-    m_scene.load_mmap_bin(scene_path);
+    // TODO: Implement this function :,)
+    // m_scene.load_mmap_bin(scene_path);
   } else {
     XEV_ASSERT(std::filesystem::exists(scene_path_glb),
                "Missing sponza.glb or sponza.bin");
@@ -138,7 +139,7 @@ void App::draw() {
         glm::translate(glm::mat4(1.0f), glm::vec3(-0.9f, -0.9f, 0.0));
     transform = glm::scale(transform, glm::vec3(0.1f));
     m_renderer2D->draw_text(
-        *m_font, "hello world\n" + std::to_string(1.0f / m_dt), transform, 1.2);
+        *m_font, "hello world\n" + std::to_string(1.0f / m_dt), transform);
     m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
                        m_engine->frameContext->get_current_index(),
                        {0.1f, 0.1f, 0.1f, 1.0f});

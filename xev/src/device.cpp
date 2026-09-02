@@ -32,8 +32,10 @@ Device::Device(SDL_Window* window) {
 }
 
 Device::~Device() {
-  if (device != VK_NULL_HANDLE)
+  if (device != VK_NULL_HANDLE) {
+    vkDeviceWaitIdle(device);
     vkDestroyDevice(device, nullptr);
+  }
   if (surface != VK_NULL_HANDLE)
     vkDestroySurfaceKHR(instance, surface, nullptr);
   if (instance != VK_NULL_HANDLE)

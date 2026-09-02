@@ -1,15 +1,21 @@
 #pragma once
 #include <xev/renderer2D.h>
+#include <xev/ui/context.h>
 #include <xev/ui/font.h>
-#include <xev/ui/node.h>
-#include <memory>
+
+enum struct GameState : uint8_t;
 
 struct GUI {
-  GUI(xev::Renderer2D& r2D_, xev::font& font_, float screenW, float screenH);
-  ~GUI();
+  GUI(xev::Renderer2D& r2D_, xev::Font& font_) : ui(r2D_, font_) {}
+  ~GUI() = default;
 
-  std::unique_ptr<xev::ui::node> rootHauptmenu;
+  void draw_hauptmenu(float screenW,
+                      float screenH,
+                      glm::vec2 mousePos,
+                      bool isMouseDown,
+                      GameState& state,
+                      bool& isRunning);
+  void draw_gameplay();
 
-  xev::Renderer2D& r2D;
-  xev::Font& font;
+  xev::ui::Context ui;
 };

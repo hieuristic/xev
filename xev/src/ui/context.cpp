@@ -1,5 +1,6 @@
 #include <xev/ui/context.h>
 #include <algorithm>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace xev {
 namespace ui {
@@ -9,7 +10,7 @@ void Context::solve() {
 
   // 1. aggregate children size to parent
   for (size_t i = m_elements.size(); i--;) {
-    auto& el = m_element[i];
+    auto& el = m_elements[i];
     if (el.numChildren > 0) {
       if (el.style.direction == Direction::Vertical) {
         el.size.y += (el.numChildren - 1) * el.style.gap;
@@ -65,7 +66,7 @@ void Context::solve() {
   }
 }
 
-uint32_t Context::push(Element e) {
+uint32_t Context::push(Element&& e) {
   uint32_t idx = static_cast<uint32_t>(m_elements.size());
   e.parentIdx = m_parents.empty() ? NULLIDX : m_parents.back();
   e.size = glm::vec2(0.0f);
@@ -77,11 +78,12 @@ uint32_t Context::push(Element e) {
   }
 
   m_elements.push_back(std::move(e));
+  m_parents.push_back(idx);
   return idx;
 }
 
 void Context::pop() {
-  m_parents.pop();
+  m_parents.pop_back();
 }
 
 void Context::text(std::string_view label, float fontSize) {
@@ -97,13 +99,16 @@ void Context::text(std::string_view label, float fontSize) {
   });
 }
 
-bool Context::button(std::string_view label, float fontSize) {
+bool Context::button(std::string_view label,
+                     float fontSize,
+                     glm::vec3& color) {
   uint32_t btnIdx = NULLIDX;
   container(
       Element{
           .type = ElementType::Button,
           .style = {.direction = Direction::Horizontal,
                     .padding = Bound2(8.0f, 4.0f, 8.0f, 4.0f)},
+          .color = color,
       },
       [&] {
         btnIdx = m_parents.back();
@@ -117,16 +122,26 @@ bool Context::button(std::string_view label, float fontSize) {
 }
 
 void Context::render() {
+  if (m_elements.empty()) return;
+
+  glm::mat4 ortho =
+      glm::ortho(0.0f, m_elements[0].bound.get_width(),
+                 m_elements[0].bound.get_height(), 0.0f, -1.0f, 1.0f);
+
   for (const auto& el : m_elements) {
     if (el.type == ElementType::Button) {
-      glm::mat4 transform = glm::scale(
-          glm::translate(glm::mat4(1.0f), {el.bound.left, el.bound.top, 0.0f}),
-          {el.bound.get_width(), el.bound.get_height(), 1.0f});
-      m_r2D.draw_rect(transform);
+      glm::mat4 transform =
+          ortho *
+          glm::scale(glm::translate(glm::mat4(1.0f),
+                                    {el.bound.left, el.bound.top, 0.0f}),
+                     {el.bound.get_width(), el.bound.get_height(), 1.0f});
+      m_r2D.draw_rect(transform, el.color);
     } else if (el.type == ElementType::Text) {
-      glm::mat4 transform = glm::scale(
-          glm::translate(glm::mat4(1.0f), {el.bound.left, el.bound.top, 0.0f}),
-          {el.fontSize, el.fontSize, 1.0f});
+      glm::mat4 transform =
+          ortho *
+          glm::scale(glm::translate(glm::mat4(1.0f),
+                                    {el.bound.left, el.bound.top, 0.0f}),
+                     {el.fontSize, el.fontSize, 1.0f});
       m_r2D.draw_text(m_font, el.textData, transform);
     }
   }

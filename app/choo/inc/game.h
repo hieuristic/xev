@@ -10,9 +10,11 @@ struct Scene;
 struct Font;
 }  // namespace xev
 
-enum GameState {
-  STATE_HAUPTMENU,
-  STATE_GAMEPLAY,
+struct GUI;
+
+enum struct GameState : uint8_t {
+  Hauptmenu,
+  Gameplay,
   // GAME_CUTSCENE,
 };
 
@@ -24,8 +26,9 @@ struct Game {
   void draw_gameplay();
 
  private:
-  bool m_running;
-  GameState m_state;
+  bool m_running{true};
+  bool m_isMouseCaptured{false};
+  GameState m_state{GameState::Hauptmenu};
 
   std::unique_ptr<xev::Window> m_window;
   std::unique_ptr<xev::Engine> m_engine;

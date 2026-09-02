@@ -144,4 +144,8 @@ void Mesh::compute_aabb() {
   m_has_aabb = true;
 }
 
+void Mesh::write(std::ofstream& out) {
+  ; // TODO IMPLEMENT THIS!
+}
+
 }  // namespace xev

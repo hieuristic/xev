@@ -4,6 +4,7 @@
 namespace xev {
 
 struct Bound2 {
+  Bound2() = default;
   Bound2(float val) {
     top = val;
     left = val;

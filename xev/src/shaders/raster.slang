@@ -1,5 +1,6 @@
 #language slang 2026
 // #define DEBUG_FONT_ATLAS
+// #define DEBUG_GUI
 
 module raster;
 import global_desc;
@@ -7,6 +8,7 @@ import global_desc;
 struct DrawInfo {
   float4x4 transform;
   float4 uvBounds; // left top right bottom
+  float3 color;
   uint32_t texID;
   uint32_t isMSDF;
 };
@@ -70,7 +72,8 @@ float4 main(VertexOut vo) : SV_Target {
   float4 frag_out;
   DrawInfo info = pc.infoBuffer[vo.instID];
 
-  float4 texel = sample2DLinear(info.texID, vo.uv);
+  float4 texel = (info.texID == 0) ? float4(info.color, 1.0f)
+                                   : sample2DLinear(info.texID, vo.uv);
 
 #ifdef DEBUG_FONT_ATLAS
   frag_out = texel;

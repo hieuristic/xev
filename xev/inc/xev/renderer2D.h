@@ -27,7 +27,7 @@ struct Renderer2D : public Renderer {
             const Color4<float>& clearColor);
   void draw_text(const Font& font, std::string_view text, glm::mat4 transform);
   void draw_image(glm::mat4 transform, glm::vec4 uvBounds, uint32_t texID);
-  void draw_rect(glm::mat4 transform);
+  void draw_rect(glm::mat4 transform, glm::vec3 color);
 
   static const uint32_t MAX_DRAW_CALLS = 1000;
 
