@@ -1,12 +1,12 @@
 #pragma once
 #include <xev/renderer2D.h>
-#include <xev/ui/layout.h>
 #include <xev/ui/font.h>
+#include <xev/ui/layout.h>
 
 enum struct GameState : uint8_t;
 
 struct GUI {
-  GUI(xev::Renderer2D& r2D_, xev::Font& font_) : ui(r2D_, font_) {}
+  GUI(xev::Renderer2D& r2D_, xev::Font& font_) : layout(r2D_, font_) {}
   ~GUI() = default;
 
   void draw_hauptmenu(float screenW,
@@ -17,5 +17,5 @@ struct GUI {
                       bool& isRunning);
   void draw_gameplay();
 
-  xev::ui::Context ui;
+  xev::ui::Layout layout;
 };

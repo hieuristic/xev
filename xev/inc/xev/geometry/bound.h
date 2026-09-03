@@ -32,6 +32,10 @@ struct Bound2 {
   float bottom{0.0};
   float get_width() const { return std::abs(right - left); }
   float get_height() const { return std::abs(bottom - top); }
+  bool contains(glm::vec2& query) const {
+    return (query.x >= left) && (query.x <= right) && (query.y >= top) &&
+           (query.y <= bottom);
+  }
 };
 
 struct Bound3 {

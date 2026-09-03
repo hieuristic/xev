@@ -1,5 +1,7 @@
 #pragma once
+#include <glm/glm.hpp>
 #include <cstdint>
+#include <functional>
 #include <string_view>
 
 #include <xev/ui/style.h>
@@ -29,6 +31,10 @@ struct Element {
 
   std::string_view textData{};
   float fontSize{1.0f};
+
+  // callbacks
+  std::function<void()> onClick{};
+  std::function<void()> onHover{};
 };
 
 }  // namespace ui

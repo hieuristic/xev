@@ -6,7 +6,41 @@
 namespace xev {
 namespace ui {
 
-void Context::solve() {
+void Layout::draw(float screenW,
+                  float screenH,
+                  glm::vec2 mousePos,
+                  bool isMouseDown,
+                  std::function<void()> cb) {
+  m_mousePos = mousePos;
+  m_isMouseDown = isMouseDown;
+  m_elements.clear();
+  m_parents.clear();
+
+  container(
+      Element{
+          .style = {.direction = Direction::Vertical,
+                    .sizing = {.type = SizingType::Fixed, .value = screenW}},
+          .bound = Bound2(0.0, 0.0, screenW, screenH),
+      },
+      std::move(cb));
+
+  solve();
+  for (auto& el : m_elements) {
+    if (el.type == ElementType::Button && el.onClick && m_isMouseDown &&
+        el.bound.contains(m_mousePos)) {
+      el.onClick();
+    }
+
+    if (el.type == ElementType::Button && el.onHover &&
+        el.bound.contains(m_mousePos)) {
+      el.onHover();
+    }
+  }
+
+  render();
+}
+
+void Layout::solve() {
   if (m_elements.empty()) return;
 
   // 1. aggregate children size to parent
@@ -102,7 +136,7 @@ void Context::solve() {
   }
 }
 
-uint32_t Context::push(Element&& e) {
+uint32_t Layout::push(Element&& e) {
   uint32_t idx = static_cast<uint32_t>(m_elements.size());
   e.parentIdx = m_parents.empty() ? NULLIDX : m_parents.back();
   e.size = glm::vec2(0.0f);
@@ -120,7 +154,34 @@ uint32_t Context::push(Element&& e) {
   return idx;
 }
 
-void Context::text(std::string_view label, float fontSize, Style&& style) {
+void Layout::container(Element&& e, std::function<void()> cb) {
+  e.type = ElementType::Container;
+  uint32_t idx = push(std::move(e));
+  m_parents.push_back(idx);
+  if (cb) cb();
+  m_parents.pop_back();
+}
+
+void Layout::button(std::string_view label,
+                    float fontSize,
+                    glm::vec3& color,
+                    Style&& style,
+                    std::function<void()> onClick,
+                    std::function<void()> onHover) {
+  uint32_t btnIdx = push(Element{
+      .type = ElementType::Button,
+      .style = style,
+      .color = color,
+      .onClick = std::move(onClick),
+      .onHover = std::move(onHover),
+  });
+
+  m_parents.push_back(btnIdx);
+  text(label, fontSize);
+  m_parents.pop_back();
+}
+
+void Layout::text(std::string_view label, float fontSize, Style&& style) {
   // TODO: I'm hard coding the font size right now.
   // In the future, it should have some responsive size wrt to
   // application resolution or sth.
@@ -136,34 +197,7 @@ void Context::text(std::string_view label, float fontSize, Style&& style) {
   });
 }
 
-bool Context::button(std::string_view label,
-                     float fontSize,
-                     glm::vec3& color,
-                     Style&& style,
-                     invokable) {
-  uint32_t btnIdx = push(Element{
-      .type = ElementType::Button,
-      .style = style,
-      .color = color,
-  });
-
-  m_parents.push_back(btnIdx);
-  text(label, fontSize);
-  m_parents.pop_back();
-
-  if (btnIdx >= m_elements.size()) return false;
-
-  const auto& b = m_elements[btnIdx].bound;
-  XEV_INFO("{} {} {}", m_mousePos.x, b.left, b.right);
-  XEV_INFO("{} {} {}", m_mousePos.y, b.top, b.bottom);
-  bool hovered = (m_mousePos.x >= b.left && m_mousePos.x <= b.right &&
-                  m_mousePos.y >= b.top && m_mousePos.y <= b.bottom);
-  if (hovered)
-    XEV_INFO("Hovered");
-  return hovered && m_isMouseDown;
-}
-
-void Context::render() {
+void Layout::render() {
   if (m_elements.empty()) return;
 
   float screenW = m_elements[0].bound.get_width();
@@ -198,7 +232,7 @@ void Context::render() {
   }
 }
 
-void Context::print_tree_layout() const {
+void Layout::print_tree_layout() const {
   XEV_INFO("========== [UI Layout Tree] ==========");
   for (size_t i = 0; i < m_elements.size(); ++i) {
     const auto& el = m_elements[i];
