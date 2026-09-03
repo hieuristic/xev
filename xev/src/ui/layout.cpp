@@ -139,7 +139,8 @@ void Context::text(std::string_view label, float fontSize, Style&& style) {
 bool Context::button(std::string_view label,
                      float fontSize,
                      glm::vec3& color,
-                     Style&& style) {
+                     Style&& style,
+                     invokable) {
   uint32_t btnIdx = push(Element{
       .type = ElementType::Button,
       .style = style,

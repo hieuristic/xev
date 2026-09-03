@@ -18,11 +18,12 @@ void GUI::draw_hauptmenu(float screenW,
         },
         [&] {
           ui.text("Test Game", 2.0f);
-          if (ui.button("> Start Game", 1.0f, btnColor,
-                        {.sizing = {.type = xev::ui::SizingType::Grow}}))
-            state = GameState::Gameplay;
-          if (ui.button("> Quit", 1.0f, btnColor2,
-                       {.sizing = {.type = xev::ui::SizingType::Grow}} )) isRunning = false;
+          ui.button("> Start Game", 1.0f, btnColor,
+                    {.sizing = {.type = xev::ui::SizingType::Grow}},
+                    [&] { state = GameState::Gameplay; });
+          ui.button("> Quit", 1.0f, btnColor2,
+                    {.sizing = {.type = xev::ui::SizingType::Grow}},
+                    [&] { isRunning = false; });
         });
   });
   // ui.print_tree_layout();

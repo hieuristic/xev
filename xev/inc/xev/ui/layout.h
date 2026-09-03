@@ -1,45 +1,19 @@
 #pragma once
 #include <concepts>
-#include <cstdint>
 #include <glm/glm.hpp>
-#include <string_view>
 #include <vector>
 
 #include <xev/renderer2D.h>
 #include <xev/ui/font.h>
-#include <xev/ui/style.h>
+#include <xev/ui/element.h>
 
 namespace xev {
 namespace ui {
 
 // Inspired by clay.h Tks :)
 
-enum struct ElementType : uint8_t {
-  Container,
-  Text,
-  Button,
-};
-
-constexpr uint32_t NULLIDX = UINT32_MAX;
-
-struct Element {
-  ElementType type{ElementType::Container};
-  Style style{};
-  Bound2 bound{};
-  glm::vec2 size{};
-  glm::vec2 cursor{};
-  glm::vec3 color{};
-
-  uint32_t parentIdx{NULLIDX};  // to parents
-  uint32_t numChildren = 0;
-  uint32_t numGrowChildren = 0;
-
-  std::string_view textData{};
-  float fontSize{1.0f};
-};
-
-struct Context {
-  Context(Renderer2D& r2D, Font& font) : m_r2D(r2D), m_font(font) {}
+struct Layout {
+  Layout(Renderer2D& r2D, Font& font) : m_r2D(r2D), m_font(font) {}
   void solve();
   void render();
   void print_tree_layout() const;
