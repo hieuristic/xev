@@ -9,6 +9,7 @@ ThreadPool::ThreadPool(uint32_t numThreads) {
       while (true) {
         taskSem.acquire();
         if (shouldDie.load()) {
+          taskSem.release(1);
           return;
         }
 
@@ -17,6 +18,7 @@ ThreadPool::ThreadPool(uint32_t numThreads) {
           std::lock_guard<std::mutex> lock(queueMutex);
           if (tasks.empty()) {
             if (shouldDie.load()) {
+              taskSem.release(1);
               return;
             }
             continue;
@@ -33,7 +35,10 @@ ThreadPool::ThreadPool(uint32_t numThreads) {
 }
 
 ThreadPool::~ThreadPool() {
-  shouldDie.store(true);
+  {
+    std::lock_guard<std::mutex> lock(queueMutex);
+    shouldDie.store(true);
+  }
   taskSem.release(workers.size());
   for (auto& worker : workers) {
     if (worker.joinable()) {

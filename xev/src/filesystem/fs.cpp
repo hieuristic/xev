@@ -8,7 +8,9 @@ namespace xev {
 
 FileSystem::FileSystem() {}
 
-FileSystem::~FileSystem() {}
+FileSystem::~FileSystem() {
+  destroy_thread_pool();
+}
 
 void FileSystem::init_thread_pool(uint32_t numThreads) const {
   m_threadPool = std::make_unique<ThreadPool>(numThreads);

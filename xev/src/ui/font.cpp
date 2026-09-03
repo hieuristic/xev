@@ -7,7 +7,6 @@
 #include <xev/resource_manager.h>
 #include <xev/ui/font.h>
 
-#include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
 
 namespace xev {
@@ -33,7 +32,7 @@ Font::Font(const ResourceManager& manager,
     m_atlas.host_data[i * 4 + 0] = atlasBuffer[i * 3 + 0];  // R
     m_atlas.host_data[i * 4 + 1] = atlasBuffer[i * 3 + 1];  // G
     m_atlas.host_data[i * 4 + 2] = atlasBuffer[i * 3 + 2];  // B
-    m_atlas.host_data[i * 4 + 3] = 255;                  // A (Opaque)
+    m_atlas.host_data[i * 4 + 3] = 255;                     // A (Opaque)
   }
 
   // 2. upload data to GPU
@@ -114,16 +113,15 @@ Font::~Font() {
   m_manager.free(m_atlas);
 }
 
-glm::mat4 Font::transform(const glm::vec2& offset, uint32_t c) const {
+glm::mat3 Font::transform(const glm::vec2& offset, uint32_t c) const {
   glm::vec4 bounds = plane_bounds(c);
   float w = (bounds.z - bounds.x) * 0.5f;
   float h = (bounds.w - bounds.y) * 0.5f;
-  glm::vec2 origin = offset + glm::vec2(bounds.x + w, bounds.w + h);
+  // glm::vec2 origin = offset + glm::vec2(bounds.x + w, bounds.w + h);
+  glm::vec2 origin = offset + glm::vec2(bounds.x + w, 1.0f - (bounds.y + h));
 
-  glm::mat4 t(1.0f);
-  t = glm::translate(t, glm::vec3(origin, 0.0f));
-  t = glm::scale(t, glm::vec3(w, h, 1.0f));
-  return t;
+  return glm::mat3(glm::vec3(w, 0.0f, 0.0f), glm::vec3(0.0f, h, 0.0f),
+                   glm::vec3(origin.x, origin.y, 1.0f));
 }
 
 void Font::bind(GlobalDescriptorSet& descSet) {
@@ -147,6 +145,24 @@ glm::vec4 Font::plane_bounds(uint32_t c) const {
 glm::vec4 Font::atlas_bounds(uint32_t c) const {
   auto it = m_glyphs.find(c);
   return (it != m_glyphs.end()) ? it->second.atlasBounds : glm::vec4(0.0f);
+}
+
+glm::vec2 Font::measure(std::string_view text) const {
+  float maxLineWidth = 0.0f;
+  float currentLineWidth = 0.0f;
+  uint32_t lineCount = 1;
+
+  for (char c : text) {
+    if (c == '\n') {
+      maxLineWidth = std::max(maxLineWidth, currentLineWidth);
+      currentLineWidth = 0.0f;
+      lineCount++;
+      continue;
+    }
+    currentLineWidth += advance(c);
+  }
+  maxLineWidth = std::max(maxLineWidth, currentLineWidth);
+  return glm::vec2(maxLineWidth, lineCount * lineHeight);
 }
 
 }  // namespace xev

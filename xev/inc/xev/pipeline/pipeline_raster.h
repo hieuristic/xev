@@ -11,7 +11,7 @@ struct PipelineRaster : public Pipeline {
   };
 
   struct DrawInfo {
-    glm::mat4 transform;
+    glm::mat3 transform;
     glm::vec4 uvBounds;
     glm::vec3 color;
     uint32_t texID;

@@ -6,7 +6,7 @@ module raster;
 import global_desc;
 
 struct DrawInfo {
-  float4x4 transform;
+  column_major float3x3 transform;
   float4 uvBounds; // left top right bottom
   float3 color;
   uint32_t texID;
@@ -52,16 +52,17 @@ VertexOut main(VertexIn vi) {
 
   VertexOut vo;
   vo.instID = vi.instID;
-  vo.pos = mul(info.transform, float4(pos, 0.0f, 1.0f));
+  float3 screenPos = mul(info.transform, float3(pos, 1.0f));
+  vo.pos = float4(screenPos.xy, 0.0f, 1.0f);
   float2 normalized_uv = pos * 0.5f + 0.5f; // DO NOT CLAMP
   vo.uv = normalized_uv * (info.uvBounds.zw - info.uvBounds.xy) + info.uvBounds.xy;
   vo.uv1 = pos;
   return vo;
 }
 
-float median(float r, float g, float b) {
-  return max(min(r, g), min(max(r, g), b));
-}
+// float median(float r, float g, float b) {
+//   return max(min(r, g), min(max(r, g), b));
+// }
 
 #define EMRANGE_MIN -1
 #define EMRANGE_MAX 1
@@ -69,11 +70,16 @@ float median(float r, float g, float b) {
 
 [shader("fragment")]
 float4 main(VertexOut vo) : SV_Target {
+  if (abs(vo.uv1.x) > 1.0 || abs(vo.uv1.y) > 1.0) {
+    discard;
+  }
+
   float4 frag_out;
   DrawInfo info = pc.infoBuffer[vo.instID];
 
-  float4 texel = (info.texID == 0) ? float4(info.color, 1.0f)
-                                   : sample2DLinear(info.texID, vo.uv);
+  float4 texel = (info.texID == 0xFFFFFFFF)
+    ? float4(info.color, 1.0f)
+    : sample2DLinear(info.texID, vo.uv);
 
 #ifdef DEBUG_FONT_ATLAS
   frag_out = texel;
@@ -87,9 +93,6 @@ float4 main(VertexOut vo) : SV_Target {
     frag_out = texel;
   }
 #endif
-
-  float2 inBound = step(abs(vo.uv1), float2(1.0));
-  frag_out.a *= inBound.x * inBound.y;
 
   return frag_out;
 }

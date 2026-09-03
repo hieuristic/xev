@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <vector>
+#include <string_view>
 
 namespace xev {
 
@@ -27,8 +28,9 @@ struct Font {
   void bind(GlobalDescriptorSet& desc_set);
   glm::vec4 plane_bounds(uint32_t c) const;  // return left top right bottom
   glm::vec4 atlas_bounds(uint32_t c) const;  // return left top right bottom
-  glm::mat4 transform(const glm::vec2& offset, uint32_t c) const;
+  glm::mat3 transform(const glm::vec2& offset, uint32_t c) const;
   float advance(uint32_t c) const;
+  glm::vec2 measure(std::string_view text) const;
   uint32_t tex_id() const;
 
   float emSize = 1;

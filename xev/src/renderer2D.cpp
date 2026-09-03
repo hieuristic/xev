@@ -42,7 +42,7 @@ void Renderer2D::begin_render(VkCommandBuffer cmdbuf,
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
       .imageView = colorImage.view,
       .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
       .clearValue = {clearColor.r, clearColor.g, clearColor.b, clearColor.a},
   };
@@ -79,8 +79,8 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
 
 void Renderer2D::draw_text(const Font& font,
                            std::string_view text,
-                           glm::mat4 transform) {
-  glm::vec2 offset{-1.0f, -1.0f};
+                           glm::mat3 transform) {
+  glm::vec2 offset{0.0f, 0.0f};
   for (const char c : text) {
     if (c == '\n') {
       offset = glm::vec2(0.0f, offset.y + font.lineHeight);
@@ -99,7 +99,7 @@ void Renderer2D::draw_text(const Font& font,
   }
 }
 
-void Renderer2D::draw_image(glm::mat4 transform,
+void Renderer2D::draw_image(glm::mat3 transform,
                             glm::vec4 uvBounds,
                             uint32_t texID) {
   m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
@@ -110,12 +110,12 @@ void Renderer2D::draw_image(glm::mat4 transform,
   });
 }
 
-void Renderer2D::draw_rect(glm::mat4 transform, glm::vec3 color) {
+void Renderer2D::draw_rect(glm::mat3 transform, glm::vec3 color) {
   m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
     .transform = transform,
     .uvBounds = glm::vec4(0.0,0.0,1.0,1.0),
     .color = color,
-    .texID = 0,
+    .texID = 0xFFFFFFFF,
     .isMSDF = 0,
   });
 }
