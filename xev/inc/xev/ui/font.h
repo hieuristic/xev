@@ -26,6 +26,7 @@ struct Font {
        const std::string& config_path);
   ~Font();
   void bind(GlobalDescriptorSet& desc_set);
+  void bind(GlobalDescriptorSet& desc_set, uint32_t idx);
   glm::vec4 plane_bounds(uint32_t c) const;  // return left top right bottom
   glm::vec4 atlas_bounds(uint32_t c) const;  // return left top right bottom
   glm::mat3 transform(const glm::vec2& offset, uint32_t c) const;

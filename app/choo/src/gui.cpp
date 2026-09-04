@@ -16,14 +16,14 @@ void GUI::draw_hauptmenu(glm::vec2 mousePos,
                       .gap = 20.0f},
         },
         [&] {
-          layout.text("Goffy Ahh", 2.0f);
+          layout.text("Game :)", 2.0f);
           layout.button(
               "> Start", 1.0f, btnColor,
               {
                   .sizing = {.type = xev::ui::SizingType::Grow},
                   .padding = xev::Bound2(20.0f, 10.0f),
               },
-              [&] { state = GameState::Gameplay; },
+              [&] { state = GameState::Loading; },
               [&](xev::ui::Element& el) { el.color = btnColor2; });
           layout.button(
               "> Quit", 1.0f, btnColor,
@@ -39,6 +39,27 @@ void GUI::draw_hauptmenu(glm::vec2 mousePos,
   // exit(1);
 }
 
+void GUI::draw_loading_screen() {
+  layout.draw(glm::vec2(0.0f), false, [&] {
+    layout.container(
+        xev::ui::Element{
+            .style = {.direction = xev::ui::Direction::Horizontal,
+                      .padding = xev::Bound2(200.0f),
+                      .gap = 20.0f},
+        },
+        [&] { layout.text("Loading...", 2.0f); });
+  });
+}
+
 void GUI::draw_gameplay() {
-  ;  // TODO
+  layout.draw(glm::vec2(0.0f), false, [&] {
+    layout.container(
+        xev::ui::Element{
+            .style = {.direction = xev::ui::Direction::Horizontal,
+                      .padding = xev::Bound2(200.0f),
+                      .gap = 20.0f},
+        },
+        [&] { layout.text("This is gameplay", 2.0f); });
+  });
+
 }

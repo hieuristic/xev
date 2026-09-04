@@ -1,4 +1,6 @@
 #include <SDL3/SDL.h>
+#include <atomic>
+#include <thread>
 
 #include <xev/engine.h>
 #include <xev/filesystem/fs.h>
@@ -44,7 +46,8 @@ Game::Game() : m_running(true) {
   m_font = std::make_unique<xev::Font>(
       *m_engine->resourceManager, *m_engine->hotExec, *m_engine->fileSys,
       "fonts/akkurat.bin", "fonts/akkurat.json");
-  m_font->bind(*m_engine->globalDescriptorSet);
+
+  m_font->bind(*m_engine->globalDescriptorSet, 0);
 
   m_gui = std::make_unique<GUI>(static_cast<float>(m_window->width()),
                                 static_cast<float>(m_window->height()),
@@ -52,13 +55,21 @@ Game::Game() : m_running(true) {
 }
 
 Game::~Game() {
-  if (m_scene) {
+  if (m_scene && m_scene->on_device()) {
     m_scene->destroy(*m_engine->resourceManager);
   }
 }
 
 void Game::run() {
   if (!m_running) return;
+
+  m_scene = std::make_unique<xev::Scene>();
+  std::atomic<bool> scene_ready;
+
+  std::thread scene_loader([this, &scene_ready]() {
+    m_scene->load_gltf(*m_engine->fileSys, "models/player.glb");
+    scene_ready.store(true, std::memory_order_release);
+  });
 
   while (m_running) {
     float mouseX{0.0f}, mouseY{0.0f};
@@ -94,13 +105,34 @@ void Game::run() {
           m_engine->frameContext->get_current_render_target();
 
       switch (m_state) {
-        case GameState::Hauptmenu:
+        case GameState::Hauptmenu: {
+          if (!m_scene->on_device() &&
+              scene_ready.load(std::memory_order_acquire)) {
+            m_scene->alloc(*m_engine->resourceManager);
+            m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
+            m_scene->bind(*m_engine->globalDescriptorSet, 1);
+          }
           m_gui->draw_hauptmenu(glm::vec2(mouseX, mouseY), mouseDown, m_state,
                                 m_running);
           break;
-        case GameState::Gameplay:
+        }
+        case GameState::Loading: {
+          if (!m_scene->on_device() &&
+              scene_ready.load(std::memory_order_acquire)) {
+            m_scene->alloc(*m_engine->resourceManager);
+            m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
+            m_scene->bind(*m_engine->globalDescriptorSet, 1);
+          }
+          if (m_scene->on_device())
+            m_state = GameState::Gameplay;
+          else
+            m_gui->draw_loading_screen();
+          break;
+        }
+        case GameState::Gameplay: {
           m_gui->draw_gameplay();
           break;
+        }
       }
 
       m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
@@ -108,5 +140,9 @@ void Game::run() {
                          {0.1f, 0.1f, 0.1f, 1.0f});
       m_engine->submit_and_show(cmdbuf, output_color);
     }
+  }
+
+  if (scene_loader.joinable()) {
+    scene_loader.join();
   }
 }

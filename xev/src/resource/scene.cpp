@@ -579,6 +579,13 @@ void Scene::bind(const GlobalDescriptorSet& desc_set) {
   }
 }
 
+void Scene::bind(const GlobalDescriptorSet& desc_set, uint32_t startIdx) {
+  for (uint32_t i = 0; i < images.size(); i++) {
+    desc_set.set(images[i], i + startIdx);
+    XEV_INFO("ADDING IMAGE {} TO DESCRIPTOR SET", i);
+  }
+}
+
 void Scene::create_test_triangle() {
   XEV_INFO("Created test triangle.");
   XEV_ASSERT(meshes.size() == 0);

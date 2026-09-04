@@ -15,6 +15,7 @@ struct GUI;
 enum struct GameState : uint8_t {
   Hauptmenu,
   Gameplay,
+  Loading,
   // GAME_CUTSCENE,
 };
 

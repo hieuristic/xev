@@ -69,6 +69,7 @@ struct Scene : public Resource {
   void upload_scene(const ResourceManager& manager, const HotExec& hot_exec);
 
   void bind(const GlobalDescriptorSet& desc_set);
+  void bind(const GlobalDescriptorSet& desc_set, uint32_t startIdx);
 
  private:
   void parse_mesh(std::vector<Mesh>& out_meshes,

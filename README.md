@@ -29,6 +29,7 @@ And you should see the following image
  - support animations, physics
  - MSDF font rendering
  - custom intermediate mode UI layout system
+ - support multi-threading
 
 3. Note
  - Local object frame uses right-handed RDF system (+x - Right, +y - Down, +z - Front).

@@ -128,6 +128,11 @@ void Font::bind(GlobalDescriptorSet& descSet) {
   m_texID = descSet.set(m_atlas);
 }
 
+void Font::bind(GlobalDescriptorSet& descSet, uint32_t idx) {
+  descSet.set(m_atlas, idx);
+  m_texID = idx;
+}
+
 float Font::advance(uint32_t c) const {
   auto it = m_glyphs.find(c);
   return (it != m_glyphs.end()) ? it->second.advance : 0.0f;

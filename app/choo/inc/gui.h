@@ -14,6 +14,7 @@ struct GUI {
                       bool isMouseDown,
                       GameState& state,
                       bool& isRunning);
+  void draw_loading_screen();
   void draw_gameplay();
 
   xev::ui::Layout layout;
