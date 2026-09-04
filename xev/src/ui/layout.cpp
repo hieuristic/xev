@@ -6,9 +6,12 @@
 namespace xev {
 namespace ui {
 
-void Layout::draw(float screenW,
-                  float screenH,
-                  glm::vec2 mousePos,
+void Layout::set_resolution(float screenW, float screenH) {
+  m_screenW = screenW;
+  m_screenH = screenH;
+}
+
+void Layout::draw(glm::vec2 mousePos,
                   bool isMouseDown,
                   std::function<void()> cb) {
   m_mousePos = mousePos;
@@ -19,8 +22,8 @@ void Layout::draw(float screenW,
   container(
       Element{
           .style = {.direction = Direction::Vertical,
-                    .sizing = {.type = SizingType::Fixed, .value = screenW}},
-          .bound = Bound2(0.0, 0.0, screenW, screenH),
+                    .sizing = {.type = SizingType::Fixed, .value = m_screenW}},
+          .bound = Bound2(0.0, 0.0, m_screenW, m_screenH),
       },
       std::move(cb));
 
@@ -33,7 +36,7 @@ void Layout::draw(float screenW,
 
     if (el.type == ElementType::Button && el.onHover &&
         el.bound.contains(m_mousePos)) {
-      el.onHover();
+      el.onHover(el);
     }
   }
 
@@ -167,7 +170,7 @@ void Layout::button(std::string_view label,
                     glm::vec3& color,
                     Style&& style,
                     std::function<void()> onClick,
-                    std::function<void()> onHover) {
+                    std::function<void(Element&)> onHover) {
   uint32_t btnIdx = push(Element{
       .type = ElementType::Button,
       .style = style,
@@ -200,17 +203,14 @@ void Layout::text(std::string_view label, float fontSize, Style&& style) {
 void Layout::render() {
   if (m_elements.empty()) return;
 
-  float screenW = m_elements[0].bound.get_width();
-  float screenH = m_elements[0].bound.get_height();
-
   for (const auto& el : m_elements) {
     if (el.type == ElementType::Button) {
       float w = el.bound.get_width();
       float h = el.bound.get_height();
-      float scaleX = w / screenW;
-      float scaleY = h / screenH;
-      float posX = ((el.bound.left + w * 0.5f) / screenW) * 2.0f - 1.0f;
-      float posY = ((el.bound.top + h * 0.5f) / screenH) * 2.0f - 1.0f;
+      float scaleX = w / m_screenW;
+      float scaleY = h / m_screenH;
+      float posX = ((el.bound.left + w * 0.5f) / m_screenW) * 2.0f - 1.0f;
+      float posY = ((el.bound.top + h * 0.5f) / m_screenH) * 2.0f - 1.0f;
 
       glm::mat3 transform =
           glm::mat3(glm::vec3(scaleX, 0.0f, 0.0f),
@@ -218,10 +218,10 @@ void Layout::render() {
       m_r2D.draw_rect(transform, el.color);
     } else if (el.type == ElementType::Text) {
       float pixelScale = 28.0f * el.fontSize;
-      float scaleX = pixelScale * 2 / screenW;
-      float scaleY = pixelScale * 2 / screenH;
-      float posX = (el.bound.left / screenW) * 2.0f - 1.0f;
-      float posY = (el.bound.top / screenH) * 2.0f - 1.0f;
+      float scaleX = pixelScale * 2 / m_screenW;
+      float scaleY = pixelScale * 2 / m_screenH;
+      float posX = (el.bound.left / m_screenW) * 2.0f - 1.0f;
+      float posY = (el.bound.top / m_screenH) * 2.0f - 1.0f;
 
       glm::mat3 transform =
           glm::mat3(glm::vec3(scaleX, 0.0f, 0.0f),

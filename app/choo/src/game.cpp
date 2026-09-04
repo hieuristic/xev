@@ -46,7 +46,9 @@ Game::Game() : m_running(true) {
       "fonts/akkurat.bin", "fonts/akkurat.json");
   m_font->bind(*m_engine->globalDescriptorSet);
 
-  m_gui = std::make_unique<GUI>(*m_renderer2D, *m_font);
+  m_gui = std::make_unique<GUI>(static_cast<float>(m_window->width()),
+                                static_cast<float>(m_window->height()),
+                                *m_renderer2D, *m_font);
 }
 
 Game::~Game() {
@@ -93,8 +95,8 @@ void Game::run() {
 
       switch (m_state) {
         case GameState::Hauptmenu:
-          m_gui->draw_hauptmenu(800.0, 600.0, glm::vec2(mouseX, mouseY),
-                                mouseDown, m_state, m_running);
+          m_gui->draw_hauptmenu(glm::vec2(mouseX, mouseY), mouseDown, m_state,
+                                m_running);
           break;
         case GameState::Gameplay:
           m_gui->draw_gameplay();

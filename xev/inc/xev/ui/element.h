@@ -34,7 +34,7 @@ struct Element {
 
   // callbacks
   std::function<void()> onClick{};
-  std::function<void()> onHover{};
+  std::function<void(Element&)> onHover{};
 };
 
 }  // namespace ui
