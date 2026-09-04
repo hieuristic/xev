@@ -56,10 +56,12 @@ void GUI::draw_gameplay() {
     layout.container(
         xev::ui::Element{
             .style = {.direction = xev::ui::Direction::Horizontal,
-                      .padding = xev::Bound2(200.0f),
+                      .padding = xev::Bound2(20.0f),
                       .gap = 20.0f},
         },
-        [&] { layout.text("This is gameplay", 2.0f); });
+        [&] {
+          layout.text("health:", 1.0f);
+          layout.text("100", 1.0f);
+        });
   });
-
 }

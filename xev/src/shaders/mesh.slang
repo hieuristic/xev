@@ -69,17 +69,26 @@ float4 main(VertexDebug vo): SV_TARGET {
   return float4(diffuse, 1.0);
 #else
   Material mat = pc.scene_ptr->materials[pc.mat_id];
-  float3 diffuse = sample2DLinear(mat.albedo_texid, vo.uv).rgb;
+  float3 base_color = float3(mat.albedo.xyz) / 255.0f;
+  float3 diffuse = base_color * sample2DLinear(mat.albedo_texid, vo.uv).rgb;
   float4 metallic_roughness = sample2DLinear(mat.metallic_roughness_texid, vo.uv);
   float roughness = metallic_roughness.g * mat.rough_coef;
   float metallic = metallic_roughness.b * mat.metal_coef;
-  float3 f0 = float3(0.0);
+  float ao = (mat.metallic_roughness_texid != 0xFFFFFFFF) ? metallic_roughness.r : 1.0;
+
+  float3 f0 = lerp(float3(0.04), diffuse, metallic);
   float3 cam_xyz = pc.cam_xyz;
   float3 pix_xyz = vo.pix_xyz;
 
   float3 v = normalize(cam_xyz - pix_xyz);
   float3 n = vo.normal;
   float3 color = float3(0.0);
+
+  // ambiance
+  color += diffuse
+    * (pc.scene_ptr->ambient_color * pc.scene_ptr->ambient_intensity)
+    * ao;
+
   for (int i = 0; i < pc->scene_ptr->num_lights; i++) {
     Light light = pc->scene_ptr->lights[i];
     float3 l = normalize(light.xyz - pix_xyz); // for light
@@ -87,11 +96,13 @@ float4 main(VertexDebug vo): SV_TARGET {
     float dist = length(light.xyz - pix_xyz);
     float3 radiance = light.color * light.intensity / (dist * dist);
     color += brdf(diffuse, roughness, metallic, f0, v, n, l, h) *
-             radiance * max(dot(n, l), 0.0);
+             radiance;
   }
 
-  float exposure = 0.0015;
-  color *= exposure;
+  color *= pc.scene_ptr->exposure;
+  color = ACESFilm(color);
+  color = pow(color, float3(1.0 / 2.2));
+
   return float4(color, 1.0);
 #endif
 }

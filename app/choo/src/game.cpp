@@ -67,7 +67,7 @@ void Game::run() {
   std::atomic<bool> scene_ready;
 
   std::thread scene_loader([this, &scene_ready]() {
-    m_scene->load_gltf(*m_engine->fileSys, "models/player.glb");
+    m_scene->load_gltf(*m_engine->fileSys, "models/player.glb", 1);
     scene_ready.store(true, std::memory_order_release);
   });
 
@@ -110,7 +110,7 @@ void Game::run() {
               scene_ready.load(std::memory_order_acquire)) {
             m_scene->alloc(*m_engine->resourceManager);
             m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
-            m_scene->bind(*m_engine->globalDescriptorSet, 1);
+            m_scene->bind(*m_engine->globalDescriptorSet);
           }
           m_gui->draw_hauptmenu(glm::vec2(mouseX, mouseY), mouseDown, m_state,
                                 m_running);
@@ -121,7 +121,7 @@ void Game::run() {
               scene_ready.load(std::memory_order_acquire)) {
             m_scene->alloc(*m_engine->resourceManager);
             m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
-            m_scene->bind(*m_engine->globalDescriptorSet, 1);
+            m_scene->bind(*m_engine->globalDescriptorSet);
           }
           if (m_scene->on_device())
             m_state = GameState::Gameplay;
@@ -130,14 +130,23 @@ void Game::run() {
           break;
         }
         case GameState::Gameplay: {
+          const xev::Image& output_depth =
+              m_engine->frameContext->get_current_render_depth();
+
+          if (m_scene && m_scene->on_device()) {
+            m_renderer3D->draw(cmdbuf, output_color, output_depth,
+                               *m_engine->globalDescriptorSet, *m_scene,
+                               m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+          }
           m_gui->draw_gameplay();
           break;
         }
       }
 
+      bool shouldClear = (m_state != GameState::Gameplay);
       m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
                          m_engine->frameContext->get_current_index(),
-                         {0.1f, 0.1f, 0.1f, 1.0f});
+                         {0.1f, 0.1f, 0.1f, 1.0f}, shouldClear);
       m_engine->submit_and_show(cmdbuf, output_color);
     }
   }

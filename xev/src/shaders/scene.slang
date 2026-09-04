@@ -6,6 +6,7 @@ struct Scene {
   // ambient
   float3 ambient_color;
   float ambient_intensity;
+  float exposure;
 
   // fog
   float3 fog_color;

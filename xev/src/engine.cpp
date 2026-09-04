@@ -1,4 +1,6 @@
 #include <SDL3/SDL.h>
+#include <filesystem>
+
 #include <xev/common.h>
 #include <xev/device.h>
 #include <xev/engine.h>
@@ -8,10 +10,10 @@
 #include <xev/frame_context.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
+#include <xev/physics.h>
 #include <xev/pipeline_manager.h>
 #include <xev/resource_manager.h>
 #include <xev/swapchain.h>
-#include <filesystem>
 
 namespace xev {
 
@@ -27,8 +29,7 @@ Engine::Engine(SDL_Window* window) {
 }
 
 void Engine::init_swapchain() {
-  if (swapchain != nullptr)
-    return;
+  if (swapchain != nullptr) return;
 
   XEV_ASSERT(m_device->surface != VK_NULL_HANDLE,
              "Failed to initialize swapchain: invalid surface");
@@ -40,8 +41,7 @@ void Engine::init_swapchain() {
 }
 
 void Engine::init_hot_exec() {
-  if (hotExec != nullptr)
-    return;
+  if (hotExec != nullptr) return;
 
   hotExec =
       std::make_unique<HotExec>(m_device->device, m_device->graphics_queue,
@@ -49,8 +49,7 @@ void Engine::init_hot_exec() {
 }
 
 void Engine::init_resource_manager() {
-  if (resourceManager != nullptr)
-    return;
+  if (resourceManager != nullptr) return;
 
   resourceManager = std::make_unique<ResourceManager>(
       m_device->instance, m_device->physical_device, m_device->device,
@@ -58,17 +57,15 @@ void Engine::init_resource_manager() {
 }
 
 void Engine::init_pipeline_manager() {
-  if (pipelineManager != nullptr)
-    return;
+  if (pipelineManager != nullptr) return;
 
   XEV_ASSERT(globalDescriptorSet != nullptr, "Invalid global desc set!");
 
-  if (fileSys == nullptr)
-    init_file_system();
+  if (fileSys == nullptr) init_file_system();
 
   const char* base = SDL_GetBasePath();
-  std::filesystem::path basePath =
-      base ? std::filesystem::path(base) / ".." : std::filesystem::current_path();
+  std::filesystem::path basePath = base ? std::filesystem::path(base) / ".."
+                                        : std::filesystem::current_path();
 
   std::filesystem::path arxPath = basePath / "f0.arx";
   if (std::filesystem::exists(arxPath)) {
@@ -88,18 +85,15 @@ void Engine::init_pipeline_manager() {
 }
 
 void Engine::init_global_descriptor_set() {
-  if ((globalDescriptorSet != nullptr) || (resourceManager == nullptr))
-    return;
+  if ((globalDescriptorSet != nullptr) || (resourceManager == nullptr)) return;
 
   globalDescriptorSet = std::make_unique<GlobalDescriptorSet>(m_device->device);
 }
 
 void Engine::init_frame_context() {
-  if (resourceManager == nullptr)
-    init_resource_manager();
+  if (resourceManager == nullptr) init_resource_manager();
 
-  if (swapchain == nullptr)
-    init_swapchain();
+  if (swapchain == nullptr) init_swapchain();
 
   frameContext = std::make_unique<FrameContext>(
       m_device->device, m_device->queue_family.graphics.value().idx,
@@ -109,6 +103,10 @@ void Engine::init_frame_context() {
 void Engine::init_file_system() {
   fileSys = std::make_unique<FileSystem>();
   fileSys->init_thread_pool();
+}
+
+void Engine::init_physics() {
+  physics = std::make_unique<Physics>();
 }
 
 void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {

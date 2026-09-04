@@ -22,3 +22,6 @@
 [submodule "ext/valvesockets"]
 	path = ext/valvesockets
 	url = https://github.com/valvesoftware/gamenetworkingsockets
+[submodule "ext/jolt"]
+	path = ext/jolt
+	url = https://github.com/jrouwe/JoltPhysics.git

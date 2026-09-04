@@ -24,7 +24,8 @@ struct Renderer2D : public Renderer {
             const Image& colorImage,
             const GlobalDescriptorSet& descSet,
             uint32_t currFrameIdx,
-            const Color4<float>& clearColor);
+            const Color4<float>& clearColor = {.1f, .1f, .1f, .1f},
+            const bool clear = false);
   void draw_text(const Font& font, std::string_view text, glm::mat3 transform);
   void draw_image(glm::mat3 transform, glm::vec4 uvBounds, uint32_t texID);
   void draw_rect(glm::mat3 transform, glm::vec3 color);
@@ -34,7 +35,8 @@ struct Renderer2D : public Renderer {
  private:
   void begin_render(VkCommandBuffer cmdBuf,
                     const Image& colorImage,
-                    const Color4<float>& clearColor);
+                    const Color4<float>& clearColor,
+                    const bool clear);
 
   ResourceManager& m_resourceManager;
   PipelineManager& m_pipelineManager;

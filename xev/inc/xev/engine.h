@@ -15,6 +15,7 @@ struct GlobalDescriptorSet;
 struct FrameContext;
 struct FileSystem;
 struct HotExec;
+struct Physics;
 
 struct Engine {
   Engine();
@@ -32,6 +33,7 @@ struct Engine {
   std::unique_ptr<FrameContext> frameContext;
   std::unique_ptr<HotExec> hotExec;
   std::unique_ptr<FileSystem> fileSys;
+  std::unique_ptr<Physics> physics;
 
   void init_swapchain();
   void init_resource_manager();
@@ -40,6 +42,7 @@ struct Engine {
   void init_frame_context();
   void init_hot_exec();
   void init_file_system();
+  void init_physics();
   void submit_and_show(VkCommandBuffer cmd, const Image& image);
 
  private:

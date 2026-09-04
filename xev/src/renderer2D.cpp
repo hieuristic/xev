@@ -37,12 +37,14 @@ Renderer2D::~Renderer2D() {
 
 void Renderer2D::begin_render(VkCommandBuffer cmdbuf,
                               const Image& colorImage,
-                              const Color4<float>& clearColor) {
+                              const Color4<float>& clearColor,
+                              const bool clear) {
   VkRenderingAttachmentInfo color_attachment = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
       .imageView = colorImage.view,
       .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .loadOp =
+          clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
       .clearValue = {clearColor.r, clearColor.g, clearColor.b, clearColor.a},
   };
@@ -60,7 +62,8 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
                       const Image& colorImage,
                       const GlobalDescriptorSet& descSet,
                       uint32_t currFrameIdx,
-                      const Color4<float>& clearColor) {
+                      const Color4<float>& clearColor,
+                      const bool clear) {
   XEV_ASSERT(colorImage.on_device());
 
   descSet.bind(cmdbuf, m_pipelineRaster.layout);
@@ -68,7 +71,7 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
 
   memcpy(m_drawInfoBuffers[0].alloc_info.pMappedData, m_drawInfos.data(),
          m_drawInfos.size() * sizeof(m_drawInfos[0]));
-  begin_render(cmdbuf, colorImage, clearColor);
+  begin_render(cmdbuf, colorImage, clearColor, clear);
   m_pipelineRaster.draw(cmdbuf, m_drawInfoBuffers[0].addr, m_drawInfos.size(),
                         colorImage.width, colorImage.height);
   vkCmdEndRendering(cmdbuf);
@@ -112,11 +115,11 @@ void Renderer2D::draw_image(glm::mat3 transform,
 
 void Renderer2D::draw_rect(glm::mat3 transform, glm::vec3 color) {
   m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
-    .transform = transform,
-    .uvBounds = glm::vec4(0.0,0.0,1.0,1.0),
-    .color = color,
-    .texID = 0xFFFFFFFF,
-    .isMSDF = 0,
+      .transform = transform,
+      .uvBounds = glm::vec4(0.0, 0.0, 1.0, 1.0),
+      .color = color,
+      .texID = 0xFFFFFFFF,
+      .isMSDF = 0,
   });
 }
 

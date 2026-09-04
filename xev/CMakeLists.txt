@@ -12,6 +12,7 @@ target_link_libraries(xev_core PUBLIC imgui
   glm::glm
   VulkanMemoryAllocator
   GameNetworkingSockets::static
+  Jolt
 )
 target_compile_definitions(xev_core PUBLIC VK_NO_PROTOTYPES)
 

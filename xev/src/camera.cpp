@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include <xev/camera.h>
 
 namespace xev {
@@ -68,6 +70,14 @@ void Camera::set_aspect(float aspect_) {
 void Camera::set_fov_deg(float deg) {
   fovy_rad = glm::radians(deg);
   fovx_rad = 2.0f * std::atan(aspect * std::tan(fovy_rad * 0.5f));
+}
+
+float Camera::ev100() const {
+  return std::log2((aperture * aperture * shutter_freq) * (100.0f / iso));
+}
+
+float Camera::exposure() const {
+  return 1.0f / (1.2f * std::pow(2.0f, ev100()));
 }
 
 }  // namespace xev

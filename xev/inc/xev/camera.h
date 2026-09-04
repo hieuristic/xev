@@ -29,8 +29,15 @@ struct Camera {
   void set_aspect(float aspect);
   void set_fov_deg(float deg);
 
+  float ev100() const;
+  float exposure() const;
+
   glm::quat rot;
   glm::vec3 pos;
+
+  float aperture = 2.8f;
+  float shutter_freq = 125.0f;
+  float iso = 100.0f;
 
   float aspect = 1.0f;
   float fovx_rad = glm::radians(100.0);

@@ -6,8 +6,9 @@ namespace xev {
 
 struct SceneBuffer {
   // ambient
-  glm::vec3 ambient_color;
-  float ambient_intensity;
+  glm::vec3 ambient_color{1.0f};
+  float ambient_intensity{0.05f};
+  float exposure{0.0016f};
 
   // fog
   glm::vec3 fog_color;

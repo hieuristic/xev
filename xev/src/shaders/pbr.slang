@@ -27,10 +27,10 @@ public float G_GTR(float nh, float gamma, float alpha) {
 }
 
 public float V_Smith(float nv, float nl, float alpha) {
-  float a = alpha * alpha;
-  float v_ggx = nl * sqrt(nv * nv * (1 - a) + a);
-  float l_ggx = nv * sqrt(nl * nl * (1 - a) + a);
-  return 0.5 / max(v_ggx + l_ggx, 0.00001);
+  float a2 = alpha * alpha;
+  float v_ggx = nl * sqrt(max(nv * nv * (1.0 - a2) + a2, 0.0));
+  float l_ggx = nv * sqrt(max(nl * nl * (1.0 - a2) + a2, 0.0));
+  return 0.5 / max(v_ggx + l_ggx, 1e-4);
 }
 
 public float F_Schlick(float u, float f0, float f90) {
@@ -45,20 +45,31 @@ public float fd_Lambert() {
   return PI_INV;
 }
 
+public float fd_WrapHill(float nl_unclamp, float w) {
+  float norm = (2.0 + w) / (2.0 * (1.0 + w));
+  float wrapped = max(nl_unclamp + w, 0.0) / (1.0 + w);
+  return norm * pow(wrapped, 1.0 + w) * PI_INV;
+}
+
 public float fd_Burley(float nv, float nl, float lh, float alpha) {
   float f90 = 0.5 + 2.0 * alpha * lh * lh;
   return F_Schlick(nl, 1.0, f90) * F_Schlick(nv, 1.0, f90) * PI_INV;
 }
 
 public float3 brdf(float3 diffuse, float roughness, float metallic, float3 f0,
-                  float3 v, float3 n, float3 l, float3 h) {
-  float nl = dot(n, l);
-  float nh = dot(n, h);
-  float nv = dot(n, v);
-  float hv = dot(h, v);
-  float alpha = roughness * roughness;
+                  float3 v, float3 n, float3 l, float3 h, float wrap = 0.3) {
 
-  float3 fr = (G_TR(nh, alpha) * V_Smith(nv, nl, alpha)) * F_Schlick(hv, f0, 1.0);
-  float fd = fd_Lambert();
-  return diffuse * (fd + fr);
+  float nl_unclamp = dot(n, l);
+  float nl = clamp(dot(n, l), 1e-4, 1.0);
+  float nh = clamp(dot(n, h), 0.0, 1.0);
+  float nv = clamp(dot(n, v), 1e-4, 1.0);
+  float hv = clamp(dot(h, v), 0.0, 1.0);
+  float alpha = clamp(roughness * roughness, 0.001, 1.0);
+
+  float3 fr = (G_TR(nh, alpha) * V_Smith(nv, nl, alpha)) * F_Schlick(hv, f0, 1.0) * max(nl_unclamp, 0.0);;
+  float w = wrap * (1.0 - metallic);
+  float norm = (2.0 + w) / (2.0 * (1.0 + w));
+  float wrapped_nl = max(nl_unclamp + w, 0.0) / (1.0 + w);
+  float3 fd = diffuse * (1.0 - metallic) * (norm * pow(wrapped_nl, 1.0 + w));
+  return fr + fd;
 }

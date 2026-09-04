@@ -153,7 +153,11 @@ void Scene::parse_mesh(std::vector<Mesh>& meshes,
   }
 }
 
-void Scene::load_gltf(const FileSystem& fileSys, std::string_view filepath) {
+void Scene::load_gltf(const FileSystem& fileSys,
+                      std::string_view filepath,
+                      uint32_t idxOffset_) {
+  idxOffset = idxOffset_;
+
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
@@ -174,12 +178,9 @@ void Scene::load_gltf(const FileSystem& fileSys, std::string_view filepath) {
         static_cast<unsigned int>(gltfData.size()), "");
   }
 
-  if (!warn.empty())
-    XEV_WARN("glTF Warning: {}", warn);
-  if (!err.empty())
-    XEV_ERROR("glTF Error: {}", err);
-  if (!ret)
-    return;
+  if (!warn.empty()) XEV_WARN("glTF Warning: {}", warn);
+  if (!err.empty()) XEV_ERROR("glTF Error: {}", err);
+  if (!ret) return;
 
   if (on_device()) {
     XEV_ERROR("Loading glTF into an active scene. Please call .release().");
@@ -215,18 +216,17 @@ void Scene::load_gltf(const FileSystem& fileSys, std::string_view filepath) {
 
     int albedo_idx = gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
     mat.albedo_texid =
-        (albedo_idx >= 0) ? model.textures[albedo_idx].source : -1;
+        (albedo_idx >= 0) ? model.textures[albedo_idx].source : 0xFFFFFFFF;
 
     int mr_idx = gltf_mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
     mat.metallic_roughness_texid =
-        (mr_idx >= 0) ? model.textures[mr_idx].source : -1;
+        (mr_idx >= 0) ? model.textures[mr_idx].source : 0xFFFFFFFF;
     materials.emplace_back(mat);
   }
 
   // parsing images
   for (const auto& gltf_img : model.images) {
-    if (gltf_img.bits != 8)
-      XEV_INFO("LOADING NON-8BITS IMAGES");
+    if (gltf_img.bits != 8) XEV_INFO("LOADING NON-8BITS IMAGES");
     XEV_INFO("TEXTURE: {}x{}x{} {}-bits", gltf_img.width, gltf_img.height,
              gltf_img.component, gltf_img.bits);
     Image img{static_cast<uint32_t>(gltf_img.width),
@@ -344,8 +344,7 @@ uint64_t Scene::size_device() const {
 }
 
 bool Scene::on_device() const {
-  if (meshes.size() == 0)
-    return false;
+  if (meshes.size() == 0) return false;
 
   bool res = true;
   for (const auto& mesh : meshes) {
@@ -369,12 +368,10 @@ void Scene::alloc(const ResourceManager& manager) {
   }
 
   for (auto& tex : images) {
-    if (!tex.on_device())
-      manager.alloc(tex);
+    if (!tex.on_device()) manager.alloc(tex);
   }
   for (auto& mesh : meshes) {
-    if (!mesh.on_device())
-      mesh.alloc(manager);
+    if (!mesh.on_device()) mesh.alloc(manager);
   }
 }
 
@@ -384,13 +381,11 @@ void Scene::free(const ResourceManager& manager) {
   manager.free(materials_device);
 
   for (auto& tex : images) {
-    if (tex.on_device())
-      manager.free(tex);
+    if (tex.on_device()) manager.free(tex);
   }
 
   for (auto& mesh : meshes) {
-    if (mesh.on_device())
-      mesh.free(manager);
+    if (mesh.on_device()) mesh.free(manager);
   }
 }
 
@@ -456,8 +451,7 @@ void Scene::upload_meshes(const ResourceManager& manager,
 
 void Scene::upload_lights(const ResourceManager& manager,
                           const HotExec& hot_exec) {
-  if (lights.empty())
-    return;
+  if (lights.empty()) return;
 
   uint64_t size = lights.size() * sizeof(LightGPU);
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
@@ -498,8 +492,7 @@ void Scene::upload_lights(const ResourceManager& manager,
 
 void Scene::upload_materials(const ResourceManager& manager,
                              const HotExec& hot_exec) {
-  if (materials.empty())
-    return;
+  if (materials.empty()) return;
 
   uint64_t size = materials.size() * sizeof(MaterialGPU);
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
@@ -510,13 +503,19 @@ void Scene::upload_materials(const ResourceManager& manager,
         static_cast<MaterialGPU*>(staging.alloc_info.pMappedData);
     uint64_t offset_ = 0;
     for (uint32_t i = 0; i < materials.size(); i++) {
+      uint32_t albedo_id = (materials[i].albedo_texid != 0xFFFFFFFF)
+                               ? (materials[i].albedo_texid + idxOffset)
+                               : 0xFFFFFFFF;
+      uint32_t mr_id = (materials[i].metallic_roughness_texid != 0xFFFFFFFF)
+                           ? (materials[i].metallic_roughness_texid + idxOffset)
+                           : 0xFFFFFFFF;
       map_[i] = {
           .albedo = materials[i].albedo,
           .metal_coef = materials[i].metal_coef,
           .rough_coef = materials[i].rough_coef,
           .emiss_coef = materials[i].emiss_coef,
-          .albedo_texid = materials[i].albedo_texid,
-          .metallic_roughness_texid = materials[i].metallic_roughness_texid,
+          .albedo_texid = albedo_id,
+          .metallic_roughness_texid = mr_id,
       };
       // memcpy((char*)map_ + offset_, (void*)&materials[i], sizeof(Material));
       // offset_ += sizeof(Material);
@@ -566,6 +565,7 @@ void Scene::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   upload_lights(manager, hot_exec);
   upload_materials(manager, hot_exec);
 
+  scene_buffer.exposure = active_cam.exposure();
   scene_buffer.light_buffer_address = lights_device.addr;
   scene_buffer.num_lights = lights.size();
   scene_buffer.material_buffer_address = materials_device.addr;
@@ -574,7 +574,7 @@ void Scene::upload(const ResourceManager& manager, const HotExec& hot_exec) {
 
 void Scene::bind(const GlobalDescriptorSet& desc_set) {
   for (uint32_t i = 0; i < images.size(); i++) {
-    desc_set.set(images[i], i);
+    desc_set.set(images[i], i + idxOffset);
     XEV_INFO("ADDING IMAGE {} TO DESCRIPTOR SET", i);
   }
 }

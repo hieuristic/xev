@@ -31,7 +31,9 @@ struct Scene : public Resource {
   Scene();
   void destroy(const ResourceManager& manager);
 
-  void load_gltf(const FileSystem& fileSys, std::string_view filepath);
+  void load_gltf(const FileSystem& fileSys,
+                 std::string_view filepath,
+                 uint32_t idxOffset_ = 0);
   void save_bin(std::filesystem::path& outFile);
   void create_test_triangle();
 
@@ -47,6 +49,7 @@ struct Scene : public Resource {
   std::vector<Image> images;
   std::vector<Light> lights;
   std::vector<Material> materials;
+  uint32_t idxOffset{0};
 
   std::vector<Camera> cameras;
 
