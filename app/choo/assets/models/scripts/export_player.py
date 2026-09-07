@@ -15,19 +15,29 @@ def setup_gltf_node_group():
             gltf_group.inputs.new("NodeSocketFloat", "Occlusion")
     return gltf_group
 
-def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_samples=32):
-    print(f"=== Processing {blend_path} for collection '{collection_name}' ===")
+def export_collections(blend_path, collections, output_paths, ao_res=512, ao_samples=32):
+    if isinstance(collections, str):
+        collection_names = [collections]
+    else:
+        collection_names = list(collections)
 
-    target_col = bpy.data.collections.get(collection_name)
-    if not target_col:
-        print(f"Error: Collection '{collection_name}' not found in {blend_path}!")
-        print(f"Available collections: {[c.name for c in bpy.data.collections]}")
-        sys.exit(1)
+    print(f"=== Processing {blend_path} for collections: {collection_names} ===")
+
+    target_cols = []
+    for col_name in collection_names:
+        col = bpy.data.collections.get(col_name)
+        if not col:
+            print(f"Error: Collection '{col_name}' not found in {blend_path}!")
+            print(f"Available collections: {[c.name for c in bpy.data.collections]}")
+            sys.exit(1)
+        target_cols.append(col)
 
     # 1. Hide unwanted collections from Cycles render bake
     for col in bpy.data.collections:
-        if col.name != collection_name:
+        if col.name not in collection_names:
             col.hide_render = True
+        else:
+            col.hide_render = False
 
     # 2. If shirt exists and body exists, hide duplicate body from render to avoid z-fighting/bake overlap
     body_obj = bpy.data.objects.get("hieu.body")
@@ -37,18 +47,39 @@ def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_
         body_obj.hide_render = True
         body_obj.hide_set(True)
 
-    # 3. Recalculate normals outward on all meshes (fixes inside-out normals on glasses, shirt, etc.)
-    for obj in target_col.objects:
-        if obj.type == 'MESH':
-            bpy.context.view_layer.objects.active = obj
-            try:
-                bpy.ops.object.mode_set(mode='EDIT')
-                bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.mesh.normals_make_consistent(inside=False)
-            except Exception as e:
-                print(f"Warning fixing normals on {obj.name}: {e}")
-            finally:
-                bpy.ops.object.mode_set(mode='OBJECT')
+    # Read exposure and camera properties dynamically from the .blend file (scene & camera)
+    scene = bpy.context.scene
+    blender_exposure_ev = float(scene.view_settings.exposure)
+    exposure_multiplier = float(math.pow(2.0, blender_exposure_ev))
+
+    cam_obj = bpy.data.objects.get("cam.active")
+    if cam_obj and cam_obj.type == 'CAMERA':
+        cam_data = cam_obj.data
+        cam_data["exposure_ev"] = blender_exposure_ev
+        cam_data["exposure"] = exposure_multiplier
+        if hasattr(cam_data, "dof") and cam_data.dof:
+            cam_data["aperture"] = float(cam_data.dof.aperture_fstop)
+        
+        # Also copy any custom camera properties defined in the blend file
+        for k, v in cam_obj.items():
+            if isinstance(v, (int, float, str)):
+                cam_data[k] = v
+
+        print(f"Dynamically read from .blend -> EV: {blender_exposure_ev}, Linear Exposure: {exposure_multiplier}, f-stop: {getattr(cam_data.dof, 'aperture_fstop', 'N/A')}")
+
+    # 3. Recalculate normals outward on player meshes (fixes inside-out normals on glasses, shirt, etc.)
+    player_col = bpy.data.collections.get("player")
+    player_objects = [o for o in player_col.objects if o.type == 'MESH'] if player_col else []
+    for obj in player_objects:
+        bpy.context.view_layer.objects.active = obj
+        try:
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+        except Exception as e:
+            print(f"Warning fixing normals on {obj.name}: {e}")
+        finally:
+            bpy.ops.object.mode_set(mode='OBJECT')
 
     # 4. Standardize materials: convert Hair BSDF to Principled BSDF
     for mat in bpy.data.materials:
@@ -72,10 +103,10 @@ def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_
     scene.cycles.samples = ao_samples
     scene.cycles.device = 'CPU'
 
-    # 6. Create bake textures and perform raytraced AO bake for each mesh
+    # 6. Create bake textures and perform raytraced AO bake for each player mesh
     baked_materials = set()
-    for obj in target_col.objects:
-        if obj.type != 'MESH' or obj.hide_render:
+    for obj in player_objects:
+        if obj.hide_render:
             continue
 
         bpy.ops.object.select_all(action='DESELECT')
@@ -109,8 +140,9 @@ def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_
     # 7. Pack baked AO into glTF standard ORM textures (R=Occlusion, G=Roughness, B=Metallic)
     gltf_group = setup_gltf_node_group()
 
-    for mat in bpy.data.materials:
-        if not mat.node_tree:
+    for mat_name in baked_materials:
+        mat = bpy.data.materials.get(mat_name)
+        if not mat or not mat.node_tree:
             continue
         
         nodes = mat.node_tree.nodes
@@ -168,13 +200,14 @@ def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_
 
             print(f"Packed ORM texture for material '{mat.name}' (Roughness={rough_val:.2f}, Metallic={metal_val:.2f})")
 
-    # 8. Select only active objects in target collection for export
+    # 8. Select only active objects in target collections for export
     for obj in bpy.data.objects:
         obj.select_set(False)
 
-    for obj in target_col.objects:
-        if not obj.hide_render:
-            obj.select_set(True)
+    for col in target_cols:
+        for obj in col.objects:
+            if not obj.hide_render:
+                obj.select_set(True)
 
     # 9. Export to GLB
     for out_path in output_paths:
@@ -187,9 +220,13 @@ def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_
             export_yup=True,
             export_cameras=True,
             export_lights=True,
+            export_extras=True,
             export_attributes=True
         )
         print(f"Successfully exported GLB to: {out_path}")
+
+def export_collection(blend_path, collection_name, output_paths, ao_res=512, ao_samples=32):
+    export_collections(blend_path, [collection_name], output_paths, ao_res, ao_samples)
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -197,10 +234,10 @@ if __name__ == "__main__":
     root_dir = os.path.abspath(os.path.join(script_dir, "../../../../.."))
 
     blend_file = os.path.join(model_dir, "player.blend")
-    collection = "map"
+    collections = ["player", "map"]
 
     output_glb_local = os.path.join(model_dir, "player.glb")
     output_glb_assets = os.path.join(root_dir, "assets", "player.glb")
 
-    export_collection(blend_file, collection, [output_glb_local, output_glb_assets])
+    export_collections(blend_file, collections, [output_glb_local, output_glb_assets])
 

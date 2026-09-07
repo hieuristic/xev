@@ -111,6 +111,7 @@ void Game::run() {
             m_scene->alloc(*m_engine->resourceManager);
             m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
             m_scene->bind(*m_engine->globalDescriptorSet);
+            m_scene->active_cam.set_aspect(m_window->get_aspect());
           }
           m_gui->draw_hauptmenu(glm::vec2(mouseX, mouseY), mouseDown, m_state,
                                 m_running);
@@ -122,6 +123,7 @@ void Game::run() {
             m_scene->alloc(*m_engine->resourceManager);
             m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
             m_scene->bind(*m_engine->globalDescriptorSet);
+            m_scene->active_cam.set_aspect(m_window->get_aspect());
           }
           if (m_scene->on_device())
             m_state = GameState::Gameplay;

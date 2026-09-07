@@ -303,11 +303,11 @@ void Scene::load_gltf(const FileSystem& fileSys,
       glm::vec3 abs_pos = glm::vec3(abs_mat[3]);
       glm::quat abs_rot = glm::quat_cast(abs_mat);
       XEV_INFO("Camera yfov {}", camera.perspective.yfov);
-      // active_cam =
-      //     Camera(abs_rot, abs_pos,
-      //            glm::degrees(static_cast<float>(camera.perspective.yfov)));
-      active_cam = Camera(abs_rot, abs_pos,
-                          70);  // TODO REMOVE HARDCODE LATER, THIS IS FOR DEBUG
+      float yfov_deg = glm::degrees(static_cast<float>(camera.perspective.yfov));
+      active_cam = Camera(abs_rot, abs_pos, yfov_deg);
+      if (camera.perspective.aspectRatio > 0.0) {
+        active_cam.set_aspect(static_cast<float>(camera.perspective.aspectRatio));
+      }
       XEV_INFO("Camera zfar {}, znear {}", active_cam.far, active_cam.near);
       cam_found = true;
     }
