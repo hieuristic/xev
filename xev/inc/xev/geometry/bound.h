@@ -45,6 +45,14 @@ struct Bound3 {
   float right{0.0};
   float bottom{0.0};
   float back{0.0};
+  float get_width() const { return std::abs(right - left); }
+  float get_height() const { return std::abs(bottom - top); }
+  float get_depth() const { return std::abs(back - front); }
+  float get_volume() const { return get_width() * get_height() * get_depth(); }
+  bool contains(glm::vec3& query) {
+    return (query.x >= left) && (query.x <= right) && (query.y >= top) &&
+           (query.y <= bottom) && (query.z >= back) && (query.z <= front);
+  }
 };
 
 }  // namespace xev
