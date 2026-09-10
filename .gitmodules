@@ -25,3 +25,6 @@
 [submodule "ext/jolt"]
 	path = ext/jolt
 	url = https://github.com/jrouwe/JoltPhysics.git
+[submodule "ext/entt"]
+	path = ext/entt
+	url = https://github.com/skypjack/entt.git
