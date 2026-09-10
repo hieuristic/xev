@@ -52,11 +52,100 @@ Game::Game() : m_running(true) {
   m_gui = std::make_unique<GUI>(static_cast<float>(m_window->width()),
                                 static_cast<float>(m_window->height()),
                                 *m_renderer2D, *m_font);
+  ecs::init(m_registry, *m_scene);
 }
 
 Game::~Game() {
   if (m_scene && m_scene->on_device()) {
     m_scene->destroy(*m_engine->resourceManager);
+  }
+}
+
+void Game::handle_input() {
+  now = SDL_GetTicks();
+  m_dt = static_cast<float>(now - m_tick) / 1000.0f;
+  m_tick = now;
+
+  uint32_t mouseButtons = SDL_GetMouseState(&m_mouseX, &m_mouseY);
+  m_isMouseDown = (mouseButtons & SDL_BUTTON_LMASK) != 0;
+
+  // input handling
+  SDL_Event event;
+  while (SDL_PollEvent(&event)) {
+    if (event.type == SDL_EVENT_QUIT) {
+      m_running = false;
+    }
+    if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && m_window &&
+        event.window.windowID == SDL_GetWindowID(m_window->get_native())) {
+      m_running = false;
+    }
+    if (event.type == SDL_EVENT_KEY_DOWN) {
+      if (event.key.key == SDLK_ESCAPE) {
+        m_running = false;
+      }
+      if (event.key.key == SDLK_Q) {
+        m_isMouseCaptured = !m_isMouseCaptured;
+        SDL_SetWindowRelativeMouseMode(m_window->get_native(),
+                                       m_isMouseCaptured);
+      }
+    }
+    if (event.type == SDL_EVENT_MOUSE_MOTION && m_isMouseCaptured) {
+      mouseRelX += event.motion.xrel;
+      mouseRelY += event.motion.yrel;
+    }
+  }
+}
+
+void Game::render() {
+  VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
+  if (cmdbuf != VK_NULL_HANDLE) {
+    const xev::Image& output_color =
+        m_engine->frameContext->get_current_render_target();
+
+    auto check_scene = [&] {
+      if (!m_scene->on_device() &&
+          scene_ready.load(std::memory_order_acquire)) {
+        m_scene->alloc(*m_engine->resourceManager);
+        m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
+        m_scene->bind(*m_engine->globalDescriptorSet);
+        m_scene->active_cam.set_aspect(m_window->get_aspect());
+      }
+    };
+
+    switch (m_state) {
+      case GameState::Hauptmenu: {
+        check_scene();
+        m_gui->draw_hauptmenu(glm::vec2(m_mouseX, m_mouseY), m_isMouseDown,
+                              m_state, m_running);
+        break;
+      }
+      case GameState::Loading: {
+        check_scene();
+        if (m_scene->on_device())
+          m_state = GameState::Gameplay;
+        else
+          m_gui->draw_loading_screen();
+        break;
+      }
+      case GameState::Gameplay: {
+        const xev::Image& output_depth =
+            m_engine->frameContext->get_current_render_depth();
+
+        if (m_scene && m_scene->on_device()) {
+          m_renderer3D->draw(cmdbuf, output_color, output_depth,
+                             *m_engine->globalDescriptorSet, *m_scene,
+                             m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+        }
+        m_gui->draw_gameplay();
+        break;
+      }
+    }
+
+    bool shouldClear = (m_state != GameState::Gameplay);
+    m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
+                       m_engine->frameContext->get_current_index(),
+                       {0.1f, 0.1f, 0.1f, 1.0f}, shouldClear);
+    m_engine->submit_and_show(cmdbuf, output_color);
   }
 }
 
@@ -72,88 +161,12 @@ void Game::run() {
   });
 
   while (m_running) {
-    float mouseX{0.0f}, mouseY{0.0f};
-    uint32_t mouseButtons = SDL_GetMouseState(&mouseX, &mouseY);
-    bool mouseDown = (mouseButtons & SDL_BUTTON_LMASK) != 0;
-
-    // input handling
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_EVENT_QUIT) {
-        m_running = false;
-      }
-      if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && m_window &&
-          event.window.windowID == SDL_GetWindowID(m_window->get_native())) {
-        m_running = false;
-      }
-      if (event.type == SDL_EVENT_KEY_DOWN) {
-        if (event.key.key == SDLK_ESCAPE) {
-          m_running = false;
-        }
-        if (event.key.key == SDLK_Q) {
-          m_isMouseCaptured = !m_isMouseCaptured;
-          SDL_SetWindowRelativeMouseMode(m_window->get_native(),
-                                         m_isMouseCaptured);
-        }
-      }
-    }
-
-    // rendering
-    VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
-    if (cmdbuf != VK_NULL_HANDLE) {
-      const xev::Image& output_color =
-          m_engine->frameContext->get_current_render_target();
-
-      switch (m_state) {
-        case GameState::Hauptmenu: {
-          if (!m_scene->on_device() &&
-              scene_ready.load(std::memory_order_acquire)) {
-            m_scene->alloc(*m_engine->resourceManager);
-            m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
-            m_scene->bind(*m_engine->globalDescriptorSet);
-            m_scene->active_cam.set_aspect(m_window->get_aspect());
-          }
-          m_gui->draw_hauptmenu(glm::vec2(mouseX, mouseY), mouseDown, m_state,
-                                m_running);
-          break;
-        }
-        case GameState::Loading: {
-          if (!m_scene->on_device() &&
-              scene_ready.load(std::memory_order_acquire)) {
-            m_scene->alloc(*m_engine->resourceManager);
-            m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
-            m_scene->bind(*m_engine->globalDescriptorSet);
-            m_scene->active_cam.set_aspect(m_window->get_aspect());
-          }
-          if (m_scene->on_device())
-            m_state = GameState::Gameplay;
-          else
-            m_gui->draw_loading_screen();
-          break;
-        }
-        case GameState::Gameplay: {
-          const xev::Image& output_depth =
-              m_engine->frameContext->get_current_render_depth();
-
-          if (m_scene && m_scene->on_device()) {
-            m_renderer3D->draw(cmdbuf, output_color, output_depth,
-                               *m_engine->globalDescriptorSet, *m_scene,
-                               m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
-          }
-          m_gui->draw_gameplay();
-          break;
-        }
-      }
-
-      bool shouldClear = (m_state != GameState::Gameplay);
-      m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
-                         m_engine->frameContext->get_current_index(),
-                         {0.1f, 0.1f, 0.1f, 1.0f}, shouldClear);
-      m_engine->submit_and_show(cmdbuf, output_color);
-    }
+    handle_input();
+    render();
   }
+}
 
-  if (scene_loader.joinable()) {
-    scene_loader.join();
-  }
+if (scene_loader.joinable()) {
+  scene_loader.join();
+}
 }
