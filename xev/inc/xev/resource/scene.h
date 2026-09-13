@@ -20,6 +20,7 @@ struct Model;
 struct Node;
 struct Material;
 struct Image;
+struct FuncPoint;
 }  // namespace tinygltf
 
 namespace xev {
@@ -49,6 +50,7 @@ struct Scene : public Resource {
   std::vector<Image> images;
   std::vector<Light> lights;
   std::vector<Material> materials;
+  std::vector<FuncPoint> funcPoints;
   uint32_t idxOffset{0};
 
   std::vector<Camera> cameras;

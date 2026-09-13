@@ -3,6 +3,7 @@
 #include <xev/resource/image.h>
 #include <xev/resource/scene.h>
 #include <xev/resource_manager.h>
+#include <xev/gameplay/funcpoint.h>
 
 #include <tiny_gltf.h>
 #include <filesystem>
@@ -323,11 +324,21 @@ void Scene::load_gltf(const FileSystem& fileSys,
       lights[node.light].direction = glm::normalize(glm::vec3(abs_mat[2]));
     }
 
+    // parse functional points
+    bool is_empty = (node.mesh == -1 && node.camera == -1 && node.light == -1);
+    if (is_empty && !node.name.empty()) {
+      glm::vec3 loc = glm::vec3(abs_mat[3]);
+      funPoints.emplace_back({loc});
+      XEV_INFO("Found funcPoint {} at {} {} {}", node.anme, loc[0], loc[1], loc[2]);
+    }
+
     for (const int& child : node.children) {
       to_visit.push({child, abs_mat});
     }
   }
 
+
+  // parse default cam
   if (!cam_found) {
     XEV_WARN("No active camera found! Creating default fly cam.");
     active_cam = Camera();

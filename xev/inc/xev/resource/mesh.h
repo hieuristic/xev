@@ -33,6 +33,7 @@ struct Mesh : public Resource {
 
   const std::string& get_name() const;
   glm::mat4 get_model_mat() const;
+  void set_model_mat(const glm::mat4& mat) { m_model_mat = mat; }
   VkDeviceAddress get_vert_addr() const;
   uint32_t get_material_id() const;
   uint32_t get_face_count() const;

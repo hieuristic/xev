@@ -1,6 +1,7 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <memory>
+#include <atomic>
 
 namespace xev {
 struct Window;
@@ -12,6 +13,7 @@ struct Font;
 }  // namespace xev
 
 struct GUI;
+struct Controller;
 
 enum struct GameState : uint8_t {
   Hauptmenu,
@@ -24,8 +26,9 @@ struct Game {
   Game();
   ~Game();
   void run();
-  void render();
-  void handle_input();
+  void render(std::atomic<bool>& scene_ready);
+  void handle_input(std::atomic<bool>& scene_ready);
+  void update_camera();
 
  private:
   bool m_running{true};
@@ -38,6 +41,7 @@ struct Game {
   float m_mouseRelX{0.0f}, m_mouseRelY{0.0f};
   bool m_isMouseDown;
 
+  Controller m_controller;
   GameState m_state{GameState::Hauptmenu};
   entt::registry m_registry;
 

@@ -9,3 +9,4 @@ struct Player {
   glm::quat rotation;
   Bound3 hitBox;
 };
+

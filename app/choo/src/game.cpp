@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <atomic>
+#include <glm/gtc/matrix_transform.hpp>
 #include <thread>
 
 #include <xev/engine.h>
@@ -16,6 +17,7 @@
 #include <xev/ui/font.h>
 #include <xev/window.h>
 
+#include "ecs.h"
 #include "game.h"
 #include "gui.h"
 
@@ -52,7 +54,6 @@ Game::Game() : m_running(true) {
   m_gui = std::make_unique<GUI>(static_cast<float>(m_window->width()),
                                 static_cast<float>(m_window->height()),
                                 *m_renderer2D, *m_font);
-  ecs::init(m_registry, *m_scene);
 }
 
 Game::~Game() {
@@ -61,8 +62,8 @@ Game::~Game() {
   }
 }
 
-void Game::handle_input() {
-  now = SDL_GetTicks();
+void Game::handle_input(std::atomic<bool>& scene_ready) {
+  uint64_t now = SDL_GetTicks();
   m_dt = static_cast<float>(now - m_tick) / 1000.0f;
   m_tick = now;
 
@@ -90,13 +91,13 @@ void Game::handle_input() {
       }
     }
     if (event.type == SDL_EVENT_MOUSE_MOTION && m_isMouseCaptured) {
-      mouseRelX += event.motion.xrel;
-      mouseRelY += event.motion.yrel;
+      m_mouseRelX += event.motion.xrel;
+      m_mouseRelY += event.motion.yrel;
     }
   }
 }
 
-void Game::render() {
+void Game::render(std::atomic<bool>& scene_ready) {
   VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
   if (cmdbuf != VK_NULL_HANDLE) {
     const xev::Image& output_color =
@@ -121,10 +122,12 @@ void Game::render() {
       }
       case GameState::Loading: {
         check_scene();
-        if (m_scene->on_device())
+        if (m_scene->on_device()) {
+          ecs::sys::init(m_registry, *m_scene);
           m_state = GameState::Gameplay;
-        else
+        } else {
           m_gui->draw_loading_screen();
+        }
         break;
       }
       case GameState::Gameplay: {
@@ -161,12 +164,16 @@ void Game::run() {
   });
 
   while (m_running) {
-    handle_input();
-    render();
+    handle_input(scene_ready);
+    controller.update(m_dt, m_mouseRelX, m_mouseRelY, SDL_GetKeyboardState(nullptr), );
+    ecs::sys::movement(m_registry, m_dt, );
+    ecs::sys::transform(m_registry);
+    ecs::sys::render_sync(m_registry, *m_scene);
+    ecs::sys::camera(m_registry, m_scene->active_cam, m_scene);
+    render(scene_ready);
   }
-}
 
-if (scene_loader.joinable()) {
-  scene_loader.join();
-}
+  if (scene_loader.joinable()) {
+    scene_loader.join();
+  }
 }

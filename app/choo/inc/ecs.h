@@ -13,33 +13,32 @@ namespace ecs {
 namespace com {
 
 struct Transform {
-  glm::vec2 pos{0.0f};
+  glm::vec3 pos{0.0f};
   glm::quat rot{1.0f, 0.0f, 0.0f, 0.0f};
+  glm::mat4 world_mat{1.0f};
 };
 
 struct Movement {
-  glm::vec3 vel{0.0};
-  float speed;
-};
-
-struct Camera {
-  float dist;
+  glm::vec3 velocity{0.0};
+  float speed{5.0f};
 };
 
 struct Mesh {
   entt::entity owner{entt::null};
-  uint32_t mesh_index;
+  uint32_t meshIdx{0};
+  glm::mat4 localOffset{1.0f};
 };
+
+struct Player{};
 
 }  // namespace com
 
 namespace sys {
 
-void init(entt& );
-void transform();
-void movement();
-void camera();
-void render();
+void init(entt::registry& registry, xev::Scene& scene);
+void movement(entt::registry& registry, float dt, const bool* keys);
+void transform(entt::registry& registry);
+void render_sync(entt::registry& registry, xev::Scene& scene);
 
 }  // namespace sys
 }  // namespace ecs
