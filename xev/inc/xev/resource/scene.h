@@ -1,5 +1,11 @@
 #pragma once
 
+#include <glm/glm.hpp>
+#include <queue>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include <xev/camera.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/resource/image.h>
@@ -9,18 +15,13 @@
 #include <xev/resource/resource.h>
 #include <xev/resource/sampler.h>
 #include <xev/scene_buffer.h>
-#include <glm/glm.hpp>
-#include <queue>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <xev/gameplay/funcpoint.h>
 
 namespace tinygltf {
 struct Model;
 struct Node;
 struct Material;
 struct Image;
-struct FuncPoint;
 }  // namespace tinygltf
 
 namespace xev {

@@ -1,7 +1,8 @@
 #pragma once
+#include <atomic>
 #include <entt/entt.hpp>
 #include <memory>
-#include <atomic>
+#include "controller.h"
 
 namespace xev {
 struct Window;
@@ -44,6 +45,8 @@ struct Game {
   Controller m_controller;
   GameState m_state{GameState::Hauptmenu};
   entt::registry m_registry;
+  entt::entity m_player;
+  entt::entity m_map;
 
   std::unique_ptr<xev::Window> m_window;
   std::unique_ptr<xev::Engine> m_engine;

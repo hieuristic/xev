@@ -328,8 +328,9 @@ void Scene::load_gltf(const FileSystem& fileSys,
     bool is_empty = (node.mesh == -1 && node.camera == -1 && node.light == -1);
     if (is_empty && !node.name.empty()) {
       glm::vec3 loc = glm::vec3(abs_mat[3]);
-      funPoints.emplace_back({loc});
-      XEV_INFO("Found funcPoint {} at {} {} {}", node.anme, loc[0], loc[1], loc[2]);
+      FuncPoint fp {node.name, loc};
+      funcPoints.push_back(fp);
+      XEV_INFO("Found funcPoint {} at {} {} {}", node.name, loc[0], loc[1], loc[2]);
     }
 
     for (const int& child : node.children) {

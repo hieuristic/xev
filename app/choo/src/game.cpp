@@ -62,7 +62,7 @@ Game::~Game() {
   }
 }
 
-void Game::handle_input(std::atomic<bool>& scene_ready) {
+void Game::handle_input(std::atomic<bool>& sceneReady) {
   uint64_t now = SDL_GetTicks();
   m_dt = static_cast<float>(now - m_tick) / 1000.0f;
   m_tick = now;
@@ -97,15 +97,14 @@ void Game::handle_input(std::atomic<bool>& scene_ready) {
   }
 }
 
-void Game::render(std::atomic<bool>& scene_ready) {
+void Game::render(std::atomic<bool>& sceneReady) {
   VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
   if (cmdbuf != VK_NULL_HANDLE) {
     const xev::Image& output_color =
         m_engine->frameContext->get_current_render_target();
 
     auto check_scene = [&] {
-      if (!m_scene->on_device() &&
-          scene_ready.load(std::memory_order_acquire)) {
+      if (!m_scene->on_device() && sceneReady.load(std::memory_order_acquire)) {
         m_scene->alloc(*m_engine->resourceManager);
         m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
         m_scene->bind(*m_engine->globalDescriptorSet);
@@ -123,7 +122,7 @@ void Game::render(std::atomic<bool>& scene_ready) {
       case GameState::Loading: {
         check_scene();
         if (m_scene->on_device()) {
-          ecs::sys::init(m_registry, *m_scene);
+          ecs::sys::init(m_registry, *m_scene, m_player, m_map);
           m_state = GameState::Gameplay;
         } else {
           m_gui->draw_loading_screen();
@@ -142,7 +141,7 @@ void Game::render(std::atomic<bool>& scene_ready) {
         m_gui->draw_gameplay();
         break;
       }
-    }
+    };
 
     bool shouldClear = (m_state != GameState::Gameplay);
     m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
@@ -156,21 +155,34 @@ void Game::run() {
   if (!m_running) return;
 
   m_scene = std::make_unique<xev::Scene>();
-  std::atomic<bool> scene_ready;
+  std::atomic<bool> sceneReady;
 
-  std::thread scene_loader([this, &scene_ready]() {
+  std::thread scene_loader([this, &sceneReady]() {
     m_scene->load_gltf(*m_engine->fileSys, "models/player.glb", 1);
-    scene_ready.store(true, std::memory_order_release);
+    sceneReady.store(true, std::memory_order_release);
   });
 
   while (m_running) {
-    handle_input(scene_ready);
-    controller.update(m_dt, m_mouseRelX, m_mouseRelY, SDL_GetKeyboardState(nullptr), );
-    ecs::sys::movement(m_registry, m_dt, );
-    ecs::sys::transform(m_registry);
-    ecs::sys::render_sync(m_registry, *m_scene);
-    ecs::sys::camera(m_registry, m_scene->active_cam, m_scene);
-    render(scene_ready);
+    handle_input(sceneReady);
+
+    switch (m_state) {
+      case GameState::Gameplay: {
+        auto& playerTransform = m_registry.get<ecs::com::Transform>(m_player);
+        auto& playerMovement = m_registry.get<ecs::com::Movement>(m_player);
+        m_controller.update(m_dt, m_mouseRelX, m_mouseRelY,
+                            SDL_GetKeyboardState(nullptr), playerTransform,
+                            playerMovement, m_scene->active_cam);
+
+        ecs::sys::transform(m_registry);
+        ecs::sys::render_sync(m_registry, *m_scene);
+        break;
+      }
+      default:
+        break;
+    }
+    m_mouseRelX = 0.0f;
+    m_mouseRelY = 0.0f;
+    render(sceneReady);
   }
 
   if (scene_loader.joinable()) {

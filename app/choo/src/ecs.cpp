@@ -8,15 +8,18 @@
 
 namespace ecs {
 
-void sys::init(entt::registry& registry, xev::Scene& scene) {
+void sys::init(entt::registry& registry,
+               xev::Scene& scene,
+               entt::entity& player,
+               entt::entity& map) {
   registry.clear();
 
-  auto player = registry.create();
+  player = registry.create();
   registry.emplace<com::Player>(player);
   registry.emplace<com::Transform>(player);
   registry.emplace<com::Movement>(player);
 
-  auto map = registry.create();
+  map = registry.create();
   registry.emplace<com::Transform>(map);
 
   // bind meshes to player
@@ -53,7 +56,8 @@ void sys::movement(entt::registry& registry, float dt, const bool* keys) {
 void sys::transform(entt::registry& registry) {
   auto view = registry.view<com::Transform>();
   for (auto [entity, t] : view.each()) {
-    t.world_mat = glm::translate(glm::mat4(1.0f), t.pos) * glm::mat4_cast(t.rot);
+    t.world_mat =
+        glm::translate(glm::mat4(1.0f), t.pos) * glm::mat4_cast(t.rot);
   }
 }
 

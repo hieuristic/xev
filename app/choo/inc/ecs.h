@@ -29,13 +29,16 @@ struct Mesh {
   glm::mat4 localOffset{1.0f};
 };
 
-struct Player{};
+struct Player {};
 
 }  // namespace com
 
 namespace sys {
 
-void init(entt::registry& registry, xev::Scene& scene);
+void init(entt::registry& registry,
+          xev::Scene& scene,
+          entt::entity& player,
+          entt::entity& map);
 void movement(entt::registry& registry, float dt, const bool* keys);
 void transform(entt::registry& registry);
 void render_sync(entt::registry& registry, xev::Scene& scene);
