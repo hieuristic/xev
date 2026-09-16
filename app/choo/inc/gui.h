@@ -4,6 +4,7 @@
 #include <xev/ui/layout.h>
 
 enum struct GameState : uint8_t;
+enum struct CharacterType : uint8_t;
 
 struct GUI {
   GUI(float screenW, float screenH, xev::Renderer2D& r2D_, xev::Font& font_)
@@ -13,7 +14,8 @@ struct GUI {
   void draw_hauptmenu(glm::vec2 mousePos,
                       bool isMouseDown,
                       GameState& state,
-                      bool& isRunning);
+                      bool& isRunning,
+                      CharacterType& character);
   void draw_loading_screen();
   void draw_gameplay();
 

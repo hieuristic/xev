@@ -1,13 +1,12 @@
 #pragma once
-#include <glm/glm.hpp>
 #include <cstdint>
 #include <functional>
+#include <glm/glm.hpp>
 #include <string_view>
 
 #include <xev/ui/style.h>
 
-namespace xev {
-namespace ui {
+namespace xev::ui {
 
 enum struct ElementType : uint8_t {
   Container,
@@ -37,5 +36,4 @@ struct Element {
   std::function<void(Element&)> onHover{};
 };
 
-}  // namespace ui
-}  // namespace xev
+}  // namespace xev::ui

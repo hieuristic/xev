@@ -5,8 +5,7 @@
 /* Thank you https://github.com/nicbarker/clay
  * for some inspiration :) */
 
-namespace xev {
-namespace ui {
+namespace xev::ui {
 
 enum struct Direction : uint8_t {
   Vertical,
@@ -46,5 +45,4 @@ struct Style {
   float gap{0.0f};
 };
 
-}  // namespace ui
-}  // namespace xev
+}  // namespace xev::ui

@@ -6,8 +6,7 @@
 #include <xev/ui/element.h>
 #include <xev/ui/font.h>
 
-namespace xev {
-namespace ui {
+namespace xev::ui {
 
 // Inspired by clay.h Tks :)
 
@@ -28,7 +27,7 @@ struct Layout {
       glm::vec3& color,
       Style&& style = Style{},
       std::function<void()> onClick = [] {},
-      std::function<void(Element&)> onHover = [](Element&){});
+      std::function<void(Element&)> onHover = [](Element&) {});
 
  private:
   uint32_t push(Element&& e);
@@ -45,5 +44,4 @@ struct Layout {
   Font& m_font;
 };
 
-}  // namespace ui
-}  // namespace xev
+}  // namespace xev::ui

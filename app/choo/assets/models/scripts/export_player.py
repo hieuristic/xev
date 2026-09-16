@@ -40,12 +40,17 @@ def export_collections(blend_path, collections, output_paths, ao_res=512, ao_sam
             col.hide_render = False
 
     # 2. If shirt exists and body exists, hide duplicate body from render to avoid z-fighting/bake overlap
-    body_obj = bpy.data.objects.get("hieu.body")
-    shirt_obj = bpy.data.objects.get("hieu.body.shirt")
-    if body_obj and shirt_obj:
-        print("Hiding overlapping 'hieu.body' in favor of 'hieu.body.shirt' for clean bake...")
-        body_obj.hide_render = True
-        body_obj.hide_set(True)
+    body_shirt_pairs = [
+        ("hieu.body", "hieu.body.shirt"),
+        ("ngok.body", "ngok.body.shirt"),
+    ]
+    for body_name, shirt_name in body_shirt_pairs:
+        body_obj = bpy.data.objects.get(body_name)
+        shirt_obj = bpy.data.objects.get(shirt_name)
+        if body_obj and shirt_obj:
+            print(f"Hiding overlapping '{body_name}' in favor of '{shirt_name}' for clean bake...")
+            body_obj.hide_render = True
+            body_obj.hide_set(True)
 
     # Read exposure and camera properties dynamically from the .blend file (scene & camera)
     scene = bpy.context.scene
@@ -68,8 +73,12 @@ def export_collections(blend_path, collections, output_paths, ao_res=512, ao_sam
         print(f"Dynamically read from .blend -> EV: {blender_exposure_ev}, Linear Exposure: {exposure_multiplier}, f-stop: {getattr(cam_data.dof, 'aperture_fstop', 'N/A')}")
 
     # 3. Recalculate normals outward on player meshes (fixes inside-out normals on glasses, shirt, etc.)
-    player_col = bpy.data.collections.get("player")
-    player_objects = [o for o in player_col.objects if o.type == 'MESH'] if player_col else []
+    player_objects = []
+    for col_name in ["player.hieu", "player.ngok"]:
+        col = bpy.data.collections.get(col_name)
+        if col:
+            player_objects.extend([o for o in col.objects if o.type == 'MESH'])
+    player_objects = list(dict.fromkeys(player_objects))
     for obj in player_objects:
         bpy.context.view_layer.objects.active = obj
         try:
@@ -234,7 +243,7 @@ if __name__ == "__main__":
     root_dir = os.path.abspath(os.path.join(script_dir, "../../../../.."))
 
     blend_file = os.path.join(model_dir, "player.blend")
-    collections = ["player", "map"]
+    collections = ["player.hieu", "player.ngok", "map"]
 
     output_glb_local = os.path.join(model_dir, "player.glb")
     output_glb_assets = os.path.join(root_dir, "assets", "player.glb")

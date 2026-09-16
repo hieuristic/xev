@@ -2,6 +2,9 @@
 #include <atomic>
 #include <entt/entt.hpp>
 #include <memory>
+
+#include <xev/network/client.h>
+
 #include "controller.h"
 
 namespace xev {
@@ -15,6 +18,7 @@ struct Font;
 
 struct GUI;
 struct Controller;
+enum struct CharacterType : uint8_t;
 
 enum struct GameState : uint8_t {
   Hauptmenu,
@@ -30,6 +34,7 @@ struct Game {
   void render(std::atomic<bool>& scene_ready);
   void handle_input(std::atomic<bool>& scene_ready);
   void update_camera();
+  void update_network();
 
  private:
   bool m_running{true};
@@ -44,9 +49,14 @@ struct Game {
 
   Controller m_controller;
   GameState m_state{GameState::Hauptmenu};
+  CharacterType m_character;
   entt::registry m_registry;
   entt::entity m_player;
+  entt::entity m_player2;
   entt::entity m_map;
+
+  bool m_hasPlayer2{false};
+  std::unique_ptr<xev::net::Client> m_client;
 
   std::unique_ptr<xev::Window> m_window;
   std::unique_ptr<xev::Engine> m_engine;

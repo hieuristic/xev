@@ -14,6 +14,7 @@
 #include <xev/pipeline_manager.h>
 #include <xev/resource_manager.h>
 #include <xev/swapchain.h>
+#include <xev/network/network.h>
 
 namespace xev {
 
@@ -107,6 +108,10 @@ void Engine::init_file_system() {
 
 void Engine::init_physics() {
   physics = std::make_unique<Physics>();
+}
+
+void Engine::init_network() {
+  network = std::make_unique<Network>();
 }
 
 void Engine::submit_and_show(VkCommandBuffer cmd, const Image& image) {

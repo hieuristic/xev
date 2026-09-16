@@ -1,18 +1,27 @@
-#include "ecs.h"
 #include <SDL3/SDL.h>
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
+#include <string>
 
 #include <xev/camera.h>
 #include <xev/resource/scene.h>
 
-namespace ecs {
+#include "character.h"
+#include "ecs.h"
 
-void sys::init(entt::registry& registry,
-               xev::Scene& scene,
-               entt::entity& player,
-               entt::entity& map) {
+namespace ecs::sys {
+
+void init(entt::registry& registry,
+          xev::Scene& scene,
+          entt::entity& player,
+          entt::entity& player2,
+          entt::entity& map,
+          CharacterType& character) {
   registry.clear();
+
+  player2 = registry.create();
+  registry.emplace<com::Player2>(player2);
+  registry.emplace<com::Transform>(player2);
 
   player = registry.create();
   registry.emplace<com::Player>(player);
@@ -22,13 +31,24 @@ void sys::init(entt::registry& registry,
   map = registry.create();
   registry.emplace<com::Transform>(map);
 
+  std::string playerPrefix =
+      (character == CharacterType::Hieu) ? "hieu." : "ngok.";
+  std::string player2Prefix =
+      (character == CharacterType::Hieu) ? "ngok." : "hieu.";
+
   // bind meshes to player
   for (uint32_t i = 0; i < scene.meshes.size(); ++i) {
     const auto& mesh = scene.meshes[i];
     auto e = registry.create();
-    bool isPlayer = mesh.get_name().rfind("hieu.", 0) == 0;
-    registry.emplace<com::Mesh>(e, isPlayer ? player : map, i,
-                                mesh.get_model_mat());
+    bool isPlayer = mesh.get_name().rfind(playerPrefix, 0) == 0;
+    bool isPlayer2 = mesh.get_name().rfind(player2Prefix, 0) == 0;
+
+    if (isPlayer)
+      registry.emplace<com::Mesh>(e, player, i, mesh.get_model_mat());
+    else if (isPlayer2)
+      registry.emplace<com::Mesh>(e, player2, i, mesh.get_model_mat());
+    else
+      registry.emplace<com::Mesh>(e, map, i, mesh.get_model_mat());
   }
 }
 
@@ -36,7 +56,7 @@ constexpr glm::vec3 forward = glm::vec3(0.0f, 0.0f, 1.0f);
 constexpr glm::vec3 right = glm::vec3(1.0f, 0.0, 0.0);
 constexpr glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
 
-void sys::movement(entt::registry& registry, float dt, const bool* keys) {
+void movement(entt::registry& registry, float dt, const bool* keys) {
   auto view = registry.view<com::Transform, com::Movement, com::Player>();
   for (auto [entity, transform, movement] : view.each()) {
     glm::vec3 moveDir{0.0f};
@@ -53,7 +73,7 @@ void sys::movement(entt::registry& registry, float dt, const bool* keys) {
   }
 }
 
-void sys::transform(entt::registry& registry) {
+void transform(entt::registry& registry) {
   auto view = registry.view<com::Transform>();
   for (auto [entity, t] : view.each()) {
     t.world_mat =
@@ -61,7 +81,7 @@ void sys::transform(entt::registry& registry) {
   }
 }
 
-void sys::render_sync(entt::registry& registry, xev::Scene& scene) {
+void render_sync(entt::registry& registry, xev::Scene& scene) {
   auto view = registry.view<com::Mesh>();
   for (auto [entity, mesh_comp] : view.each()) {
     if (!registry.valid(mesh_comp.owner)) continue;
@@ -72,4 +92,4 @@ void sys::render_sync(entt::registry& registry, xev::Scene& scene) {
   }
 }
 
-}  // namespace ecs
+}  // namespace ecs::sys

@@ -9,6 +9,8 @@
 #include <xev/frame_context.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/hot_exec.h>
+#include <xev/network/client.h>
+#include <xev/network/network.h>
 #include <xev/pipeline_manager.h>
 #include <xev/renderer2D.h>
 #include <xev/renderer3D.h>
@@ -17,9 +19,11 @@
 #include <xev/ui/font.h>
 #include <xev/window.h>
 
+#include "character.h"
 #include "ecs.h"
 #include "game.h"
 #include "gui.h"
+#include "message.h"
 
 Game::Game() : m_running(true) {
   m_window = std::make_unique<xev::Window>("demogame", 800, 600);
@@ -39,6 +43,7 @@ Game::Game() : m_running(true) {
   m_engine->init_global_descriptor_set();
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
+  m_engine->init_network();
 
   m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
   m_renderer2D = std::make_unique<xev::Renderer2D>(
@@ -57,6 +62,8 @@ Game::Game() : m_running(true) {
 }
 
 Game::~Game() {
+  if (m_client) m_client->disconnect();
+
   if (m_scene && m_scene->on_device()) {
     m_scene->destroy(*m_engine->resourceManager);
   }
@@ -116,17 +123,12 @@ void Game::render(std::atomic<bool>& sceneReady) {
       case GameState::Hauptmenu: {
         check_scene();
         m_gui->draw_hauptmenu(glm::vec2(m_mouseX, m_mouseY), m_isMouseDown,
-                              m_state, m_running);
+                              m_state, m_running, m_character);
         break;
       }
       case GameState::Loading: {
         check_scene();
-        if (m_scene->on_device()) {
-          ecs::sys::init(m_registry, *m_scene, m_player, m_map);
-          m_state = GameState::Gameplay;
-        } else {
-          m_gui->draw_loading_screen();
-        }
+        if (!m_scene->on_device()) m_gui->draw_loading_screen();
         break;
       }
       case GameState::Gameplay: {
@@ -148,6 +150,21 @@ void Game::render(std::atomic<bool>& sceneReady) {
                        m_engine->frameContext->get_current_index(),
                        {0.1f, 0.1f, 0.1f, 1.0f}, shouldClear);
     m_engine->submit_and_show(cmdbuf, output_color);
+  }
+}
+
+void Game::update_network() {
+  if (!m_client) return;
+
+  m_client->poll();
+  if (m_client->is_connected()) {
+    MsgTran t;
+    t.character = m_character;
+
+    auto& playerTransform = m_registry.get<ecs::com::Transform>(m_player);
+    t.pos = playerTransform.pos;
+    t.rot = playerTransform.rot;
+    m_client->send(&t, sizeof(t), xev::net::SendMode::Fast);
   }
 }
 
@@ -173,9 +190,35 @@ void Game::run() {
                             SDL_GetKeyboardState(nullptr), playerTransform,
                             playerMovement, m_scene->active_cam);
 
+        update_network();
         ecs::sys::transform(m_registry);
         ecs::sys::render_sync(m_registry, *m_scene);
         break;
+      }
+      case GameState::Loading: {
+        if (m_scene->on_device()) {
+          m_state = GameState::Gameplay;
+
+          ecs::sys::init(m_registry, *m_scene, m_player, m_player2, m_map,
+                         m_character);
+
+          // start connecting to server
+          m_client = std::make_unique<xev::net::Client>();
+          m_client->connect("100.124.166.46", 1906);
+          m_client->on_message([this](const uint8_t* data, uint64_t size) {
+            if (size >= sizeof(MsgTran)) {
+              auto& msg = *reinterpret_cast<const MsgTran*>(data);
+              auto& t = m_registry.get<ecs::com::Transform>(m_player2);
+              t.pos = msg.pos;
+              t.rot = msg.rot;
+              m_hasPlayer2 = true;
+            }
+          });
+
+          m_isMouseCaptured = true;
+          SDL_SetWindowRelativeMouseMode(m_window->get_native(),
+                                         m_isMouseCaptured);
+        }
       }
       default:
         break;
