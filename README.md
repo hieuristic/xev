@@ -26,10 +26,10 @@ And you should see the following image
  - clustered forward renderer
  - bindless descriptor set, dynamic rendering
  - virtual file system support archival format, loose files, etc.
+ - fast intermediate mode UI layout system
  - support animations, physics
- - MSDF font rendering
- - custom intermediate mode UI layout system
  - support multi-threading
+ - support networking, multiplayer
 
 3. Note
  - Local object frame uses right-handed RDF system (+x - Right, +y - Down, +z - Front).
