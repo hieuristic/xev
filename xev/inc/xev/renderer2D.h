@@ -1,6 +1,6 @@
 #pragma once
 #include <xev/color.h>
-#include <xev/pipeline/pipeline_raster.h>
+#include <xev/pipeline/raster.h>
 #include <xev/renderer.h>
 #include <xev/volk.h>
 #include <glm/glm.hpp>
@@ -40,10 +40,10 @@ struct Renderer2D : public Renderer {
 
   ResourceManager& m_resourceManager;
   PipelineManager& m_pipelineManager;
-  PipelineRaster m_pipelineRaster;
+  pipe::Raster m_pipelineRaster;
 
   std::vector<Buffer> m_drawInfoBuffers;
-  std::vector<PipelineRaster::DrawInfo> m_drawInfos;
+  std::vector<pipe::Raster::DrawInfo> m_drawInfos;
 };
 
 }  // namespace xev

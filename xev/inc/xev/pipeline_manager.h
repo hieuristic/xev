@@ -4,8 +4,8 @@
 
 namespace xev {
 
-struct Pipeline;
-struct PipelineMesh;
+struct RenderPipeline;
+struct ComputePipeline;
 struct FileSystem;
 
 struct PipelineManager {
@@ -21,8 +21,11 @@ struct PipelineManager {
 
   void load_shader(VkShaderModule& mod, std::string path) const;
 
-  void create(Pipeline& pipe);
-  void destroy(Pipeline& pipe) const;
+  void create(RenderPipeline& pipe);
+  void destroy(RenderPipeline& pipe) const;
+
+  void create(ComputePipeline& pipe);
+  void destroy(ComputePipeline& pipe) const;
 
  private:
   VkDevice m_device{VK_NULL_HANDLE};

@@ -1,18 +1,18 @@
+#include <xev/filesystem/fs.h>
 #include <xev/logger.h>
 #include <xev/pipeline/pipeline.h>
 #include <xev/pipeline/pipeline_mesh.h>
 #include <xev/pipeline_manager.h>
 #include <fstream>
 #include <vector>
-#include <xev/filesystem/fs.h>
 
 namespace xev {
 
-void PipelineManager::create(Pipeline& pipe) {
+void PipelineManager::create(RenderPipeline& pipe) {
   VkPushConstantRange pushConstRange = {
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       .offset = 0,
-      .size = pipe.pipeInfo.pushConstSize,
+      .size = pipe.info.pushConstSize,
   };
   VkPipelineLayoutCreateInfo layoutInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -32,7 +32,7 @@ void PipelineManager::create(Pipeline& pipe) {
   };
 
   VkPipelineColorBlendAttachmentState blendAttachments;
-  if (!pipe.pipeInfo.enableBlending) {
+  if (!pipe.info.enableBlending) {
     blendAttachments = {
         .blendEnable = VK_FALSE,
         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -66,7 +66,7 @@ void PipelineManager::create(Pipeline& pipe) {
 
   std::vector<VkDynamicState> dynamicStates{VK_DYNAMIC_STATE_VIEWPORT,
                                             VK_DYNAMIC_STATE_SCISSOR};
-  if (pipe.pipeInfo.dynamicDepth) {
+  if (pipe.info.dynamicDepth) {
     dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
   }
 
@@ -77,20 +77,20 @@ void PipelineManager::create(Pipeline& pipe) {
   };
   VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-      .topology = pipe.pipeInfo.topology,
+      .topology = pipe.info.topology,
       .primitiveRestartEnable = VK_FALSE,
   };
   VkPipelineRasterizationStateCreateInfo rasterizerState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .polygonMode = pipe.pipeInfo.polygonMode,
-      .cullMode = pipe.pipeInfo.cullMode,
-      .frontFace = pipe.pipeInfo.frontFace,
+      .polygonMode = pipe.info.polygonMode,
+      .cullMode = pipe.info.cullMode,
+      .frontFace = pipe.info.frontFace,
       .lineWidth = 1.f,
   };
   VkPipelineMultisampleStateCreateInfo multisamplingState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .sampleShadingEnable = VK_FALSE,
-      .rasterizationSamples = pipe.pipeInfo.multisampleCount,
+      .rasterizationSamples = pipe.info.multisampleCount,
       .minSampleShading = 1.0f,
   };
   VkPipelineDepthStencilStateCreateInfo depthStencilState = {
@@ -103,7 +103,7 @@ void PipelineManager::create(Pipeline& pipe) {
       .minDepthBounds = 0.f,
       .maxDepthBounds = 1.f,
   };
-  if (pipe.pipeInfo.enableDepth == false) {
+  if (pipe.info.enableDepth == false) {
     depthStencilState.depthTestEnable = VK_FALSE;
     depthStencilState.depthWriteEnable = VK_FALSE;
     depthStencilState.depthCompareOp = VK_COMPARE_OP_NEVER;
@@ -111,15 +111,15 @@ void PipelineManager::create(Pipeline& pipe) {
   VkPipelineRenderingCreateInfo renderInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
       .colorAttachmentCount = 1,
-      .pColorAttachmentFormats = &pipe.pipeInfo.colorFormat,
-      .depthAttachmentFormat = pipe.pipeInfo.depthFormat,
+      .pColorAttachmentFormats = &pipe.info.colorFormat,
+      .depthAttachmentFormat = pipe.info.depthFormat,
   };
 
   VkShaderModule shaderVert, shaderFrag;
-  XEV_INFO("pipe vert src: {}", pipe.pipeInfo.shaderVertSrc);
-  XEV_INFO("enable depth: {}", pipe.pipeInfo.enableDepth);
-  load_shader(shaderVert, pipe.pipeInfo.shaderVertSrc);
-  load_shader(shaderFrag, pipe.pipeInfo.shaderFragSrc);
+  XEV_INFO("pipe vert src: {}", pipe.info.shaderVertSrc);
+  XEV_INFO("enable depth: {}", pipe.info.enableDepth);
+  load_shader(shaderVert, pipe.info.shaderVertSrc);
+  load_shader(shaderFrag, pipe.info.shaderFragSrc);
   VkPipelineShaderStageCreateInfo vertStage = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -157,20 +157,64 @@ void PipelineManager::create(Pipeline& pipe) {
   res_ =
       vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1,
                                 &pipelineCreateInfo, nullptr, &pipe.pipeline);
-  XEV_ASSERT_VK(res_, "Failed to create graphics pipeline");
+  XEV_ASSERT_VK(res_, "Failed to create render pipeline");
 
   vkDestroyShaderModule(m_device, shaderVert, nullptr);
   vkDestroyShaderModule(m_device, shaderFrag, nullptr);
 }
 
-void PipelineManager::destroy(Pipeline& pipe) const {
+void PipelineManager::destroy(RenderPipeline& pipe) const {
+  vkDestroyPipelineLayout(m_device, pipe.layout, nullptr);
+  vkDestroyPipeline(m_device, pipe.pipeline, nullptr);
+}
+
+void PipelineManager::create(ComputePipeline& pipe) {
+  VkPushConstantRange pushConstRange = {
+      .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+      .offset = 0,
+      .size = pipe.info.pushConstSize,
+  };
+  VkPipelineLayoutCreateInfo layoutInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &m_descSetLayout,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &pushConstRange,
+  };
+  VkResult res_ =
+      vkCreatePipelineLayout(m_device, &layoutInfo, nullptr, &pipe.layout);
+  XEV_ASSERT_VK(res_, "Failed to create pipeline layout");
+
+  VkShaderModule shader;
+  load_shader(shader, pipe.info.shaderSrc);
+
+  VkPipelineShaderStageCreateInfo stage = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+      .module = shader,
+      .pName = "main",
+  };
+
+  VkComputePipelineCreateInfo pipeInfo = {
+      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+      .stage = stage,
+      .layout = pipe.info.Layout,
+  };
+
+  res_ = vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &pipeInfo,
+                                  nullptr, &pipe.pipeline);
+  XEV_ASSERT_VK(res_, "Failed to create compute pipeline");
+
+  vkDestroyShaderModule(m_device, shader, nullptr);
+}
+
+void PipelineManager::destroy(ComputePipeline& pipe) const {
   vkDestroyPipelineLayout(m_device, pipe.layout, nullptr);
   vkDestroyPipeline(m_device, pipe.pipeline, nullptr);
 }
 
 void PipelineManager::load_shader(VkShaderModule& mod, std::string path) const {
   XEV_INFO("Input path: {}", path);
-
 
   std::vector<uint8_t> shader_src_ = m_fileSys.read(path);
 

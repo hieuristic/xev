@@ -1,7 +1,7 @@
 #pragma once
 #include <xev/color.h>
+#include <xev/pipeline/mesh.h>
 #include <xev/renderer.h>
-#include <xev/pipeline/pipeline_mesh.h>
 #include <xev/volk.h>
 
 namespace xev {
@@ -43,8 +43,8 @@ struct Renderer3D : public Renderer {
   void end_render(VkCommandBuffer& cmdbuf);
 
   PipelineManager& m_pipelineManager;
-  PipelineMesh m_pipelineMesh;
-  std::vector<PipelineMesh::DrawInfo> m_mesh_cmds;
+  pipe::Mesh m_pipelineMesh;
+  std::vector<pipe::Mesh::DrawInfo> m_mesh_cmds;
 };
 
 }  // namespace xev

@@ -1,14 +1,16 @@
 #pragma once
-#include <xev/geometry/aabb.h>
-#include <xev/geometry/sphere.h>
-#include <xev/resource/buffer.h>
-#include <xev/resource/resource.h>
 #include <filesystem>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <string>
 #include <vector>
+
+#include <xev/geometry/aabb.h>
+#include <xev/geometry/sphere.h>
+#include <xev/resource/buffer.h>
+#include <xev/resource/resource.h>
+#include <xev/logger.h>
 
 namespace xev {
 
@@ -56,6 +58,7 @@ struct Mesh : public Resource {
   void compute_aabb();
 
   bool has_skeleton = false;
+  bool isVisible{true};
 
  private:
   bool m_has_bs = false;

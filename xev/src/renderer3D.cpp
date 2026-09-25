@@ -2,7 +2,7 @@
 #include <xev/color.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
-#include <xev/pipeline/pipeline_mesh.h>
+#include <xev/pipeline/mesh.h>
 #include <xev/pipeline_manager.h>
 #include <xev/renderer3D.h>
 #include <xev/resource/image.h>
@@ -84,6 +84,7 @@ void Renderer3D::draw_mesh(VkCommandBuffer cmdbuf,
   m_mesh_cmds.clear();
   for (size_t i = 0; i < scene.meshes.size(); ++i) {
     auto& mesh = scene.meshes[i];
+    if (!mesh.isVisible) continue;
     PipelineMesh::DrawInfo m_cmd{
         .mesh_id = static_cast<uint32_t>(i),
         .material_id = mesh.get_material_id(),

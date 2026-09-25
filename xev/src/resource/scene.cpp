@@ -1,15 +1,17 @@
 #include <xev/filesystem/fs.h>
+#include <xev/gameplay/funcpoint.h>
 #include <xev/logger.h>
 #include <xev/resource/image.h>
 #include <xev/resource/scene.h>
 #include <xev/resource_manager.h>
-#include <xev/gameplay/funcpoint.h>
+#include <xev/string2hash.h>
 
 #include <tiny_gltf.h>
 #include <filesystem>
 #include <fstream>
 #include <glm/gtc/type_ptr.hpp>
 #include <limits>
+#include <nlohmann/json.hpp>
 
 namespace xev {
 
@@ -304,10 +306,12 @@ void Scene::load_gltf(const FileSystem& fileSys,
       glm::vec3 abs_pos = glm::vec3(abs_mat[3]);
       glm::quat abs_rot = glm::quat_cast(abs_mat);
       XEV_INFO("Camera yfov {}", camera.perspective.yfov);
-      float yfov_deg = glm::degrees(static_cast<float>(camera.perspective.yfov));
+      float yfov_deg =
+          glm::degrees(static_cast<float>(camera.perspective.yfov));
       active_cam = Camera(abs_rot, abs_pos, yfov_deg);
       if (camera.perspective.aspectRatio > 0.0) {
-        active_cam.set_aspect(static_cast<float>(camera.perspective.aspectRatio));
+        active_cam.set_aspect(
+            static_cast<float>(camera.perspective.aspectRatio));
       }
       XEV_INFO("Camera zfar {}, znear {}", active_cam.far, active_cam.near);
       cam_found = true;
@@ -328,16 +332,16 @@ void Scene::load_gltf(const FileSystem& fileSys,
     bool is_empty = (node.mesh == -1 && node.camera == -1 && node.light == -1);
     if (is_empty && !node.name.empty()) {
       glm::vec3 loc = glm::vec3(abs_mat[3]);
-      FuncPoint fp {node.name, loc};
+      FuncPoint fp{node.name, loc};
       funcPoints.push_back(fp);
-      XEV_INFO("Found funcPoint {} at {} {} {}", node.name, loc[0], loc[1], loc[2]);
+      XEV_INFO("Found funcPoint {} at {} {} {}", node.name, loc[0], loc[1],
+               loc[2]);
     }
 
     for (const int& child : node.children) {
       to_visit.push({child, abs_mat});
     }
   }
-
 
   // parse default cam
   if (!cam_found) {
@@ -648,6 +652,59 @@ void Scene::save_bin(std::filesystem::path& outFile) {
   out.write(reinterpret_cast<const char*>(&scene_buffer), sizeof(scene_buffer));
   for (auto& mesh : meshes)
     mesh.write(out);
+}
+
+void Scene::load_anim_metadata(const FileSystem& fileSys,
+                               std::string_view filepath) {
+  if (!fileSys.exists(filepath)) return;
+
+  std::vector<uint8_t> buffer = fileSys.read(filepath);
+  if (buffer.empty()) return;
+
+  try {
+    nlohmann::json root = nlohmann::json::parse(buffer.begin(), buffer.end());
+
+    if (root.contains("actions") && root["actions"].is_array()) {
+      for (const auto& actJson : root["actions"]) {
+        Action act;
+        act.id = actJson.value("id", 0);
+        if (act.id == 0 && actJson.contains("name")) {
+          act.id = string2hash(actJson["name"]);
+        }
+#ifdef XEVDEBUG
+        if (actJson.contains("name")) {
+          debugNames[act.id] = actJson["name"].get<std::string>();
+        }
+#endif
+        actions.emplace_back(std::move(act));
+      }
+    }
+
+    if (roots.contains("puppets") && roots["puppets"].is_array()) {
+      for (const auto& pupJson : root["puppets"]) {
+        Puppet pup;
+        pup.id = pupJson.value("id", 0);
+        if (pup.id == 0 && pupJson.contains("name")) {
+          pup.id = string2hash(pupJson["name"]);
+        }
+#ifdef XEVDEBUG
+        if (pupJson.contains("name")) {
+          debugNames[pup.id] = pupJson["name"].get<std::string>();
+        }
+#endif
+        if (pupJson.contains("actions") && pupJson["actions"].is_array()) {
+          for (const auto& aID : pupJson["actions"])
+            pup.actions.push_back(aID.get<uint32_t>());
+        }
+      }
+    }
+    puppets.emplace_back(pup);
+    XEV_INFO("Loaded animation metadata: {} puppets, {} actions",
+             puppets.size(), actions.size());
+
+  } catch (const std::exception& e) {
+    XEV_ERROR("Failed to load animation: {}\n{}\n", filepath, e.what());
+  }
 }
 
 }  // namespace xev

@@ -12,13 +12,13 @@ __include postprocess;
 import global_desc;
 import pbr;
 
-struct Vertex {
+struct VertexIn {
   float3 position;
   float3 normal;
   float2 uv;
 };
 
-struct VertexDebug {
+struct VertexOut {
   float4 position : SV_POSITION;
   float3 normal;
   float2 uv;
@@ -31,7 +31,7 @@ struct PushConstants {
   column_major float4x4 model_mat;
   float3 cam_xyz;
   Scene* scene_ptr;
-  Vertex* vert_ptr;
+  VertexIn* vert_ptr;
   uint32_t mat_id;
 };
 
@@ -39,9 +39,9 @@ struct PushConstants {
 uniform PushConstants pc;
 
 [shader("vertex")]
-VertexDebug main(uint32_t vid : SV_VertexID) {
-  VertexDebug vo;
-  Vertex vi = pc.vert_ptr[vid];
+VertexOut main(uint32_t vid : SV_VertexID) {
+  VertexOut vo;
+  VertexIn vi = pc.vert_ptr[vid];
   float4 world_pos = mul(pc.model_mat, float4(vi.position, 1.0));
   vo.position = mul(pc.view_proj, world_pos);
   vo.normal = normalize(mul((float3x3)pc.model_mat, vi.normal));
@@ -52,7 +52,7 @@ VertexDebug main(uint32_t vid : SV_VertexID) {
 }
 
 [shader("fragment")]
-float4 main(VertexDebug vo): SV_TARGET {
+float4 main(VertexOut vo): SV_TARGET {
 #ifdef DEBUG_MESH_DEPTH
   float r = vo.normal.z * 0.5 + 0.5;
   float g = vo.normal.z * 0.5 + 0.5;

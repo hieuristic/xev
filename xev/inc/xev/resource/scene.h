@@ -4,9 +4,13 @@
 #include <queue>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
+#include <xev/animation/action.h>
+#include <xev/animation/puppet.h>
 #include <xev/camera.h>
+#include <xev/gameplay/funcpoint.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/resource/image.h>
 #include <xev/resource/light.h>
@@ -15,7 +19,6 @@
 #include <xev/resource/resource.h>
 #include <xev/resource/sampler.h>
 #include <xev/scene_buffer.h>
-#include <xev/gameplay/funcpoint.h>
 
 namespace tinygltf {
 struct Model;
@@ -36,7 +39,8 @@ struct Scene : public Resource {
   void load_gltf(const FileSystem& fileSys,
                  std::string_view filepath,
                  uint32_t idxOffset_ = 0);
-  void save_bin(std::filesystem::path& outFile);
+  void load_anim_metadata(const FileSystem& fileSys, std::string_view filepath);
+  void save_bin(const std::filesystem::path& outFile);
   void create_test_triangle();
 
   uint64_t size_device() const override;
@@ -53,6 +57,12 @@ struct Scene : public Resource {
   std::vector<Material> materials;
   std::vector<FuncPoint> funcPoints;
   uint32_t idxOffset{0};
+
+  std::vector<Puppet> puppets;
+  std::vector<Action> actions;
+#ifdef XEVDEBUG
+  std::unordererd_map<uint32_t, std::string> debugNames;
+#endif
 
   std::vector<Camera> cameras;
 
@@ -81,7 +91,7 @@ struct Scene : public Resource {
   void parse_mesh(std::vector<Mesh>& out_meshes,
                   const tinygltf::Model& model,
                   const tinygltf::Node& node,
-                  glm::mat4 model_mat) const;
+                  const glm::mat4& model_mat) const;
 };
 
 }  // namespace xev
