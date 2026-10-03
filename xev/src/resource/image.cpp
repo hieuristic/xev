@@ -1,7 +1,7 @@
 #include <xev/common.h>
 #include <xev/logger.h>
-#include <xev/resource/image.h>
 #include <xev/resource/buffer.h>
+#include <xev/resource/image.h>
 #include <xev/resource_manager.h>
 
 namespace xev {
@@ -123,8 +123,7 @@ void Image::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   };
   manager.alloc(staging);
 
-  void* map_ = staging.alloc_info.pMappedData;
-  memcpy(map_, host_data.data(), host_data.size());
+  staging.write(host_data.data(), host_data.size());
 
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
     this->layout = VK_IMAGE_LAYOUT_UNDEFINED;

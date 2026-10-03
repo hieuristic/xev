@@ -82,10 +82,8 @@ void Mesh::upload(const ResourceManager& manager, const HotExec& hot_exec) {
     vert_data[i].uv = m_uvs[i];
   }
 
-  void* map_ = staging.alloc_info.pMappedData;
-  memcpy(map_, m_faces.data(), m_device_face.size);
-  memcpy((char*)map_ + m_device_face.size, vert_data.data(),
-         m_device_vert.size);
+  staging.write(m_faces.data(), m_device_face.size);
+  staging.write(vert_data.data(), m_device_vert.size, m_device_face.size);
 
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
     const VkBufferCopy face_reg = {

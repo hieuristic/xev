@@ -1,6 +1,6 @@
 #include <xev/global_descriptor_set.h>
 #include <xev/logger.h>
-#include <xev/pipeline/pipeline_raster.h>
+#include <xev/pipeline/raster.h>
 #include <xev/pipeline_manager.h>
 #include <xev/renderer2D.h>
 #include <xev/resource/buffer.h>
@@ -14,12 +14,12 @@ Renderer2D::Renderer2D(PipelineManager& pipelineManager,
                        ResourceManager& resourceManager,
                        uint32_t numFrameInFlight)
     : m_pipelineManager(pipelineManager), m_resourceManager(resourceManager) {
-  m_pipelineRaster.pipeInfo.colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
-  m_pipelineRaster.pipeInfo.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
+  m_pipelineRaster.info.colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+  m_pipelineRaster.info.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
   m_pipelineManager.create(m_pipelineRaster);
 
   while (numFrameInFlight--) {
-    Buffer infoBuf{MAX_DRAW_CALLS * sizeof(PipelineRaster::DrawInfo),
+    Buffer infoBuf{MAX_DRAW_CALLS * sizeof(pipe::Raster::DrawInfo),
                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                    VMA_MEMORY_USAGE_AUTO};
@@ -69,8 +69,8 @@ void Renderer2D::draw(VkCommandBuffer cmdbuf,
   descSet.bind(cmdbuf, m_pipelineRaster.layout);
   prepare_attachments(cmdbuf, colorImage);
 
-  memcpy(m_drawInfoBuffers[0].alloc_info.pMappedData, m_drawInfos.data(),
-         m_drawInfos.size() * sizeof(m_drawInfos[0]));
+  m_drawInfoBuffers[0].write(m_drawInfos.data(),
+                             m_drawInfos.size() * sizeof(m_drawInfos[0]));
   begin_render(cmdbuf, colorImage, clearColor, clear);
   m_pipelineRaster.draw(cmdbuf, m_drawInfoBuffers[0].addr, m_drawInfos.size(),
                         colorImage.width, colorImage.height);
@@ -92,7 +92,7 @@ void Renderer2D::draw_text(const Font& font,
 
     // TODO: maybe move the transform to the GPU and just
     // add another field called offset ?
-    m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
+    m_drawInfos.emplace_back(pipe::Raster::DrawInfo{
         .transform = transform * font.transform(offset, c),
         .uvBounds = font.atlas_bounds(c),
         .texID = font.tex_id(),
@@ -105,7 +105,7 @@ void Renderer2D::draw_text(const Font& font,
 void Renderer2D::draw_image(glm::mat3 transform,
                             glm::vec4 uvBounds,
                             uint32_t texID) {
-  m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
+  m_drawInfos.emplace_back(pipe::Raster::DrawInfo{
       .transform = transform,
       .uvBounds = uvBounds,
       .texID = texID,
@@ -114,7 +114,7 @@ void Renderer2D::draw_image(glm::mat3 transform,
 }
 
 void Renderer2D::draw_rect(glm::mat3 transform, glm::vec3 color) {
-  m_drawInfos.emplace_back(PipelineRaster::DrawInfo{
+  m_drawInfos.emplace_back(pipe::Raster::DrawInfo{
       .transform = transform,
       .uvBounds = glm::vec4(0.0, 0.0, 1.0, 1.0),
       .color = color,

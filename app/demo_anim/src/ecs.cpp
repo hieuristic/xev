@@ -1,0 +1,98 @@
+#include <SDL3/SDL.h>
+#include <cmath>
+#include <glm/gtc/matrix_transform.hpp>
+#include <string>
+
+#include <xev/camera.h>
+#include <xev/resource/scene.h>
+
+#include "character.h"
+#include "ecs.h"
+
+namespace ecs::sys {
+
+void init(entt::registry& registry,
+          xev::Scene& scene,
+          entt::entity& player,
+          entt::entity& map) {
+  registry.clear();
+
+  player = registry.create();
+  registry.emplace<com::Player>(player);
+  registry.emplace<com::Transform>(player);
+  registry.emplace<com::Movement>(player);
+
+  map = registry.create();
+  registry.emplace<com::Transform>(map);
+
+  // bind meshes to player or map
+  for (uint32_t i = 0; i < scene.meshes.size(); ++i) {
+    auto& mesh = scene.meshes[i];
+    const std::string& name = mesh.get_name();
+
+    // Hide any legacy player models (e.g. player.*, hieu.*, ngok.*)
+    bool isLegacyPlayer = name.rfind("player", 0) == 0 ||
+                          name.rfind("hieu", 0) == 0 ||
+                          name.rfind("ngok", 0) == 0;
+    if (isLegacyPlayer) {
+      // mesh.set_model_mat(glm::mat4(0.0f));
+      mesh.isVisible = false;
+      continue;
+    }
+
+    bool isMap = name.rfind("ground", 0) == 0 ||
+                 name.rfind("Plane", 0) == 0 ||
+                 name.rfind("map", 0) == 0 ||
+                 name.rfind("Grid", 0) == 0;
+
+    auto e = registry.create();
+    if (!isMap) {
+      XEV_INFO(mesh.get_name());
+      registry.emplace<com::Mesh>(e, player, i, mesh.get_model_mat());
+    } else {
+      registry.emplace<com::Mesh>(e, map, i, mesh.get_model_mat());
+    }
+  }
+}
+
+constexpr glm::vec3 forward = glm::vec3(0.0f, 0.0f, 1.0f);
+constexpr glm::vec3 right = glm::vec3(1.0f, 0.0, 0.0);
+constexpr glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
+
+void movement(entt::registry& registry, float dt, const bool* keys) {
+  auto view = registry.view<com::Transform, com::Movement, com::Player>();
+  for (auto [entity, transform, movement] : view.each()) {
+    glm::vec3 moveDir{0.0f};
+    if (keys[SDL_SCANCODE_W]) moveDir += forward;
+    if (keys[SDL_SCANCODE_S]) moveDir -= forward;
+    if (keys[SDL_SCANCODE_A]) moveDir -= right;
+    if (keys[SDL_SCANCODE_D]) moveDir += right;
+    if (keys[SDL_SCANCODE_SPACE]) moveDir += up;
+    if (keys[SDL_SCANCODE_LSHIFT]) moveDir -= up;
+    movement.velocity = (glm::length(moveDir) > 0.001f)
+                            ? glm::normalize(moveDir) * movement.speed
+                            : glm::vec3(0.0f);
+    transform.pos += movement.velocity * dt;
+  }
+}
+
+void transform(entt::registry& registry) {
+  auto view = registry.view<com::Transform>();
+  for (auto [entity, t] : view.each()) {
+    t.world_mat =
+        glm::translate(glm::mat4(1.0f), t.pos) * glm::mat4_cast(t.rot);
+  }
+}
+
+void render_sync(entt::registry& registry, xev::Scene& scene) {
+  auto view = registry.view<com::Mesh>();
+  for (auto [entity, mesh_comp] : view.each()) {
+    if (!registry.valid(mesh_comp.owner)) continue;
+    if (mesh_comp.meshIdx >= scene.meshes.size()) continue;
+    const auto& parent = registry.get<com::Transform>(mesh_comp.owner);
+    scene.meshes[mesh_comp.meshIdx].set_model_mat(parent.world_mat *
+                                                  mesh_comp.localOffset);
+  }
+}
+
+}  // namespace ecs::sys

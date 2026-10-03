@@ -4,7 +4,7 @@
 #include <xev/resource/image.h>
 #include <xev/resource/scene.h>
 #include <xev/resource_manager.h>
-#include <xev/string2hash.h>
+#include <xev/util/string_hash.h>
 
 #include <tiny_gltf.h>
 #include <filesystem>
@@ -12,6 +12,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 namespace xev {
 
@@ -20,7 +21,7 @@ Scene::Scene() {}
 void Scene::parse_mesh(std::vector<Mesh>& meshes,
                        const tinygltf::Model& model,
                        const tinygltf::Node& node,
-                       glm::mat4 model_mat) const {
+                       const glm::mat4& model_mat) const {
   std::string name = node.name;
 
   const tinygltf::Mesh& gltf_mesh = model.meshes[node.mesh];
@@ -417,9 +418,7 @@ void Scene::upload_images(const ResourceManager& manager,
     };
     manager.alloc(staging);
 
-    void* map_ = staging.alloc_info.pMappedData;
-    memcpy(map_, img.host_data.data(), size);
-
+    staging.write(img.host_data.data(), size);
     stagings.emplace_back(staging);
   }
 
@@ -557,10 +556,7 @@ void Scene::upload_scene(const ResourceManager& manager,
   Buffer staging{size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
 
-  {
-    void* map_ = staging.alloc_info.pMappedData;
-    memcpy(map_, &scene_buffer, size);
-  }
+  staging.write(&scene_buffer, size);
 
   scene_device.size = size;
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
@@ -643,7 +639,7 @@ void Scene::destroy(const ResourceManager& manager) {
   meshes.clear();
 }
 
-void Scene::save_bin(std::filesystem::path& outFile) {
+void Scene::save_bin(const std::filesystem::path& outFile) {
   XEV_ASSERT(!std::filesystem::exists(outFile), "Writing to an existing file!");
   std::ofstream out(outFile, std::ios::binary);
   XEV_ASSERT(out.is_open());
@@ -669,7 +665,7 @@ void Scene::load_anim_metadata(const FileSystem& fileSys,
         Action act;
         act.id = actJson.value("id", 0);
         if (act.id == 0 && actJson.contains("name")) {
-          act.id = string2hash(actJson["name"]);
+          act.id = string2hash(actJson["name"].get<std::string>());
         }
 #ifdef XEVDEBUG
         if (actJson.contains("name")) {
@@ -680,12 +676,12 @@ void Scene::load_anim_metadata(const FileSystem& fileSys,
       }
     }
 
-    if (roots.contains("puppets") && roots["puppets"].is_array()) {
+    if (root.contains("puppets") && root["puppets"].is_array()) {
       for (const auto& pupJson : root["puppets"]) {
         Puppet pup;
         pup.id = pupJson.value("id", 0);
         if (pup.id == 0 && pupJson.contains("name")) {
-          pup.id = string2hash(pupJson["name"]);
+          pup.id = string2hash(pupJson["name"].get<std::string>());
         }
 #ifdef XEVDEBUG
         if (pupJson.contains("name")) {
@@ -696,9 +692,9 @@ void Scene::load_anim_metadata(const FileSystem& fileSys,
           for (const auto& aID : pupJson["actions"])
             pup.actions.push_back(aID.get<uint32_t>());
         }
+        puppets.emplace_back(pup);
       }
     }
-    puppets.emplace_back(pup);
     XEV_INFO("Loaded animation metadata: {} puppets, {} actions",
              puppets.size(), actions.size());
 

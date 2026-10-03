@@ -5,7 +5,7 @@
 
 namespace xev {
 
-uint32_t string2hash(std::string_view sv) {
+inline uint32_t string2hash(std::string_view sv) {
   return std::hash<std::string_view>{}(sv);
 }
 

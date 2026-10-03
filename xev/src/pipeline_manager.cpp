@@ -1,7 +1,7 @@
 #include <xev/filesystem/fs.h>
 #include <xev/logger.h>
+#include <xev/pipeline/mesh.h>
 #include <xev/pipeline/pipeline.h>
-#include <xev/pipeline/pipeline_mesh.h>
 #include <xev/pipeline_manager.h>
 #include <fstream>
 #include <vector>
@@ -198,7 +198,7 @@ void PipelineManager::create(ComputePipeline& pipe) {
   VkComputePipelineCreateInfo pipeInfo = {
       .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
       .stage = stage,
-      .layout = pipe.info.Layout,
+      .layout = pipe.layout,
   };
 
   res_ = vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &pipeInfo,

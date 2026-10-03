@@ -1,11 +1,11 @@
+#include <stb_image.h>
+#include <xev/filesystem/fs.h>
 #include <xev/hot_exec.h>
 #include <xev/logger.h>
 #include <xev/resource/buffer.h>
 #include <xev/resource/image.h>
 #include <xev/resource/sampler.h>
 #include <xev/resource_manager.h>
-#include <stb_image.h>
-#include <xev/filesystem/fs.h>
 
 namespace xev {
 
@@ -18,8 +18,7 @@ ResourceManager::ResourceManager(VkInstance instance,
 }
 
 ResourceManager::~ResourceManager() {
-  if (m_allocator != nullptr)
-    vmaDestroyAllocator(m_allocator);
+  if (m_allocator != nullptr) vmaDestroyAllocator(m_allocator);
 }
 
 void ResourceManager::init_allocator(VkInstance instance,
@@ -91,8 +90,7 @@ void ResourceManager::upload(const HotExec& hotExec,
   {
     uint64_t offset_ = 0;
     for (uint32_t i = 0; i < dsts.size(); i++) {
-      memcpy((char*)staging.alloc_info.pMappedData + offset_, srcs[i],
-             sizes[i]);
+      staging.write(srcs[i], sizes[i], offset_);
       offset_ += sizes[i];
     }
   }

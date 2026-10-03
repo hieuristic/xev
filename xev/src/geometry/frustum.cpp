@@ -1,4 +1,6 @@
+#include <xev/camera.h>
 #include <xev/geometry/frustum.h>
+#include <xev/geometry/sphere.h>
 
 namespace xev {
 
@@ -39,10 +41,14 @@ Frustum::Frustum(const Camera& camera) {
 
   glm::vec3 n_near = forward;
   glm::vec3 n_far = -forward;
-  glm::vec3 n_right = glm::normalize(glm::cross(up, forward + right * tan_half_x));
-  glm::vec3 n_left = glm::normalize(glm::cross(forward - right * tan_half_x, up));
-  glm::vec3 n_top = glm::normalize(glm::cross(right, forward - down * tan_half_y));
-  glm::vec3 n_bot = glm::normalize(glm::cross(forward + down * tan_half_y, right));
+  glm::vec3 n_right =
+      glm::normalize(glm::cross(up, forward + right * tan_half_x));
+  glm::vec3 n_left =
+      glm::normalize(glm::cross(forward - right * tan_half_x, up));
+  glm::vec3 n_top =
+      glm::normalize(glm::cross(right, forward - down * tan_half_y));
+  glm::vec3 n_bot =
+      glm::normalize(glm::cross(forward + down * tan_half_y, right));
 
   auto make_plane = [](const glm::vec3& n, const glm::vec3& p) -> glm::vec4 {
     return {n.x, n.y, n.z, -glm::dot(n, p)};
@@ -61,8 +67,7 @@ Frustum::~Frustum() {}
 bool Frustum::contains(const Sphere& sphere) {
   for (const auto& plane : m_planes) {
     float d = glm::dot(glm::vec3(plane), sphere.origin) + plane.w;
-    if (d < -sphere.radius)
-      return true;
+    if (d < -sphere.radius) return true;
   }
   return false;
 }

@@ -42,8 +42,8 @@ Font::Font(const ResourceManager& manager,
       VMA_MEMORY_USAGE_AUTO,
   };
   manager.alloc(staging);
-  void* map_ = staging.alloc_info.pMappedData;
-  memcpy(map_, m_atlas.host_data.data(), m_atlas.host_data.size());
+  staging.write(m_atlas.host_data.data(), m_atlas.host_data.size());
+
   hotExec.run([&](const VkCommandBuffer cmdbuf) {
     m_atlas.layout = VK_IMAGE_LAYOUT_UNDEFINED;
     m_atlas.update_layout(cmdbuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);

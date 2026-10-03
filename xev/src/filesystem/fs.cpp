@@ -1,3 +1,6 @@
+
+#include <string_view>
+
 #include <tiny_gltf.h>
 #include <xev/filesystem/fs.h>
 #include <xev/filesystem/mount.h>
@@ -18,6 +21,10 @@ void FileSystem::init_thread_pool(uint32_t numThreads) const {
 
 void FileSystem::destroy_thread_pool() {
   m_threadPool.reset();
+}
+
+bool FileSystem::exists(std::string_view filepath) const {
+  return find_mnt(filepath) != fs::INVALID_MOUNT;
 }
 
 // IMPORTANT: This always return idx + 1
@@ -45,8 +52,7 @@ std::future<std::vector<uint8_t>> FileSystem::read_async(
     std::string_view filepath,
     uint64_t offset,
     uint64_t count) const {
-  if (m_threadPool == nullptr)
-    init_thread_pool();
+  if (m_threadPool == nullptr) init_thread_pool();
 
   return m_threadPool->submit(
       [this, p = std::string(filepath), offset, count]() {

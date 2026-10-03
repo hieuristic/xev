@@ -1,0 +1,206 @@
+#include <SDL3/SDL.h>
+#include <atomic>
+#include <filesystem>
+#include <glm/gtc/matrix_transform.hpp>
+#include <string>
+#include <thread>
+
+#include <xev/engine.h>
+#include <xev/filesystem/fs.h>
+#include <xev/filesystem/loose.h>
+#include <xev/frame_context.h>
+#include <xev/global_descriptor_set.h>
+#include <xev/hot_exec.h>
+#include <xev/pipeline_manager.h>
+#include <xev/renderer2D.h>
+#include <xev/renderer3D.h>
+#include <xev/resource/scene.h>
+#include <xev/resource_manager.h>
+#include <xev/ui/font.h>
+#include <xev/window.h>
+
+#include "character.h"
+#include "ecs.h"
+#include "game.h"
+#include "gui.h"
+
+Game::Game() : m_running(true) {
+  m_window = std::make_unique<xev::Window>("demo_anim", 800, 600);
+
+  SDL_SetWindowRelativeMouseMode(m_window->get_native(), m_isMouseCaptured);
+
+  const char* base = SDL_GetBasePath();
+  std::filesystem::path basePath = base ? std::filesystem::path(base) / ".."
+                                        : std::filesystem::current_path();
+  m_assetsPath = basePath / "assets";
+
+  m_engine = std::make_unique<xev::Engine>(m_window->get_native());
+  m_engine->init_file_system();
+  m_engine->fileSys->mount(xev::LooseMount{m_assetsPath});
+  m_engine->init_swapchain();
+  m_engine->init_resource_manager();
+  m_engine->init_hot_exec();
+  m_engine->init_global_descriptor_set();
+  m_engine->init_pipeline_manager();
+  m_engine->init_frame_context();
+
+  m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
+  m_renderer2D = std::make_unique<xev::Renderer2D>(
+      *m_engine->pipelineManager, *m_engine->resourceManager,
+      m_engine->frameContext->get_num_frames());
+
+  m_font = std::make_unique<xev::Font>(
+      *m_engine->resourceManager, *m_engine->hotExec, *m_engine->fileSys,
+      "fonts/akkurat.bin", "fonts/akkurat.json");
+
+  m_font->bind(*m_engine->globalDescriptorSet, 0);
+
+  m_gui = std::make_unique<GUI>(static_cast<float>(m_window->width()),
+                                static_cast<float>(m_window->height()),
+                                *m_renderer2D, *m_font);
+}
+
+Game::~Game() {
+  if (m_scene && m_scene->on_device()) {
+    m_scene->destroy(*m_engine->resourceManager);
+  }
+}
+
+void Game::handle_input(std::atomic<bool>& sceneReady) {
+  uint64_t now = SDL_GetTicks();
+  m_dt = static_cast<float>(now - m_tick) / 1000.0f;
+  m_tick = now;
+
+  uint32_t mouseButtons = SDL_GetMouseState(&m_mouseX, &m_mouseY);
+  m_isMouseDown = (mouseButtons & SDL_BUTTON_LMASK) != 0;
+
+  // input handling
+  SDL_Event event;
+  while (SDL_PollEvent(&event)) {
+    if (event.type == SDL_EVENT_QUIT) {
+      m_running = false;
+    }
+    if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && m_window &&
+        event.window.windowID == SDL_GetWindowID(m_window->get_native())) {
+      m_running = false;
+    }
+    if (event.type == SDL_EVENT_KEY_DOWN) {
+      if (event.key.key == SDLK_ESCAPE) {
+        m_running = false;
+      }
+      if (event.key.key == SDLK_Q) {
+        m_isMouseCaptured = !m_isMouseCaptured;
+        SDL_SetWindowRelativeMouseMode(m_window->get_native(),
+                                       m_isMouseCaptured);
+      }
+    }
+    if (event.type == SDL_EVENT_MOUSE_MOTION && m_isMouseCaptured) {
+      m_mouseRelX += event.motion.xrel;
+      m_mouseRelY += event.motion.yrel;
+    }
+  }
+}
+
+void Game::render(std::atomic<bool>& sceneReady) {
+  VkCommandBuffer cmdbuf = m_engine->frameContext->acquire_frame();
+  if (cmdbuf != VK_NULL_HANDLE) {
+    const xev::Image& output_color =
+        m_engine->frameContext->get_current_render_target();
+
+    auto check_scene = [&] {
+      if (!m_scene->on_device() && sceneReady.load(std::memory_order_acquire)) {
+        m_scene->alloc(*m_engine->resourceManager);
+        m_scene->upload(*m_engine->resourceManager, *m_engine->hotExec);
+        m_scene->bind(*m_engine->globalDescriptorSet);
+        m_scene->active_cam.set_aspect(m_window->get_aspect());
+      }
+    };
+
+    switch (m_state) {
+      case GameState::Hauptmenu: {
+        check_scene();
+        m_gui->draw_hauptmenu(glm::vec2(m_mouseX, m_mouseY), m_isMouseDown,
+                              m_state, m_running);
+        break;
+      }
+      case GameState::Loading: {
+        check_scene();
+        if (!m_scene->on_device()) m_gui->draw_loading_screen();
+        break;
+      }
+      case GameState::Gameplay: {
+        const xev::Image& output_depth =
+            m_engine->frameContext->get_current_render_depth();
+
+        if (m_scene && m_scene->on_device()) {
+          m_renderer3D->draw(cmdbuf, output_color, output_depth,
+                             *m_engine->globalDescriptorSet, *m_scene,
+                             m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+        }
+        m_gui->draw_gameplay();
+        break;
+      }
+    };
+
+    bool shouldClear = (m_state != GameState::Gameplay);
+    m_renderer2D->draw(cmdbuf, output_color, *m_engine->globalDescriptorSet,
+                       m_engine->frameContext->get_current_index(),
+                       {0.1f, 0.1f, 0.1f, 1.0f}, shouldClear);
+    m_engine->submit_and_show(cmdbuf, output_color);
+  }
+}
+
+void Game::run() {
+  if (!m_running) return;
+
+  m_scene = std::make_unique<xev::Scene>();
+  std::atomic<bool> sceneReady;
+
+  std::thread scene_loader([this, &sceneReady]() {
+    std::string glbPath = "models/player_anim.glb";
+    if (!std::filesystem::exists(m_assetsPath / glbPath)) {
+      glbPath = "models/player.glb";
+    }
+    m_scene->load_gltf(*m_engine->fileSys, glbPath, 1);
+    sceneReady.store(true, std::memory_order_release);
+  });
+
+  while (m_running) {
+    handle_input(sceneReady);
+
+    switch (m_state) {
+      case GameState::Gameplay: {
+        auto& playerTransform = m_registry.get<ecs::com::Transform>(m_player);
+        auto& playerMovement = m_registry.get<ecs::com::Movement>(m_player);
+        m_controller.update(m_dt, m_mouseRelX, m_mouseRelY,
+                            SDL_GetKeyboardState(nullptr), playerTransform,
+                            playerMovement, m_scene->active_cam);
+
+        ecs::sys::transform(m_registry);
+        ecs::sys::render_sync(m_registry, *m_scene);
+        break;
+      }
+      case GameState::Loading: {
+        if (m_scene->on_device()) {
+          m_state = GameState::Gameplay;
+
+          ecs::sys::init(m_registry, *m_scene, m_player, m_map);
+
+          m_isMouseCaptured = true;
+          SDL_SetWindowRelativeMouseMode(m_window->get_native(),
+                                         m_isMouseCaptured);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    m_mouseRelX = 0.0f;
+    m_mouseRelY = 0.0f;
+    render(sceneReady);
+  }
+
+  if (scene_loader.joinable()) {
+    scene_loader.join();
+  }
+}

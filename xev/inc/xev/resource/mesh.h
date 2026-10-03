@@ -8,9 +8,9 @@
 
 #include <xev/geometry/aabb.h>
 #include <xev/geometry/sphere.h>
+#include <xev/logger.h>
 #include <xev/resource/buffer.h>
 #include <xev/resource/resource.h>
-#include <xev/logger.h>
 
 namespace xev {
 

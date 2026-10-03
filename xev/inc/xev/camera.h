@@ -4,7 +4,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <xev/geometry/frustum.h>
+
 namespace xev {
+
+struct Mesh;
 
 enum CAMERA_TYPE {
   CAM_PERSPECTIVE,
@@ -25,6 +29,7 @@ struct Camera {
   glm::mat4 create_view_mat() const;
   glm::mat4 create_proj_mat() const;
   glm::mat4 create_vp_mat() const;
+  void compute_frustum();
 
   void set_aspect(float aspect);
   void set_fov_deg(float deg);
@@ -32,8 +37,11 @@ struct Camera {
   float ev100() const;
   float exposure() const;
 
+  bool can_see(Mesh& mesh) const;
+
   glm::quat rot;
   glm::vec3 pos;
+  Frustum frustum;
 
   float aperture = 2.8f;
   float shutter_freq = 125.0f;

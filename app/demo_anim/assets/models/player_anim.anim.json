@@ -1,0 +1,41 @@
+{
+  "scene": "scene",
+  "puppet": [
+    {
+      "id": 748274432,
+      "name": "player",
+      "meshes": [
+        1,
+        2
+      ],
+      "actions": [
+        47364266,
+        2686853648,
+        4162136220
+      ]
+    }
+  ],
+  "action": [
+    {
+      "id": 47364266,
+      "name": "hit",
+      "track": "hit",
+      "frame_start": 1.0,
+      "frame_end": 88.0
+    },
+    {
+      "id": 2686853648,
+      "name": "walk",
+      "track": "walk",
+      "frame_start": 0.0,
+      "frame_end": 41.0
+    },
+    {
+      "id": 4162136220,
+      "name": "dance",
+      "track": "dance",
+      "frame_start": 0.0,
+      "frame_end": 185.0
+    }
+  ]
+}

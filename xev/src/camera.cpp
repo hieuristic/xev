@@ -1,12 +1,19 @@
 #include <cmath>
 
 #include <xev/camera.h>
+#include <xev/frustum.h>
+#include <xev/geometry/sphere.h>
 
 namespace xev {
+
+void Camera::compute_frustum() {
+  ;
+}
 
 Camera::Camera() {
   rot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
   pos = glm::vec3(0.0f);
+  compute_frustum();
 }
 
 Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fov_deg) {
@@ -14,6 +21,7 @@ Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fov_deg) {
   pos = pos_;
   fovx_rad = glm::radians(fov_deg);
   fovy_rad = glm::radians(fov_deg);
+  compute_frustum();
 }
 
 Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fovx_deg, float fovy_deg) {
@@ -21,6 +29,7 @@ Camera::Camera(glm::quat rot_, glm::vec3 pos_, float fovx_deg, float fovy_deg) {
   pos = pos_;
   fovx_rad = glm::radians(fovx_deg);
   fovy_rad = glm::radians(fovy_deg);
+  compute_frustum();
 }
 
 Camera::Camera(glm::quat rot_,
@@ -35,6 +44,7 @@ Camera::Camera(glm::quat rot_,
   fovy_rad = glm::radians(fovy_deg);
   shift_x = shift_x_;
   shift_y = shift_y_;
+  compute_frustum();
 }
 
 glm::mat4 Camera::create_view_mat() const {
@@ -65,11 +75,13 @@ glm::mat4 Camera::create_vp_mat() const {
 void Camera::set_aspect(float aspect_) {
   aspect = aspect_;
   fovx_rad = 2.0f * std::atan(aspect * std::tan(fovy_rad * 0.5f));
+  compute_frustum();
 }
 
 void Camera::set_fov_deg(float deg) {
   fovy_rad = glm::radians(deg);
   fovx_rad = 2.0f * std::atan(aspect * std::tan(fovy_rad * 0.5f));
+  compute_frustum();
 }
 
 float Camera::ev100() const {
@@ -78,6 +90,12 @@ float Camera::ev100() const {
 
 float Camera::exposure() const {
   return 1.0f / (1.2f * std::pow(2.0f, ev100()));
+}
+
+bool Camera::can_see(Mesh& mesh) const {
+  Sphere s;
+  mesh.get_bs(s);
+  return frustum.contains(s);
 }
 
 }  // namespace xev

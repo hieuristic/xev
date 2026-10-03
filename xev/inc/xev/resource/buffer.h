@@ -25,11 +25,9 @@ struct Buffer : Resource {
   uint64_t size_device() const override { return size; }
   bool on_device() const override { return buffer != VK_NULL_HANDLE; }
 
-  void upload(VkCommandBuffer cmdbuf,
-              const Buffer& staging_buffer,
-              void* src,
-              uint64_t size,
-              uint64_t offset);
+  void write(const void* src, uint64_t size, uint64_t offset = 0);
+  void set_ptr(uint64_t new_ptr);
+  void clear();
 };
 
 }  // namespace xev
