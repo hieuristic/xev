@@ -10,7 +10,8 @@
 
 namespace xev {
 
-Renderer3D::Renderer3D(PipelineManager& manager) : m_pipelineManager(manager) {
+Renderer3D::Renderer3D(PipelineManager& manager, uint32_t numFrames)
+    : m_pipelineManager(manager) {
   m_pipeMesh.info.colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
   m_pipeMesh.info.depthFormat = VK_FORMAT_R8G8B8A8_UNORM;
   m_pipeMesh.info.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
@@ -98,15 +99,14 @@ void Renderer3D::draw(VkCommandBuffer cmdbuf,
     pipe::Mesh::DrawInfo m_meshInfo{
         .meshId = static_cast<uint32_t>(i),
         .materialId = mesh.get_material_id(),
-        .toWorld = mesh.get_model_mat(),
-        .isSkinned = false,
-        .skinnedMeshAddress = 0,
     };
     m_meshInfos.push_back(m_meshInfo);
 
     if (!mesh.has_skinned) continue;
 
-    pipe::Skinning::DispatchInfo m_skinningInfo{,};
+    pipe::Skinning::DispatchInfo m_skinningInfo{
+        ,
+    };
     m_pipeSkinning.dispatch(cmbuf, mesh,
   }
 

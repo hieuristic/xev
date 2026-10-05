@@ -19,6 +19,7 @@ function(xev_add_app NAME)
         "${CMAKE_SOURCE_DIR}/xev/src/shaders/mesh.slang"
         "${CMAKE_SOURCE_DIR}/xev/src/shaders/triangle.slang"
         "${CMAKE_SOURCE_DIR}/xev/src/shaders/raster.slang"
+        "${CMAKE_SOURCE_DIR}/xev/src/shaders/skinning.slang"
     )
 
     # Symlink assets if the app has an assets folder

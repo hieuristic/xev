@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include <xev/animation/skeleton.h>
 
 namespace xev {
 
@@ -8,8 +7,8 @@ struct Action;
 
 struct Puppet {
   uint32_t id{0};
-  Skeleton skeleton;
-  std::vector<uint32_t> meshes;
+  uint32_t skeleton_id{0};
+  std::vector<uint32_t> mesh_ids;
   std::vector<uint32_t> actions;
 };
 

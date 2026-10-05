@@ -1,24 +1,22 @@
 #pragma once
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <glm/glm.hpp>
 
-#include <xev/geomtry/group.h>
+#include <xev/geometry/group.h>
 
 namespace xev {
 
-struct Bone {
-  Sim3 T;
-#ifdef XEVDEBUG
-  std::string name;
-#endif
-};
-
 struct Skeleton {
-  std::vector<uint32_t> parentIndices;
+  uint32_t id{0};
+  std::vector<uint16_t> parentIndices;
   std::vector<glm::mat4> invBindMats;
-  std::vector<Bone> bones;
+  std::vector<Sim3> pose;
+#ifdef XEVDEBUG
+  std::vector<std::string> boneNames;
+#endif
 };
 
 }  // namespace xev

@@ -46,7 +46,8 @@ void Mesh::draw(VkCommandBuffer cmdbuf,
         .modelMat = mesh.get_model_mat(),
         .camXYZ = camera.pos,
         .sceneBuffer = scene.scene_device.addr,
-        .vertexBuffer = mesh.get_vert_addr(),
+        .vertexBuffer = mesh.is_skinned() ? mesh.get_skinned_vert_addr()
+                                          : mesh.get_vert_addr(),
         .matID = mesh.get_material_id(),
     };
 

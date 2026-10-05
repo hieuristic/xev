@@ -2,7 +2,12 @@
 
 module skinning;
 
-import mesh;
+// import mesh;
+struct Vertex {
+  float3 position;
+  float3 normal;
+  float2 uv;
+};
 
 struct Skinning {
   uint4 boneIdx;
@@ -10,25 +15,25 @@ struct Skinning {
 };
 
 struct PushConst {
-  const float4x4* deforms;
-  const Skinning* skinning;
-  const VertexOut* iBuf;
-  VertexOut* oBuf;
+  column_major float4x4* deforms;
+  Skinning* skinning;
+  Vertex* iBuf;
+  Vertex* oBuf;
   uint32_t offset;
   uint32_t maxThread;
 };
 
 [[vk::push_constant]]
-uniform PushConstants pc;
+uniform PushConst pc;
 
 [shader("compute")]
-[numthreads(256,1,1)]
+[numthreads(256, 1, 1)]
 void main(uint32_t threadID : SV_DispatchThreadID) {
   uint32_t idx = threadID.x;
-  if (idx >= maxThread) return;
+  if (idx >= pc.maxThread) return;
 
   // front loading
-  VertexOut v = pc.iBuf[idx];
+  Vertex v = pc.iBuf[idx];
   Skinning skinning = pc.skinning[idx];
 
   uint4 b = pc.offset + skinning.boneIdx;

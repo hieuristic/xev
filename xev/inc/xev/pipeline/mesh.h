@@ -24,9 +24,6 @@ struct Mesh : public RenderPipeline {
   struct DrawInfo {
     uint32_t meshId;
     uint32_t materialId;
-    glm::mat4 toWorld;
-    bool isSkinned;
-    VkDeviceAddress skinnedMeshAddress;
 
     bool operator<(const DrawInfo& other) const {
       return materialId < other.materialId;

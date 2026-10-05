@@ -24,6 +24,11 @@ struct Mesh : public Resource {
     glm::vec2 uv;
   };
 
+  struct SkinningVertex {
+    glm::uvec4 boneIdx{0};
+    glm::vec4 weight{0.0f};
+  };
+
   Mesh() = default;
   Mesh(std::string name,
        glm::mat4 model_mat,
@@ -31,7 +36,8 @@ struct Mesh : public Resource {
        std::vector<glm::vec3> positions,
        std::vector<glm::vec3> normals,
        std::vector<glm::vec2> uvs,
-       std::vector<glm::uvec3> faces);
+       std::vector<glm::uvec3> faces,
+       std::vector<SkinningVertex> skinning = {});
 
   const std::string& get_name() const;
   glm::mat4 get_model_mat() const;
@@ -39,6 +45,11 @@ struct Mesh : public Resource {
   VkDeviceAddress get_vert_addr() const;
   uint32_t get_material_id() const;
   uint32_t get_face_count() const;
+  uint32_t get_vertex_count() const;
+
+  bool is_skinned() { return !m_skinning.empty(); }
+  VkDeviceAddress get_skinning_addr();
+  VkDeviceAddress get_skinned_vert_addr();
 
   uint64_t size_device() const override;
   bool on_device() const override;
@@ -57,7 +68,7 @@ struct Mesh : public Resource {
   void get_aabb(AABB& aabb) const;
   void compute_aabb();
 
-  bool has_skeleton = false;
+  int skinId{-1};
   bool isVisible{true};
 
  private:
@@ -77,6 +88,14 @@ struct Mesh : public Resource {
                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
+  Buffer m_device_skinning{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                               VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                               VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                           VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
+  Buffer m_device_skinned_vert{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
 
   // host data
   std::vector<glm::uvec3> m_faces;
@@ -84,5 +103,6 @@ struct Mesh : public Resource {
   std::vector<glm::vec3> m_normals;
   std::vector<glm::vec2> m_uvs;
   uint32_t m_mat_id;
+  std::vector<SkinningVert> m_skinning;
 };
 }  // namespace xev
