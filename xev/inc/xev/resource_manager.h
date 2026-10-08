@@ -35,6 +35,9 @@ struct ResourceManager {
   void alloc(Buffer& buf) const;
   void free(Buffer& buf) const;
 
+  void alloc(BufferArray& bufArray) const;
+  void free(BufferArray& bufArray) const;
+
   void alloc(Sampler& sampler) const;
   void free(Sampler& sampler) const;
 

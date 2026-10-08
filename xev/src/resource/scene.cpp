@@ -371,8 +371,8 @@ bool Scene::on_device() const {
 }
 
 void Scene::alloc(const ResourceManager& manager) {
-  scene_device.size = sizeof(SceneBuffer);
-  manager.alloc(scene_device);
+  bufScene.size = sizeof(SceneBuffer);
+  manager.alloc(bufScene);
 
   if (!lights.empty()) {
     lights_device.size = sizeof(LightGPU) * lights.size();
@@ -393,7 +393,7 @@ void Scene::alloc(const ResourceManager& manager) {
 }
 
 void Scene::free(const ResourceManager& manager) {
-  manager.free(scene_device);
+  manager.free(bufScene);
   manager.free(lights_device);
   manager.free(materials_device);
 
@@ -558,14 +558,14 @@ void Scene::upload_scene(const ResourceManager& manager,
 
   staging.write(&scene_buffer, size);
 
-  scene_device.size = size;
+  bufScene.size = size;
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
     const VkBufferCopy reg = {
         .srcOffset = 0,
         .dstOffset = 0,
         .size = size,
     };
-    vkCmdCopyBuffer(cmdbuf, staging.buffer, scene_device.buffer, 1, &reg);
+    vkCmdCopyBuffer(cmdbuf, staging.buffer, bufScene.buffer, 1, &reg);
   });
 
   manager.free(staging);

@@ -6,6 +6,9 @@
 
 namespace xev {
 
+/*
+ * This store the animation data
+ */
 struct Action {
   uint32_t id{0};
   float duration{0.0};

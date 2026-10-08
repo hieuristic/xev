@@ -10,21 +10,23 @@
 
 namespace xev {
 
-Renderer3D::Renderer3D(PipelineManager& manager, uint32_t numFrames)
-    : m_pipelineManager(manager) {
+Renderer3D::Renderer3D(PipelineManager& pipelineManager,
+                       ResourceManager& resourceManager,
+                       uint32_t numFrameInFlight)
+    : m_pipelineManager(pipelineManager), m_resourceManager(resourceManager) {
   m_pipeMesh.info.colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
   m_pipeMesh.info.depthFormat = VK_FORMAT_R8G8B8A8_UNORM;
   m_pipeMesh.info.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
-  XEV_INFO("At renderer3d, pipemesh vert src: {}",
-           m_pipeMesh.info.shaderVertSrc);
   m_pipelineManager.create(m_pipeMesh);
+  m_resourceManager.create(m_pipeSkinning);
 
-  m_pipelineManager.create(m_pipeSkinning);
-  XEV_INFO("Done with pipelinemesh!");
+  m_resourceManager.alloc(m_bufArrBoneTransforms);
 }
 
 Renderer3D::~Renderer3D() {
   m_pipelineManager.destroy(m_pipeMesh);
+  m_pipelineManager.destroy(m_pipeSkinning);
+  m_resourceManager.free(m_bufArrBoneTransform);
 }
 
 void Renderer3D::prepare_render(VkCommandBuffer& cmdbuf,
@@ -60,13 +62,13 @@ void Renderer3D::prepare_render(VkCommandBuffer& cmdbuf,
   vkCmdBeginRendering(cmdbuf, &render_info);
 }
 
-void Renderer3D::prepare_skinning() {
+void Renderer3D::wait_skinning() {
   // need vertex data available before skinning
   const VkMemoryBarrier2 barrier = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-      .srcStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+      .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
       .srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-      .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
       .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
   };
   const VkDependencyInfo info = {
@@ -74,64 +76,82 @@ void Renderer3D::prepare_skinning() {
       .memoryBarrierCount = 1,
       .pMemoryBarriers = &barrier,
   };
-  vkCmdPipelineBarrier2(cmd, &info);
+  vkCmdPipelineBarrier2(cmdbuf, &info);
 }
 
-void Renderer3D::draw(VkCommandBuffer cmdbuf,
+void Renderer3D::draw(const VkCommandBuffer cmdbuf,
                       const Image& colorImage,
                       const Image& depthImage,
                       const GlobalDescriptorSet& desc_set,
                       const Scene& scene,
                       const Camera& camera,
-                      Color4<float> clearColor,
-                      const Buffer& skeletonBuffer) {
+                      const Color4<float>& clearColor,
+                      const uint32_t currFrameIdx = 0) {
   XEV_ASSERT(scene.on_device() && colorImage.on_device() &&
              depthImage.on_device());
 
   m_meshInfos.clear();
   m_skinningInfos.clear();
 
+  bool isAnimated = m_numBones[currFrameIdx] == 0;
+
   for (uint32_t i = 0; i < scene.meshes.size(); ++i) {
     const auto& mesh = scene.meshes[i];
     if (!mesh.isVisible) continue;
     if (!camera.can_see(mesh)) continue;
 
-    pipe::Mesh::DrawInfo m_meshInfo{
+    m_meshInfos.push_back({
         .meshId = static_cast<uint32_t>(i),
         .materialId = mesh.get_material_id(),
-    };
-    m_meshInfos.push_back(m_meshInfo);
+    });
 
-    if (!mesh.has_skinned) continue;
+    if (isAnimated || !mesh.is_skinned) continue;
 
-    pipe::Skinning::DispatchInfo m_skinningInfo{
-        ,
-    };
+    m_skinningInfos.push_back({
+        .boneTransform = m_bufArrBoneTransform.get_addr(currFrameIdx),
+        .palette = mesh.get_palette_addr(),
+        .iBuf = mesh.get_vert_addr(),
+        .oBuf = mesh.get_skinned_vert_addr(currFrameIdx),
+        .offset = 0,
+        .count = mesh.get_vertex_count(),
+    });
     m_pipeSkinning.dispatch(cmbuf, mesh,
   }
 
-  // question, does the mesh store the index to the "skinned buffer"?
-
-  prepare_skinning(cmdbuf);
-  dispatch_skinning();
+  if (!m_skinningInfos) {
+    dispatch_skinning(cmdbuf);
+    wait_skinning(cmdbuf);
+  }
 
   desc_set.bind(cmdbuf, m_pipeMesh.layout);
   prepare_attachments(cmdbuf, colorImage, depthImage);
   prepare_render(cmdbuf, colorImage, depthImage, clearColor);
-  draw_mesh(cmdbuf, scene, camera, colorImage.width, colorImage.height);
+  draw_mesh(cmdbuf, scene, camera, colorImage.width, colorImage.height,
+            currFrameIdx, isAnimated);
 
   prepare_transfer(cmdbuf, colorImage);
 }
 
+void Renderer3D::upload_skinning(uint32_t currFrameIdx,
+                                 std::span<const glm::mat4> data) {
+  // URGENT TODO This function is incomplete without proper syncing
+  // this it update regularly, direct upload can cause performance issue
+  XEV_ASSERT(currFrameIdx < m_skinningBuffers.size());
+  XEV_ASSERT(data.size() <= MAX_BONES);
+  m_skinningBuffers[currFrameIdx].write(data.data(), data.size_bytes());
+  m_numBones[currFrameIdx] = static_cast<uint32_t>(data.size());
+}
+
 void Renderer3D::dispatch_skinning(VkCommandBuffer cmdbuf) {
-  m_pipeSkinning.dispatch(info);
+  m_pipeSkinning.dispatch(cmdbuf, m_skinningInfos);
 }
 
 void Renderer3D::draw_mesh(VkCommandBuffer cmdbuf,
                            const Scene& scene,
                            const Camera& camera,
-                           uint32_t width,
-                           uint32_t height) {
+                           const uint32_t width,
+                           const uint32_t height,
+                           const bool isAnimated) {
   m_pipeMesh.draw(cmdbuf, scene, camera, m_meshInfos, width, height);
   vkCmdEndRendering(cmdbuf);
 }

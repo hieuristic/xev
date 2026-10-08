@@ -6,8 +6,8 @@ namespace xev::pipe {
 
 struct Skinning : ComputePipeline {
   struct PushConst {
-    VkDeviceAddress deforms;
-    VkDeviceAddress skinning;
+    VkDeviceAddress boneTransforms;
+    VkDeviceAddress palettes;
     VkDeviceAddress iBuf;
     VkDeviceAddress oBuf;
     uint32_t offset;
@@ -15,8 +15,8 @@ struct Skinning : ComputePipeline {
   };
 
   struct DispatchInfo {
-    VkDeviceAddress deforms{0};
-    VkDeviceAddress skinning{0};
+    VkDeviceAddress boneTransforms{0};
+    VkDeviceAddress palettes{0};
     VkDeviceAddress iBuf{0};
     VkDeviceAddress oBuf{0};
     uint32_t offset{0};

@@ -1,5 +1,4 @@
 #pragma once
-#include <SDL3/SDL.h>
 #include <xev/resource/resource.h>
 #include <xev/vma.h>
 
@@ -22,12 +21,12 @@ struct Buffer : Resource {
   VmaMemoryUsage usage{VMA_MEMORY_USAGE_AUTO};
   uint64_t size{0};
 
+  void set_size(uint64_t size_) { size = size_; }
+
   uint64_t size_device() const override { return size; }
   bool on_device() const override { return buffer != VK_NULL_HANDLE; }
 
   void write(const void* src, uint64_t size, uint64_t offset = 0);
-  void set_ptr(uint64_t new_ptr);
-  void clear();
 };
 
 }  // namespace xev

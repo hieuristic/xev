@@ -44,7 +44,9 @@ Game::Game() : m_running(true) {
   m_engine->init_pipeline_manager();
   m_engine->init_frame_context();
 
-  m_renderer3D = std::make_unique<xev::Renderer3D>(*m_engine->pipelineManager);
+  m_renderer3D = std::make_unique<xev::Renderer3D>(
+      *m_engine->pipelineManager, *m_engine->resourceManager,
+      m_engine->frameContext->get_num_frames());
   m_renderer2D = std::make_unique<xev::Renderer2D>(
       *m_engine->pipelineManager, *m_engine->resourceManager,
       m_engine->frameContext->get_num_frames());
@@ -135,7 +137,8 @@ void Game::render(std::atomic<bool>& sceneReady) {
         if (m_scene && m_scene->on_device()) {
           m_renderer3D->draw(cmdbuf, output_color, output_depth,
                              *m_engine->globalDescriptorSet, *m_scene,
-                             m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f});
+                             m_scene->active_cam, {0.1f, 0.1f, 0.1f, 1.0f},
+                             m_engine->frameContext->get_current_index());
         }
         m_gui->draw_gameplay();
         break;

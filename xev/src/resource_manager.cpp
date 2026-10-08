@@ -76,6 +76,39 @@ void ResourceManager::free(Buffer& buf) const {
   vmaDestroyBuffer(m_allocator, buf.buffer, buf.alloc);
 }
 
+void ResourceManager::alloc(BufferArray& bufArray) const {
+  XEV_ASSERT(bufArray.slotSize != 0,
+             "Trying to allocate an empty buffer array.");
+
+  VkBufferCreateInfo buffer_info = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .size = bufArray.stride * bufArray.numSlot,
+      .usage = bufArray.flags,
+  };
+
+  VmaAllocationCreateInfo create_info = {
+      .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
+               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+      .usage = bufArray.usage,
+  };
+
+  VkResult res_ = vmaCreateBuffer(m_allocator, &buffer_info, &create_info,
+                                  &bufArray.buffer, &bufArray.alloc, &bufArray.alloc_info);
+
+  XEV_ASSERT_VK(res_, "Failed to create buffer");
+
+  if (bufArray.flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+    VkBufferDeviceAddressInfo info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        .buffer = bufArray.buffer};
+    bufArray.addr = vkGetBufferDeviceAddress(m_device, &info);
+  }
+}
+
+void ResourceManager::free(BufferArray& bufArray) const {
+  vmaDestroyBuffer(m_allocator, buf.buffer, buf.alloc);
+}
+
 void ResourceManager::upload(const HotExec& hotExec,
                              const std::vector<Buffer>& dsts,
                              const std::vector<void*>& srcs,

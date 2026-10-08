@@ -9,7 +9,9 @@
 
 #include <xev/animation/action.h>
 #include <xev/animation/puppet.h>
+#include <xev/animation/skeleton.h>
 #include <xev/camera.h>
+#include <xev/frame_buffer.h>
 #include <xev/gameplay/funcpoint.h>
 #include <xev/global_descriptor_set.h>
 #include <xev/resource/image.h>
@@ -60,21 +62,25 @@ struct Scene : public Resource {
 
   std::vector<Puppet> puppets;
   std::vector<Action> actions;
+  std::vector<Skeleton> skeletons;
 #ifdef XEVDEBUG
   std::unordererd_map<uint32_t, std::string> debugNames;
 #endif
 
   std::vector<Camera> cameras;
 
-  Buffer scene_device{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+  Buffer bufScene{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+  Buffer bufLights{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                   VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+  Buffer bufMaterials{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                       VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
-  Buffer lights_device{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                       VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
-  Buffer materials_device{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+  BufferArray bufArrSkeletons{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                              VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
 
   void upload(const ResourceManager& manager, const HotExec& hot_exec);
   void upload_meshes(const ResourceManager& manager, const HotExec& hot_exec);

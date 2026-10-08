@@ -9,14 +9,14 @@ struct Vertex {
   float2 uv;
 };
 
-struct Skinning {
+struct Palette {
   uint4 boneIdx;
   float4 weight;
 };
 
 struct PushConst {
-  column_major float4x4* deforms;
-  Skinning* skinning;
+  column_major float4x4* boneTransforms;
+  Palette* palettes;
   Vertex* iBuf;
   Vertex* oBuf;
   uint32_t offset;
@@ -34,21 +34,21 @@ void main(uint32_t threadID : SV_DispatchThreadID) {
 
   // front loading
   Vertex v = pc.iBuf[idx];
-  Skinning skinning = pc.skinning[idx];
+  Palette palette = pc.palettes[idx];
 
-  uint4 b = pc.offset + skinning.boneIdx;
-  float4 w = skinning.weight;
+  uint4 b = pc.offset + palette.boneIdx;
+  float4 w = palette.weight;
 
   // LBS
-  float4x4 blendedDeform4 = w.x * pc.deforms[b.x] +
-                            w.y * pc.deforms[b.y] +
-                            w.z * pc.deforms[b.z] +
-                            w.w * pc.deforms[b.w];
-  // float3x3 blendedDeform3 = float3x3(blendedDeform4);
+  float4x4 deformMat4 = w.x * pc.boneTransforms[b.x] +
+                        w.y * pc.boneTransforms[b.y] +
+                        w.z * pc.boneTransforms[b.z] +
+                        w.w * pc.boneTransforms[b.w];
+  // float3x3 deformMat3 = float3x3(deformMat4);
 
-  v.position = mul(blendedDeform4, float4(v.position, 1.0f)).xyz;
-  v.normal = normalize(mul((float3x3)blendedDeform4, v.normal));
-  // v.tangent.xyz = blendedDeform3 * v.tangent.xyz;
+  v.position = mul(deformMat4, float4(v.position, 1.0f)).xyz;
+  v.normal = normalize(mul((float3x3)deformMat4, v.normal));
+  // v.tangent.xyz = deformMat3 * v.tangent.xyz;
 
   pc.oBuf[idx] = v;
 }

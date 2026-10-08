@@ -2,6 +2,7 @@
 #include <xev/logger.h>
 #include <xev/resource/mesh.h>
 #include <xev/resource_manager.h>
+#include <xev/frame_context.h>
 
 namespace xev {
 
@@ -12,7 +13,7 @@ Mesh::Mesh(std::string name,
            std::vector<glm::vec3> normals,
            std::vector<glm::vec2> uvs,
            std::vector<glm::uvec3> faces,
-           std::vector<SkinningVertex> skinning)
+           std::vector<VertexPalette> skinning)
     : m_name(std::move(name)),
       m_model_mat(model_mat),
       m_mat_id(mat_id),
@@ -40,19 +41,20 @@ uint32_t Mesh::get_face_count() const {
 }
 
 uint32_t Mesh::get_vertex_count() const {
-  return static_cast<uint32_t>(m_vertex.size());
+  return static_cast<uint32_t>(m_positions.size());
 }
 
 VkDeviceAddress Mesh::get_vert_addr() const {
-  return m_device_vert.addr;
+  return m_bufVert.addr;
 }
 
-VkDeviceAddress Mesh::get_skinning_addr() const {
-  return m_device_vert.addr;
+VkDeviceAddress Mesh::get_palette_addr() const {
+  return m_bufPalette.addr;
 }
 
-VkDeviceAddress Mesh::get_skinned_vert_addr() const {
-  return m_device_vert.addr;
+VkDeviceAddress Mesh::get_skinned_vert_addr(uint32_t frameIdx) const {
+  XEV_ASSERT(frameIdx < FrameContext::MAX_IN_FLIGHT);
+  return m_bufArrSkinnedVert.get_addr(frameIdx);
 }
 
 void Mesh::alloc(const ResourceManager& manager) {
@@ -67,21 +69,21 @@ void Mesh::alloc(const ResourceManager& manager) {
   }
 
   // face (index) buffer
-  m_device_face.size = sizeof(glm::uvec3) * m_faces.size();
-  manager.alloc(m_device_face);
+  m_bufFace.set_size(sizeof(glm::uvec3) * m_faces.size());
+  manager.alloc(m_bufFace);
 
   // vertex buffer
-  m_device_vert.size = m_positions.size() * sizeof(Vertex);
-  manager.alloc(m_device_vert);
+  m_bufVert.set_size(m_positions.size() * sizeof(Vertex));
+  manager.alloc(m_bufVert);
 
   if (is_skinned()) {
     // skinning buffer
-    m_device_skinning.size = m_skinning.size() * sizeof(SkinningVert);
-    manager.alloc(m_device_skinning);
+    m_bufPalette.set_size(m_skinning.size() * sizeof(VertexPalette));
+    manager.alloc(m_bufPalette);
 
     // skinned vert buffer
-    m_device_skinned_vert.size = m_positions.size() * sizeof(Vertex);
-    mananger.alloc(m_device_skinned_vert);
+    m_bufArraySkinnedVert.set_size(m_positions.size() * sizeof(Vertex));
+    mananger.alloc(m_bufArraySkinnedVert);
   }
 
   m_on_device = true;
@@ -90,11 +92,10 @@ void Mesh::alloc(const ResourceManager& manager) {
 }
 
 void Mesh::upload(const ResourceManager& manager, const HotExec& hot_exec) {
-  XEV_ASSERT(m_device_face.on_device() && m_device_vert.on_device());
+  XEV_ASSERT(m_bufFace.on_device() && m_bufVert.on_device());
 
-  Arena staging{
-      m_device_face.size + m_device_vert.size + m_device_skinning.size,
-      VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
+  Arena staging{m_bufFace.size + m_bufVert.size + m_bufPalette.size,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
 
   std::vector<Vertex> vert_data(m_positions.size(), Vertex{});
@@ -104,36 +105,36 @@ void Mesh::upload(const ResourceManager& manager, const HotExec& hot_exec) {
     vert_data[i].uv = m_uvs[i];
   }
 
-  staging.write(m_faces.data(), m_device_face.size);
-  staging.write(vert_data.data(), m_device_vert.size);
-  if (is_skinned()) staging.write(m_skinning.data(), m_device_skinning.size);
+  staging.write(m_faces.data(), m_bufFace.size);
+  staging.write(vert_data.data(), m_bufVert.size);
+  if (is_skinned()) staging.write(m_skinning.data(), m_bufPalette.size);
 
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
     const VkBufferCopy face_reg = {
         .srcOffset = 0,
         .dstOffset = 0,
-        .size = m_device_face.size,
+        .size = m_bufFace.size,
     };
     const VkBufferCopy vert_reg = {
-        .srcOffset = m_device_face.size,
+        .srcOffset = m_bufFace.size,
         .dstOffset = 0,
-        .size = m_device_vert.size,
+        .size = m_bufVert.size,
     };
 
-    vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer, m_device_face.buffer, 1,
+    vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer, m_bufFace.buffer, 1,
                     &face_reg);
-    vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer, m_device_vert.buffer, 1,
+    vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer, m_bufVert.buffer, 1,
                     &vert_reg);
     if (is_skinned()) {
       const VkBufferCopy skin_reg = {
-          .srcOffset = m_device_face.size + m_device_vert.size,
+          .srcOffset = m_bufFace.size + m_bufVert.size,
           .dstOffset = 0,
           .size = skin_size,
       };
-      vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer, m_device_skinning.buffer,
-                      1, &skin_reg);
+      vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer, m_bufPalette.buffer, 1,
+                      &skin_reg);
       vkCmdCopyBuffer(cmdbuf, staging.buffer.buffer,
-                      m_device_skinned_vert.buffer, 1, &vert_reg);
+                      m_bufArraySkinnedVert.buffer, 1, &vert_reg);
     }
   });
 
@@ -141,8 +142,8 @@ void Mesh::upload(const ResourceManager& manager, const HotExec& hot_exec) {
 }
 
 void Mesh::bind(const VkCommandBuffer& cmdbuf, VkDeviceAddress& addr) const {
-  vkCmdBindIndexBuffer(cmdbuf, m_device_face.buffer, 0, VK_INDEX_TYPE_UINT32);
-  addr = m_device_vert.addr;
+  vkCmdBindIndexBuffer(cmdbuf, m_bufFace.buffer, 0, VK_INDEX_TYPE_UINT32);
+  addr = m_bufVert.addr;
 }
 
 bool Mesh::on_device() const {
@@ -150,20 +151,19 @@ bool Mesh::on_device() const {
 }
 
 void Mesh::free(const ResourceManager& manager) {
-  manager.free(m_device_face);
-  manager.free(m_device_vert);
+  manager.free(m_bufFace);
+  manager.free(m_bufVert);
   if (is_skinned()) {
-    manager.free(m_device_skinning);
-    manager.free(m_device_skinned_vert);
+    manager.free(m_bufPalette);
+    manager.free(m_bufArraySkinnedVert);
   }
   m_on_device = false;
 }
 
 uint64_t Mesh::size_device() const {
-  uint32_t size = m_device_vert.size_device() + m_device_face.size_device();
+  uint32_t size = m_bufVert.size_device() + m_bufFace.size_device();
   if (is_skinned()) {
-    size +=
-        m_device_skinning.size_device() + m_device_skinned_vert.size_device();
+    size += m_bufPalette.size_device() + m_bufArraySkinnedVert.size_device();
   }
   return size;
 };
