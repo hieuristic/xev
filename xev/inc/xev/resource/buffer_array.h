@@ -45,7 +45,10 @@ struct BufferArray : Resource {
   uint64_t size_device() const override { return size; }
   bool on_device() const override { return buffer != VK_NULL_HANDLE; }
 
-  void write(const void* src, uint64_t size, uint64_t offset = 0);
+  void write(const uint32_t idx,
+             const void* data,
+             const uint64_t size,
+             const uint64_t offset);
 };
 
 }  // namespace xev

@@ -8,10 +8,11 @@ void pipe::Skinning::dispatch(VkCommandBuffer cmdbuf,
 
   for (const auto& d : infos) {
     PushConst pc = {
-        .deforms = d.deforms,
-        .skinning = d.skinning,
-        .iBuf = d.iBuf,
-        .oBuf = d.oBuf,
+        .boneTransforms = d.boneTransforms,
+        .boneIdices = d.boneIdices,
+        .boneWeights = d.boneWeights,
+        .iVertBuf = d.iVertBuf,
+        .oVertBuf = d.oVertBuf,
         .offset = d.offset,
         .maxThread = d.count,
     };

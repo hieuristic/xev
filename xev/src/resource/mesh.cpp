@@ -1,8 +1,8 @@
+#include <xev/frame_context.h>
 #include <xev/hot_exec.h>
 #include <xev/logger.h>
 #include <xev/resource/mesh.h>
 #include <xev/resource_manager.h>
-#include <xev/frame_context.h>
 
 namespace xev {
 
@@ -13,7 +13,8 @@ Mesh::Mesh(std::string name,
            std::vector<glm::vec3> normals,
            std::vector<glm::vec2> uvs,
            std::vector<glm::uvec3> faces,
-           std::vector<VertexPalette> skinning)
+           std::vector<glm::uvec4> boneIndices,
+           std::vector<glm::uvec4> boneWeights, )
     : m_name(std::move(name)),
       m_model_mat(model_mat),
       m_mat_id(mat_id),
@@ -21,7 +22,8 @@ Mesh::Mesh(std::string name,
       m_normals(std::move(normals)),
       m_uvs(std::move(uvs)),
       m_faces(std::move(faces)),
-      m_skinning(std::move(skinning)),
+      m_boneIndices(std::move(boneIndices)),
+      m_boneWeights(std::move(boneWeights)),
 {}
 
 const std::string& Mesh::get_name() const {
@@ -48,8 +50,12 @@ VkDeviceAddress Mesh::get_vert_addr() const {
   return m_bufVert.addr;
 }
 
-VkDeviceAddress Mesh::get_palette_addr() const {
-  return m_bufPalette.addr;
+VkDeviceAddress Mesh::get_bone_indices_addr() const {
+  return m_bufBoneIndices.addr;
+}
+
+VkDeviceAddress Mesh::get_bone_weights_addr() const {
+  return m_bufBoneWeights.addr;
 }
 
 VkDeviceAddress Mesh::get_skinned_vert_addr(uint32_t frameIdx) const {
@@ -77,9 +83,11 @@ void Mesh::alloc(const ResourceManager& manager) {
   manager.alloc(m_bufVert);
 
   if (is_skinned()) {
-    // skinning buffer
-    m_bufPalette.set_size(m_skinning.size() * sizeof(VertexPalette));
-    manager.alloc(m_bufPalette);
+    // palette
+    m_bufBoneIndices.set_size(m_boneIndices.size() * sizeof(glm::uvec4));
+    manager.alloc(m_bufBoneIndices);
+    m_bufBoneWeights.set_size(m_boneWeights.size() * sizeof(glm::vec4));
+    manager.alloc(m_boneWeights);
 
     // skinned vert buffer
     m_bufArraySkinnedVert.set_size(m_positions.size() * sizeof(Vertex));
@@ -94,7 +102,8 @@ void Mesh::alloc(const ResourceManager& manager) {
 void Mesh::upload(const ResourceManager& manager, const HotExec& hot_exec) {
   XEV_ASSERT(m_bufFace.on_device() && m_bufVert.on_device());
 
-  Arena staging{m_bufFace.size + m_bufVert.size + m_bufPalette.size,
+  Arena staging{m_bufFace.size + m_bufVert.size + m_bufBoneIndices.size +
+                    m_bufBoneWeights.size,
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO};
   manager.alloc(staging);
 
@@ -107,7 +116,11 @@ void Mesh::upload(const ResourceManager& manager, const HotExec& hot_exec) {
 
   staging.write(m_faces.data(), m_bufFace.size);
   staging.write(vert_data.data(), m_bufVert.size);
-  if (is_skinned()) staging.write(m_skinning.data(), m_bufPalette.size);
+
+  if (is_skinned()) {
+    staging.write(m_boneIndices.data(), m_bufBoneIndices.size);
+    staging.write(m_boneWeights.data(), m_bufBoneWeights.size);
+  }
 
   hot_exec.run([&](const VkCommandBuffer cmdbuf) {
     const VkBufferCopy face_reg = {

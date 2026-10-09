@@ -8,8 +8,6 @@ namespace xev {
 
 struct Sim3;
 
-inline constexpr k_NOPARENT = 0xFFFF;
-
 void forward_kinematics(std::span<const Sim3> localTransform,
                         std::span<const uint16_t> parents,
                         std::span<const glm::mat4> invBindMat,

@@ -9,6 +9,8 @@ void forward_kinematics(std::span<const Sim3> localTransforms,
                         std::span<const glm::mat4> invBindMats,
                         std::span<glm::mat4> modelTransform,
                         std::span<glm::mat4> skinning) {
+  inline constexpr uint16_t NO_PARENT = 0xFFFF;
+
   const size_t numBones = localTransforms.size();
   XEV_ASSERT(modelTransform.size() >= numBones);
   XEV_ASSERT(skinning.size() >= numBones);
@@ -18,7 +20,7 @@ void forward_kinematics(std::span<const Sim3> localTransforms,
     const uint16_t pi = parents[i];
 
     modelTransform[i] =
-        (pi = k_NOPARENT) ? localMat : modelTransform[pi] * localMat;
+        (pi = NO_PARENT) ? localMat : modelTransform[pi] * localMat;
 
     skinning[i] = modelTransform[i] * invBindMats[i];
   }

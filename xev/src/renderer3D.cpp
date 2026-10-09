@@ -18,15 +18,14 @@ Renderer3D::Renderer3D(PipelineManager& pipelineManager,
   m_pipeMesh.info.depthFormat = VK_FORMAT_R8G8B8A8_UNORM;
   m_pipeMesh.info.multisampleCount = VK_SAMPLE_COUNT_1_BIT;
   m_pipelineManager.create(m_pipeMesh);
-  m_resourceManager.create(m_pipeSkinning);
-
+  m_pipelineManager.create(m_pipeSkinning);
   m_resourceManager.alloc(m_bufArrBoneTransforms);
 }
 
 Renderer3D::~Renderer3D() {
   m_pipelineManager.destroy(m_pipeMesh);
   m_pipelineManager.destroy(m_pipeSkinning);
-  m_resourceManager.free(m_bufArrBoneTransform);
+  m_resourceManager.free(m_bufArrBoneTransforms);
 }
 
 void Renderer3D::prepare_render(VkCommandBuffer& cmdbuf,
@@ -67,9 +66,9 @@ void Renderer3D::wait_skinning() {
   const VkMemoryBarrier2 barrier = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
       .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-      .srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+      .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
       .dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
-      .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+      .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
   };
   const VkDependencyInfo info = {
       .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -108,14 +107,14 @@ void Renderer3D::draw(const VkCommandBuffer cmdbuf,
     if (isAnimated || !mesh.is_skinned) continue;
 
     m_skinningInfos.push_back({
-        .boneTransform = m_bufArrBoneTransform.get_addr(currFrameIdx),
-        .palette = mesh.get_palette_addr(),
+        .boneTransform = m_bufArrBoneTransforms.get_addr(currFrameIdx),
+        .boneIndices = mesh.get_bone_indices_addr(),
+        .boneWeights = mesh.get_bone_weights_addr(),
         .iBuf = mesh.get_vert_addr(),
         .oBuf = mesh.get_skinned_vert_addr(currFrameIdx),
         .offset = 0,
         .count = mesh.get_vertex_count(),
     });
-    m_pipeSkinning.dispatch(cmbuf, mesh,
   }
 
   if (!m_skinningInfos) {
@@ -133,12 +132,13 @@ void Renderer3D::draw(const VkCommandBuffer cmdbuf,
 }
 
 void Renderer3D::upload_skinning(uint32_t currFrameIdx,
-                                 std::span<const glm::mat4> data) {
+                                 std::span<const glm::mat4> transforms) {
   // URGENT TODO This function is incomplete without proper syncing
   // this it update regularly, direct upload can cause performance issue
-  XEV_ASSERT(currFrameIdx < m_skinningBuffers.size());
+  XEV_ASSERT(currFrameIdx < m_bufArrBoneTransforms.size());
   XEV_ASSERT(data.size() <= MAX_BONES);
-  m_skinningBuffers[currFrameIdx].write(data.data(), data.size_bytes());
+  m_bufArrBoneTransforms[currFrameIdx].write(transforms.data(),
+                                             transforms.size_bytes());
   m_numBones[currFrameIdx] = static_cast<uint32_t>(data.size());
 }
 

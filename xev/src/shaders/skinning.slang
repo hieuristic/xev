@@ -16,9 +16,10 @@ struct Palette {
 
 struct PushConst {
   column_major float4x4* boneTransforms;
-  Palette* palettes;
-  Vertex* iBuf;
-  Vertex* oBuf;
+  uint4* boneIndices;
+  float4* boneWeights;
+  Vertex* iVertBuf;
+  Vertex* oVertBuf;
   uint32_t offset;
   uint32_t maxThread;
 };
@@ -33,7 +34,7 @@ void main(uint32_t threadID : SV_DispatchThreadID) {
   if (idx >= pc.maxThread) return;
 
   // front loading
-  Vertex v = pc.iBuf[idx];
+  Vertex v = pc.iVertBuf[idx];
   Palette palette = pc.palettes[idx];
 
   uint4 b = pc.offset + palette.boneIdx;
@@ -50,5 +51,5 @@ void main(uint32_t threadID : SV_DispatchThreadID) {
   v.normal = normalize(mul((float3x3)deformMat4, v.normal));
   // v.tangent.xyz = deformMat3 * v.tangent.xyz;
 
-  pc.oBuf[idx] = v;
+  pc.oVertBuf[idx] = v;
 }

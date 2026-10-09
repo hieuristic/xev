@@ -151,10 +151,59 @@ void Scene::parse_mesh(std::vector<Mesh>& meshes,
       }
     }
 
-    meshes.push_back(Mesh(name, model_mat, mat_id, std::move(positions),
-                          std::move(normals), std::move(uvs),
-                          std::move(faces)));
+    {  // palette
+      std::vector<glm::uvec4> boneIndices;
+      std::vector<glm::vec4> boneWeights;
+
+      auto boneIt = pri.attributes.find("JOINTS_0");
+      auto weightIt = pri.attributes.find("WEIGHTS_0");
+      if (boneIt != pri.attributes.end() && weightIt != pri.attributes.end()) {
+        const auto& b_acc = model.accessors[boneIt->second];
+        const auto& b_bv = model.bufferViews[b_acc.bufferView];
+        const auto* b_data = model.buffers[b_bv.buffer].data.data() +
+                             b_bv.byteOffset + b_acc.byteOffset;
+        const int b_stride = b_acc.ByteStride(b_bv);
+
+        const auto& w_acc = model.accessors[weightIt->second];
+        const auto& w_bv = model.bufferViews[w_acc.bufferView];
+        const auto* w_data = model.buffers[w_bv.buffer].data.data() +
+                             w_bv.byteOffset + w_acc.byteOffset;
+        const int w_stride = w_acc.ByteStride(w_bv);
+
+        for (size_t i = 0; i < positions.size(); ++i) {
+          const auto* b_ptr = b_data + i * b_stride;
+          if (b_acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+            boneIndices[i] = {b_ptr[0], b_ptr[1], b_ptr[2], b_ptr[3]};
+          } else if (b_acc.componentType ==
+                     TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+            const auto* s = reinterpret_cast<const uint16_t*>(b_ptr);
+            boneIndices[i] = {s[0], s[1], s[2], s[3]};
+          }
+
+          const auto* w_ptr = w_data + i * w_stride;
+          if (w_acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+            boneWeights[i] = *reinterpret_cast<const glm::vec4*>(w_ptr);
+          } else if (w_acc.componentType ==
+                     TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+            boneWeights[i] =
+                glm::vec4(w_ptr[0], w_ptr[1], w_ptr[2], w_ptr[3]) / 255.0f;
+          } else if (w_acc.componentType ==
+                     TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+            const auto* s = reinterpret_cast<const uint16_t*>(w_ptr);
+            boneWeights[i] = glm::vec4(s[0], s[1], s[2], s[3]) / 65535.0f;
+          }
+
+          float sum = boneWeights[i].x + boneWeights[i].y + boneWeights[i].z +
+                      boneWeights[i].w;
+          if (sum > 1e-6f) boneWeights[i] /= sum;
+        }
+      }
+    }
   }
+
+  meshes.push_back(Mesh(name, model_mat, mat_id, std::move(positions),
+                        std::move(normals), std::move(uvs), std::move(faces)));
+}
 }
 
 void Scene::load_gltf(const FileSystem& fileSys,

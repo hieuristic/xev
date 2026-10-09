@@ -24,11 +24,6 @@ struct Mesh : public Resource {
     glm::vec2 uv;
   };
 
-  struct VertexPalette {
-    glm::uvec4 boneIdx{0};
-    glm::vec4 weight{0.0f};
-  };
-
   Mesh() = default;
   Mesh(std::string name,
        glm::mat4 model_mat,
@@ -37,7 +32,7 @@ struct Mesh : public Resource {
        std::vector<glm::vec3> normals,
        std::vector<glm::vec2> uvs,
        std::vector<glm::uvec3> faces,
-       std::vector<SkinningVertex> skinning = {});
+       std::vector<VertexPalette> palette = {});
 
   const std::string& get_name() const;
   glm::mat4 get_model_mat() const;
@@ -48,7 +43,8 @@ struct Mesh : public Resource {
   uint32_t get_vertex_count() const;
 
   bool is_skinned() const { return !m_skinning.empty(); }
-  VkDeviceAddress get_skinning_addr() const;
+  VkDeviceAddress get_bone_indices_addr() const;
+  VkDeviceAddress get_bone_weights_addr() const;
   VkDeviceAddress get_skinned_vert_addr(uint32_t frameIdx = 0) const;
 
   uint64_t size_device() const override;
@@ -92,10 +88,14 @@ struct Mesh : public Resource {
                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
 
   // on device bone idx and weight vertex data
-  Buffer m_bufPalette{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                      VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
+  Buffer m_bufBoneWeights{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                              VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                          VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
+  Buffer m_bufBoneIndices{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                              VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                          VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
 
   // on device output vertex data from skinning compute
   BufferArray m_bufArrSkinnedVert{FrameContext::MAX_IN_FLIGHT,
@@ -110,6 +110,9 @@ struct Mesh : public Resource {
   std::vector<glm::vec3> m_normals;
   std::vector<glm::vec2> m_uvs;
   uint32_t m_mat_id;
-  std::vector<VertexPalette> m_skinning;
+
+  std::vector<glm::uvec4> m_boneIdices;
+  std::vector<glm::vec4> m_boneWeights;
 };
+
 }  // namespace xev
